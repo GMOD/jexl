@@ -3,12 +3,13 @@
  * Copyright 2020 Tom Shawver
  */
 
-const Jexl = require('lib/Jexl')
+import { vi, describe, beforeEach, it, expect } from 'vitest'
+import { Jexl } from '../../src/Jexl'
 let inst
 
 describe('Expression', () => {
   beforeEach(() => {
-    inst = new Jexl.Jexl()
+    inst = new Jexl()
   })
   describe('compile', () => {
     it('returns the parent instance', () => {
@@ -23,7 +24,7 @@ describe('Expression', () => {
     })
     it('compiles more than once if requested', () => {
       const expr = inst.createExpression('2*2')
-      const spy = jest.spyOn(expr, 'compile')
+      const spy = vi.spyOn(expr, 'compile')
       expr.compile()
       expr.compile()
       expect(spy).toHaveBeenCalledTimes(2)
@@ -44,7 +45,7 @@ describe('Expression', () => {
     })
     it('never compiles more than once', async () => {
       const expr = inst.createExpression('2*2')
-      const spy = jest.spyOn(expr, 'compile')
+      const spy = vi.spyOn(expr, 'compile')
       await expr.eval()
       await expr.eval()
       expect(spy).toHaveBeenCalledTimes(1)
@@ -65,7 +66,7 @@ describe('Expression', () => {
     })
     it('never compiles more than once', () => {
       const expr = inst.createExpression('2*2')
-      const spy = jest.spyOn(expr, 'compile')
+      const spy = vi.spyOn(expr, 'compile')
       expr.evalSync()
       expr.evalSync()
       expect(spy).toHaveBeenCalledTimes(1)

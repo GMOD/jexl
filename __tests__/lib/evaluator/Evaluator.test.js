@@ -3,11 +3,13 @@
  * Copyright 2020 Tom Shawver
  */
 
-const Lexer = require('lib/Lexer')
-const Parser = require('lib/parser/Parser')
-const Evaluator = require('lib/evaluator/Evaluator')
-const grammar = require('lib/grammar').getGrammar()
-const PromiseSync = require('lib/PromiseSync')
+import { describe, it, expect } from 'vitest'
+import Lexer from '../../../src/Lexer'
+import Parser from '../../../src/parser/Parser'
+import Evaluator from '../../../src/evaluator/Evaluator'
+import { getGrammar } from '../../../src/grammar'
+import PromiseSync from '../../../src/PromiseSync'
+const grammar = getGrammar()
 
 const lexer = new Lexer(grammar)
 

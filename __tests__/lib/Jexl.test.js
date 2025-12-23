@@ -3,13 +3,14 @@
  * Copyright 2020 Tom Shawver
  */
 
-const Jexl = require('lib/Jexl')
-const Expression = require('lib/Expression')
+import { describe, beforeEach, it, expect } from 'vitest'
+import { Jexl } from '../../src/Jexl'
+import Expression from '../../src/Expression'
 let inst
 
 describe('Jexl', () => {
   beforeEach(() => {
-    inst = new Jexl.Jexl()
+    inst = new Jexl()
   })
   describe('compile', () => {
     it('returns an instance of Expression', () => {

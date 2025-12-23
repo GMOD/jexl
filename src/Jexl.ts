@@ -29,6 +29,7 @@ class Jexl {
 
   constructor() {
     this._grammar = getGrammar()
+    this.expr = this.expr.bind(this)
   }
 
   /**

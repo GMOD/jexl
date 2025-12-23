@@ -3,9 +3,12 @@
  * Copyright 2020 Tom Shawver
  */
 
-const Lexer = require('lib/Lexer')
-const Parser = require('lib/parser/Parser')
-const grammar = require('lib/grammar').getGrammar()
+import { describe, beforeEach, it, expect } from 'vitest'
+import Lexer from '../../../src/Lexer'
+import Parser from '../../../src/parser/Parser'
+import { getGrammar } from '../../../src/grammar'
+
+const grammar = getGrammar()
 
 let inst
 const lexer = new Lexer(grammar)
