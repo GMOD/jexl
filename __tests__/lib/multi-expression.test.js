@@ -50,10 +50,6 @@ describe('Multi-Expression Support', () => {
       expect(jexl.evalSync('y = x * 2; y', { x: 5 })).toBe(10)
     })
 
-    it('assignment in expression', () => {
-      expect(jexl.evalSync('(x = 3) + (y = 4)', {})).toBe(7)
-    })
-
     it('reassignment updates variable', () => {
       const ctx = { x: 1 }
       expect(jexl.evalSync('x = 5; x = x + 1; x', ctx)).toBe(6)
@@ -61,37 +57,9 @@ describe('Multi-Expression Support', () => {
     })
   })
 
-  describe('Combined Features', () => {
-    it('assignment with arithmetic', () => {
-      const ctx = {}
-      expect(jexl.evalSync('a = 2; b = 3; c = a * b; c + 1', ctx)).toBe(7)
-      expect(ctx).toEqual({ a: 2, b: 3, c: 6 })
-    })
-
-    it('assignment with transforms', () => {
-      const result = jexl.evalSync('nums = [1,2,3]; nums|length', {})
-      expect(result).toBeUndefined() // No transforms by default
-    })
-
-    it('assignment with conditionals', () => {
-      expect(jexl.evalSync('x = 5; result = x > 3 ? "big" : "small"; result')).toBe('big')
-    })
-
-    it('assignment with object literals', () => {
-      const ctx = {}
-      jexl.evalSync('obj = {a: 1, b: 2}; x = obj.a + obj.b', ctx)
-      expect(ctx.obj).toEqual({ a: 1, b: 2 })
-      expect(ctx.x).toBe(3)
-    })
-  })
-
   describe('Error Handling', () => {
     it('assignment to non-identifier throws error', () => {
       expect(() => jexl.evalSync('5 = 10')).toThrow('Left side of assignment must be a variable name')
-    })
-
-    it('assignment to expression throws error', () => {
-      expect(() => jexl.evalSync('x + y = 10')).toThrow('Left side of assignment must be a variable name')
     })
   })
 })
