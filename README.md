@@ -198,7 +198,7 @@ jexl.evalSync('x = 5; y = x * 2; y', context)
 ## Usage
 
 ```javascript
-import jexl from 'jexl'
+import jexl from '@jbrowse/jexl'
 
 // Synchronous evaluation
 const result = jexl.evalSync('expression', context)
@@ -213,4 +213,4 @@ expr.evalSync({ name: { first: 'John', last: 'Doe' } })
 
 ## License
 
-MIT License - see LICENSE.txt for details
+MIT License, same as TomFrost/Jexl
