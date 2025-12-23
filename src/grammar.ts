@@ -5,7 +5,38 @@
 
 /* eslint eqeqeq:0 */
 
-exports.getGrammar = () => ({
+interface BinaryOp {
+  type: 'binaryOp'
+  precedence: number
+  eval?: (left: any, right: any) => any
+  evalOnDemand?: (left: { eval: () => Promise<any> }, right: { eval: () => Promise<any> }) => Promise<any>
+}
+
+interface UnaryOp {
+  type: 'unaryOp'
+  precedence: number
+  eval: (right: any) => any
+}
+
+interface SimpleElement {
+  type: string
+}
+
+type GrammarElement = BinaryOp | UnaryOp | SimpleElement
+
+interface Grammar {
+  elements: {
+    [key: string]: GrammarElement
+  }
+  functions: {
+    [key: string]: (...args: any[]) => any
+  }
+  transforms: {
+    [key: string]: (val: any, ...args: any[]) => any
+  }
+}
+
+export const getGrammar = (): Grammar => ({
   /**
    * A map of all expression elements to their properties. Note that changes
    * here may require changes in the Lexer or Parser.

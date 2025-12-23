@@ -40,10 +40,9 @@ exports.BinaryExpression = function (ast) {
     const wrap = (subAst) => ({ eval: () => this.eval(subAst) })
     return grammarOp.evalOnDemand(wrap(ast.left), wrap(ast.right))
   }
-  return this.Promise.all([
-    this.eval(ast.left),
-    this.eval(ast.right)
-  ]).then((arr) => grammarOp.eval(arr[0], arr[1]))
+  return this.Promise.all([this.eval(ast.left), this.eval(ast.right)]).then(
+    (arr) => grammarOp.eval(arr[0], arr[1])
+  )
 }
 
 /**

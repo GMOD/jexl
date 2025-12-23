@@ -3,7 +3,29 @@
  * Copyright 2020 Tom Shawver
  */
 
-const h = require('./handlers')
+import * as h from './handlers'
+import type { AstNode } from '../types'
+import type Parser from './Parser'
+
+interface TokenTypeOptions {
+  toState?: string
+  handler?: (this: Parser, ...args: any[]) => void
+}
+
+interface StateDefinition {
+  tokenTypes?: {
+    [tokenType: string]: TokenTypeOptions
+  }
+  subHandler?: (this: Parser, ast: AstNode | null) => void
+  endStates?: {
+    [tokenType: string]: string
+  }
+  completable?: boolean
+}
+
+interface States {
+  [state: string]: StateDefinition
+}
 
 /**
  * A mapping of all states in the finite state machine to a set of instructions
@@ -37,7 +59,7 @@ const h = require('./handlers')
  *
  * @type {{}}
  */
-exports.states = {
+export const states: States = {
   expectOperand: {
     tokenTypes: {
       literal: { toState: 'expectBinOp' },

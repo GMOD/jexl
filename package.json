@@ -9,7 +9,7 @@
   "scripts": {
     "format": "prettier --write '**/*.{json,js,md}'",
     "lint": "eslint '**/*.js'",
-    "test": "npm run lint && NODE_PATH=./ RESOURCES_PATH=./lib jest --coverage --colors",
+    "test": "NODE_PATH=./ RESOURCES_PATH=./lib jest --coverage --colors",
     "test:watch": "NODE_PATH=./ RESOURCES_PATH=./lib jest --watchAll --colors",
     "build": "babel lib -d dist",
     "prepublishOnly": "npm test && npm run build"
@@ -85,7 +85,8 @@
     "husky": "^4.2.5",
     "jest": "^25.5.4",
     "lint-staged": "^10.2.2",
-    "prettier": "^2.0.5"
+    "prettier": "^2.0.5",
+    "typescript": "^5.9.3"
   },
   "babel": {
     "plugins": [

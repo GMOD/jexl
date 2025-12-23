@@ -3,8 +3,15 @@
  * Copyright 2020 Tom Shawver
  */
 
-const handlers = require('./handlers')
-const states = require('./states').states
+import * as handlers from './handlers'
+import { states } from './states'
+import type { AstNode, Token } from '../types'
+
+interface Grammar {
+  elements: {
+    [key: string]: any
+  }
+}
 
 /**
  * The Parser is a state machine that converts tokens from the {@link Lexer}
@@ -24,7 +31,20 @@ const states = require('./states').states
  *      instead of boolean false.
  */
 class Parser {
-  constructor(grammar, prefix, stopMap) {
+  _grammar: Grammar
+  _state: string
+  _tree: AstNode | null
+  _exprStr: string
+  _relative: boolean
+  _stopMap: { [tokenType: string]: any }
+  _cursor?: AstNode | null
+  _subParser?: Parser
+  _parentStop?: boolean
+  _nextIdentEncapsulate?: boolean
+  _nextIdentRelative?: boolean
+  _curObjKey?: string
+
+  constructor(grammar: Grammar, prefix?: string, stopMap?: { [tokenType: string]: any }) {
     this._grammar = grammar
     this._state = 'expectOperand'
     this._tree = null
@@ -43,7 +63,7 @@ class Parser {
    * @returns {boolean|*} the stopState value if this parser encountered a token
    *      in the stopState mapb false if tokens can continue.
    */
-  addToken(token) {
+  addToken(token: Token): any {
     if (this._state === 'complete') {
       throw new Error('Cannot add a new token to a completed Parser')
     }
@@ -54,15 +74,15 @@ class Parser {
       if (!this._subParser) {
         this._startSubExpression(startExpr)
       }
-      const stopState = this._subParser.addToken(token)
+      const stopState = this._subParser!.addToken(token)
       if (stopState) {
         this._endSubExpression()
         if (this._parentStop) return stopState
         this._state = stopState
       }
-    } else if (state.tokenTypes[token.type]) {
+    } else if (state.tokenTypes?.[token.type]) {
       const typeOpts = state.tokenTypes[token.type]
-      let handleFunc = handlers[token.type]
+      let handleFunc = (handlers as any)[token.type]
       if (typeOpts.handler) {
         handleFunc = typeOpts.handler
       }
@@ -88,7 +108,7 @@ class Parser {
    * @param {Array<{type: <string>}>} tokens An array of tokens, as provided by
    *      the {@link Lexer#tokenize} function.
    */
-  addTokens(tokens) {
+  addTokens(tokens: Token[]) {
     tokens.forEach(this.addToken, this)
   }
 
@@ -125,8 +145,8 @@ class Parser {
    * @private
    */
   _endSubExpression() {
-    states[this._state].subHandler.call(this, this._subParser.complete())
-    this._subParser = null
+    states[this._state].subHandler!.call(this, this._subParser!.complete())
+    this._subParser = undefined
   }
 
   /**
@@ -136,11 +156,11 @@ class Parser {
    * @param {{type: <string>}} node A node to be added to the AST
    * @private
    */
-  _placeAtCursor(node) {
+  _placeAtCursor(node: AstNode) {
     if (!this._cursor) {
       this._tree = node
     } else {
-      this._cursor.right = node
+      (this._cursor as any).right = node
       this._setParent(node, this._cursor)
     }
     this._cursor = node
@@ -154,8 +174,8 @@ class Parser {
    * @param {{type: <string>}} node A node to be added to the AST
    * @private
    */
-  _placeBeforeCursor(node) {
-    this._cursor = this._cursor._parent
+  _placeBeforeCursor(node: AstNode) {
+    this._cursor = this._cursor?._parent
     this._placeAtCursor(node)
   }
 
@@ -168,7 +188,7 @@ class Parser {
    *      parent of the new node
    * @private
    */
-  _setParent(node, parent) {
+  _setParent(node: AstNode, parent: AstNode) {
     Object.defineProperty(node, '_parent', {
       value: parent,
       writable: true
@@ -181,7 +201,7 @@ class Parser {
    * @param {string} [exprStr] The expression string to prefix to the new Parser
    * @private
    */
-  _startSubExpression(exprStr) {
+  _startSubExpression(exprStr?: string) {
     let endStates = states[this._state].endStates
     if (!endStates) {
       this._parentStop = true
@@ -191,4 +211,4 @@ class Parser {
   }
 }
 
-module.exports = Parser
+export default Parser

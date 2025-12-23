@@ -3,13 +3,27 @@
  * Copyright 2020 Tom Shawver
  */
 
-const Evaluator = require('./evaluator/Evaluator')
-const Lexer = require('./Lexer')
-const Parser = require('./parser/Parser')
-const PromiseSync = require('./PromiseSync')
+import Evaluator from './evaluator/Evaluator'
+import Lexer from './Lexer'
+import Parser from './parser/Parser'
+import PromiseSync from './PromiseSync'
+import type { AstNode } from './types'
+
+interface Grammar {
+  elements: {
+    [key: string]: any
+  }
+  [key: string]: any
+}
+
+type PromiseConstructor = typeof Promise | typeof PromiseSync
 
 class Expression {
-  constructor(grammar, exprStr) {
+  _grammar: Grammar
+  _exprStr: string
+  _ast: AstNode | null
+
+  constructor(grammar: Grammar, exprStr: string) {
     this._grammar = grammar
     this._exprStr = exprStr
     this._ast = null
@@ -48,12 +62,12 @@ class Expression {
    * @throws {*} on error
    */
   evalSync(context = {}) {
-    const res = this._eval(context, PromiseSync)
+    const res = this._eval(context, PromiseSync as any)
     if (res.error) throw res.error
     return res.value
   }
 
-  _eval(context, promise) {
+  _eval(context: any, promise: PromiseConstructor) {
     return promise.resolve().then(() => {
       const ast = this._getAst()
       const evaluator = new Evaluator(
@@ -62,7 +76,7 @@ class Expression {
         undefined,
         promise
       )
-      return evaluator.eval(ast)
+      return evaluator.eval(ast!)
     })
   }
 
@@ -72,4 +86,4 @@ class Expression {
   }
 }
 
-module.exports = Expression
+export default Expression

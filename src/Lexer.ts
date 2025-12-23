@@ -3,6 +3,8 @@
  * Copyright 2020 Tom Shawver
  */
 
+import type { Token } from './types'
+
 const numericRegex = /^-?(?:(?:[0-9]*\.[0-9]+)|[0-9]+)$/
 const identRegex = /^[a-zA-Zа-яА-Я_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF$][a-zA-Zа-яА-Я0-9_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF$]*$/
 const escEscRegex = /\\\\/
@@ -32,6 +34,12 @@ const minusNegatesAfter = [
   'colon'
 ]
 
+interface Grammar {
+  elements: {
+    [key: string]: any
+  }
+}
+
 /**
  * Lexer is a collection of stateless, statically-accessed functions for the
  * lexical parsing of a Jexl string.  Its responsibility is to identify the
@@ -43,7 +51,10 @@ const minusNegatesAfter = [
  * @type {{}}
  */
 class Lexer {
-  constructor(grammar) {
+  _grammar: Grammar
+  _splitRegex?: RegExp
+
+  constructor(grammar: Grammar) {
     this._grammar = grammar
   }
 
@@ -53,7 +64,7 @@ class Lexer {
    * @returns {Array<string>} An array of substrings defining the functional
    *      elements of the expression.
    */
-  getElements(str) {
+  getElements(str: string) {
     const regex = this._getSplitRegex()
     return str.split(regex).filter((elem) => {
       // Remove empty strings
@@ -71,8 +82,8 @@ class Lexer {
    *      converted to tokens
    * @returns {Array<{type, value, raw}>} an array of token objects.
    */
-  getTokens(elements) {
-    const tokens = []
+  getTokens(elements: string[]) {
+    const tokens: Token[] = []
     let negate = false
     for (let i = 0; i < elements.length; i++) {
       if (this._isWhitespace(elements[i])) {
@@ -124,7 +135,7 @@ class Lexer {
    * @returns {Array<{type, value, raw}>} an array of token objects.
    * @throws {Error} if the provided string contains an invalid token.
    */
-  tokenize(str) {
+  tokenize(str: string) {
     const elements = this.getElements(str)
     return this.getTokens(elements)
   }
@@ -138,8 +149,8 @@ class Lexer {
    * @throws {Error} if the provided string is not a valid expression element.
    * @private
    */
-  _createToken(element) {
-    const token = {
+  _createToken(element: string): Token {
+    const token: Token = {
       type: 'literal',
       value: element,
       raw: element
@@ -168,7 +179,7 @@ class Lexer {
    * @see https://developer.mozilla.org/en/docs/Web/JavaScript/Guide/Regular_Expressions
    * @private
    */
-  _escapeRegExp(str) {
+  _escapeRegExp(str: string) {
     str = str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     if (str.match(identRegex)) {
       str = '\\b' + str + '\\b'
@@ -214,7 +225,7 @@ class Lexer {
    *      symbol; false otherwise
    * @private
    */
-  _isNegative(tokens) {
+  _isNegative(tokens: Token[]) {
     if (!tokens.length) return true
     return minusNegatesAfter.some(
       (type) => type === tokens[tokens.length - 1].type
@@ -229,7 +240,7 @@ class Lexer {
    *      false otherwise.
    * @private
    */
-  _isWhitespace(str) {
+  _isWhitespace(str: string) {
     return !!str.match(whitespaceRegex)
   }
 
@@ -244,7 +255,7 @@ class Lexer {
    *      properly processed.
    * @private
    */
-  _unquote(str) {
+  _unquote(str: string) {
     const quote = str[0]
     const escQuoteRegex = new RegExp('\\\\' + quote, 'g')
     return str
@@ -254,4 +265,4 @@ class Lexer {
   }
 }
 
-module.exports = Lexer
+export default Lexer
