@@ -1,16 +1,14 @@
 # @jbrowse/jexl
 
-A fork of the jexl lang for jbrowse
+A fork of the TomFrost/jexl minimal expression lang for jbrowse
 
-## What's New in v3.0
+Major changes include
 
-Version 3.0 is a major simplification of Jexl with breaking changes:
-
-- **Synchronous only** - All evaluation is synchronous. No async/await needed.
-- **No transforms** - The pipe operator (`|`) has been removed. Use functions instead.
-- **No filter expressions** - Relative filter syntax like `array[.property == value]` has been removed. Regular bracket notation for indexing (`array[0]`, `object["key"]`) still works.
-
-See [CHANGELOG.md](CHANGELOG.md) for migration guide.
+- Removing async
+- Remove 'transforms' (use functions instead)
+- Remove array filtering expressions
+- Added template strings
+- Added multiple expression evaluation
 
 ## Quick Examples
 
@@ -201,8 +199,10 @@ jexl.eval('max(1, 5, 3)') // 5
 
 ```javascript
 // Add a binary operator
-jexl.addBinaryOp('~=', 20, (left, right) =>
-  left.toLowerCase() === right.toLowerCase()
+jexl.addBinaryOp(
+  '~=',
+  20,
+  (left, right) => left.toLowerCase() === right.toLowerCase()
 )
 
 jexl.eval('"Hello" ~= "hello"') // true
