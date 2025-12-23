@@ -5,26 +5,26 @@
 
 /* eslint eqeqeq:0 */
 
-interface BinaryOp {
+export interface BinaryOp {
   type: 'binaryOp'
   precedence: number
   eval?: (left: any, right: any) => any
   evalOnDemand?: (left: { eval: () => Promise<any> }, right: { eval: () => Promise<any> }) => Promise<any>
 }
 
-interface UnaryOp {
+export interface UnaryOp {
   type: 'unaryOp'
   precedence: number
   eval: (right: any) => any
 }
 
-interface SimpleElement {
+export interface SimpleElement {
   type: string
 }
 
-type GrammarElement = BinaryOp | UnaryOp | SimpleElement
+export type GrammarElement = BinaryOp | UnaryOp | SimpleElement
 
-interface Grammar {
+export interface Grammar {
   elements: {
     [key: string]: GrammarElement
   }
@@ -54,6 +54,7 @@ export const getGrammar = (): Grammar => ({
     '(': { type: 'openParen' },
     ')': { type: 'closeParen' },
     '?': { type: 'question' },
+    ';': { type: 'semicolon' },
     '+': {
       type: 'binaryOp',
       precedence: 30,
@@ -156,6 +157,13 @@ export const getGrammar = (): Grammar => ({
       type: 'unaryOp',
       precedence: Infinity,
       eval: (right) => !right
+    },
+    '=': {
+      type: 'binaryOp',
+      precedence: 2,
+      eval: (left, right) => {
+        throw new Error('Assignment handled specially')
+      }
     }
   },
 

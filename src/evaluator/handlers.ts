@@ -100,16 +100,13 @@ export function FilterExpression(this: Evaluator, ast: any) {
  */
 export function Identifier(this: Evaluator, ast: any) {
   if (!ast.from) {
-    return ast.relative ? this._relContext[ast.value] : this._context[ast.value]
+    const contextSource = ast.relative ? this._relContext : this._context
+    return contextSource[ast.value]
   }
   return this.eval(ast.from).then((context: any) => {
-    if (context === undefined || context === null) {
-      return undefined
-    }
-    if (Array.isArray(context)) {
-      context = context[0]
-    }
-    return context?.[ast.value]
+    if (context == null) return undefined
+    const ctx = Array.isArray(context) ? context[0] : context
+    return ctx?.[ast.value]
   })
 }
 
@@ -170,4 +167,35 @@ export function UnaryExpression(this: Evaluator, ast: any) {
   return this.eval(ast.right).then((right: any) =>
     this._grammar.elements[ast.operator].eval(right)
   )
+}
+
+/**
+ * Evaluates a SequenceExpression by evaluating each expression in order
+ * and returning the value of the last expression.
+ */
+export function SequenceExpression(this: Evaluator, ast: any) {
+  let lastValue: any
+  let promise = this.Promise.resolve()
+
+  for (const expr of ast.expressions) {
+    promise = promise.then(() =>
+      this.eval(expr).then((val: any) => {
+        lastValue = val
+      })
+    )
+  }
+
+  return promise.then(() => lastValue)
+}
+
+/**
+ * Evaluates an AssignmentExpression by evaluating the right side
+ * and assigning it to the variable name on the left side.
+ */
+export function AssignmentExpression(this: Evaluator, ast: any) {
+  return this.eval(ast.right).then((value: any) => {
+    const varName = ast.left.value
+    this._context[varName] = value
+    return value
+  })
 }

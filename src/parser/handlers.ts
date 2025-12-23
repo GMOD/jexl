@@ -41,6 +41,21 @@ export function arrayVal(this: Parser, ast: AstNode | null) {
  * @param {{type: <string>}} token A token object
  */
 export function binaryOp(this: Parser, token: Token) {
+  if (token.value === '=') {
+    if (this._cursor?.type !== 'Identifier') {
+      throw new Error('Left side of assignment must be a variable name')
+    }
+
+    const node: any = {
+      type: 'AssignmentExpression',
+      operator: '=',
+      left: this._cursor
+    }
+    this._cursor = this._cursor._parent
+    this._placeAtCursor(node)
+    return
+  }
+
   const precedence = (this._grammar.elements[token.value] as any).precedence || 0
   let parent = this._cursor?._parent
   while (
@@ -67,13 +82,15 @@ export function binaryOp(this: Parser, token: Token) {
  * AST.
  */
 export function dot(this: Parser) {
+  const isBinaryExprWithRight = (node: AstNode) =>
+    node.type === 'BinaryExpression' && (node as any).right
+
   this._nextIdentEncapsulate =
     this._cursor &&
     this._cursor.type !== 'UnaryExpression' &&
-    (this._cursor.type !== 'BinaryExpression' ||
-      (this._cursor.type === 'BinaryExpression' && (this._cursor as any).right))
-  this._nextIdentRelative =
-    !this._cursor || (this._cursor && !this._nextIdentEncapsulate)
+    (this._cursor.type !== 'BinaryExpression' || isBinaryExprWithRight(this._cursor))
+
+  this._nextIdentRelative = !this._cursor || !this._nextIdentEncapsulate
   if (this._nextIdentRelative) {
     this._relative = true
   }
@@ -231,4 +248,19 @@ export function unaryOp(this: Parser, token: Token) {
     type: 'UnaryExpression',
     operator: token.value
   } as any)
+}
+
+/**
+ * Handles semicolon separator between expressions
+ */
+export function semicolon(this: Parser) {
+  if (!this._sequenceExpressions) {
+    this._sequenceExpressions = [this._tree!]
+  } else {
+    this._sequenceExpressions.push(this._tree!)
+  }
+
+  this._tree = null
+  this._cursor = null
+  this._state = 'expectOperand'
 }

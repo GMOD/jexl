@@ -43,6 +43,7 @@ class Parser {
   _nextIdentEncapsulate?: boolean
   _nextIdentRelative?: boolean
   _curObjKey?: string
+  _sequenceExpressions?: AstNode[]
 
   constructor(grammar: Grammar, prefix?: string, stopMap?: { [tokenType: string]: any }) {
     this._grammar = grammar
@@ -127,6 +128,17 @@ class Parser {
     if (this._subParser) {
       this._endSubExpression()
     }
+
+    if (this._sequenceExpressions) {
+      this._sequenceExpressions.push(this._tree!)
+      const sequence: any = {
+        type: 'SequenceExpression',
+        expressions: this._sequenceExpressions
+      }
+      this._state = 'complete'
+      return sequence
+    }
+
     this._state = 'complete'
     return this._cursor ? this._tree : null
   }

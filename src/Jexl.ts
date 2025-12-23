@@ -80,9 +80,7 @@ class Jexl {
    * @param {{}} map A map of expression function names to javascript functions
    */
   addFunctions(map: { [key: string]: (...args: any[]) => any }) {
-    for (let key in map) {
-      this._grammar.functions[key] = map[key]
-    }
+    Object.assign(this._grammar.functions, map)
   }
 
   /**
@@ -121,9 +119,7 @@ class Jexl {
    * @param {{}} map A map of transform names to transform functions
    */
   addTransforms(map: { [key: string]: (val: any, ...args: any[]) => any }) {
-    for (let key in map) {
-      this._grammar.transforms[key] = map[key]
-    }
+    Object.assign(this._grammar.transforms, map)
   }
 
   /**

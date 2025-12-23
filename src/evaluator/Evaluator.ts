@@ -78,17 +78,11 @@ class Evaluator {
    * @returns {Promise<{}>} resolves with the result map.
    */
   evalMap(map: { [key: string]: AstNode }) {
-    const keys = Object.keys(map)
-    const result: { [key: string]: any } = {}
-    const asts = keys.map((key) => {
-      return this.eval(map[key])
-    })
-    return this.Promise.all(asts).then((vals: any[]) => {
-      vals.forEach((val, idx) => {
-        result[keys[idx]] = val
-      })
-      return result
-    })
+    const entries = Object.entries(map)
+    const promises = entries.map(([_, ast]) => this.eval(ast))
+    return this.Promise.all(promises).then((vals: any[]) =>
+      Object.fromEntries(entries.map(([key], idx) => [key, vals[idx]]))
+    )
   }
 
   /**
@@ -111,28 +105,15 @@ class Evaluator {
    * @private
    */
   _filterRelative(subject: any, expr: AstNode) {
-    const promises: any[] = []
-    if (!Array.isArray(subject)) {
-      subject = subject === undefined ? [] : [subject]
-    }
-    subject.forEach((elem: any) => {
-      const evalInst = new Evaluator(
-        this._grammar,
-        this._context,
-        elem,
-        this.Promise
-      )
-      promises.push(evalInst.eval(expr))
-    })
-    return this.Promise.all(promises).then((values: any[]) => {
-      const results: any[] = []
-      values.forEach((value, idx) => {
-        if (value) {
-          results.push(subject[idx])
-        }
-      })
-      return results
-    })
+    const arr = Array.isArray(subject) ? subject : (subject == null ? [] : [subject])
+
+    const promises = arr.map(elem =>
+      new Evaluator(this._grammar, this._context, elem, this.Promise).eval(expr)
+    )
+
+    return this.Promise.all(promises).then((values: any[]) =>
+      arr.filter((_, idx) => values[idx])
+    )
   }
 
   /**

@@ -53,6 +53,7 @@ interface Grammar {
 class Lexer {
   _grammar: Grammar
   _splitRegex?: RegExp
+  _escQuoteRegexCache: Map<string, RegExp> = new Map()
 
   constructor(grammar: Grammar) {
     this._grammar = grammar
@@ -257,9 +258,13 @@ class Lexer {
    */
   _unquote(str: string) {
     const quote = str[0]
-    const escQuoteRegex = new RegExp('\\\\' + quote, 'g')
+    let escQuoteRegex = this._escQuoteRegexCache.get(quote)
+    if (!escQuoteRegex) {
+      escQuoteRegex = new RegExp('\\\\' + quote, 'g')
+      this._escQuoteRegexCache.set(quote, escQuoteRegex)
+    }
     return str
-      .substr(1, str.length - 2)
+      .slice(1, -1)
       .replace(escQuoteRegex, quote)
       .replace(escEscRegex, '\\')
   }

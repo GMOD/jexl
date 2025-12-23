@@ -3,38 +3,41 @@
  * Copyright 2020 Tom Shawver
  */
 
-class PromiseSync<T = any> {
+class PromiseSync<T = unknown> {
   value?: T
-  error?: any
+  error?: unknown
 
-  constructor(fn: (resolve: (val: any) => void, reject: (error: any) => void) => void) {
+  constructor(fn: (resolve: (val: T) => void, reject: (error: unknown) => void) => void) {
     fn(this._resolve.bind(this), this._reject.bind(this))
   }
 
-  catch(rejected: (error: any) => any) {
+  catch<TResult = never>(rejected: (error: unknown) => TResult): PromiseSync<T | TResult> {
     if (this.error) {
       try {
-        this._resolve(rejected(this.error))
+        this._resolve(rejected(this.error) as any)
       } catch (e) {
         this._reject(e)
       }
     }
-    return this
+    return this as any
   }
 
-  then(resolved: (val: T) => any, rejected?: (error: any) => any) {
+  then<TResult1 = T, TResult2 = never>(
+    resolved: (val: T) => TResult1,
+    rejected?: (error: unknown) => TResult2
+  ): PromiseSync<TResult1 | TResult2> {
     if (!this.error) {
       try {
-        this._resolve(resolved(this.value as T))
+        this._resolve(resolved(this.value as T) as any)
       } catch (e) {
         this._reject(e)
       }
     }
     if (rejected) this.catch(rejected)
-    return this
+    return this as any
   }
 
-  _reject(error: any) {
+  _reject(error: unknown) {
     this.value = undefined
     this.error = error
   }
@@ -52,25 +55,25 @@ class PromiseSync<T = any> {
     }
   }
 
-  static all(vals: any[]) {
+  static all<T>(vals: (PromiseSync<T> | T)[]): PromiseSync<T[]> {
     return new PromiseSync((resolve) => {
       const resolved = vals.map((val) => {
         while (val instanceof PromiseSync) {
-          if (val.error) throw Error(val.error)
-          val = val.value
+          if (val.error) throw Error(String(val.error))
+          val = val.value as T
         }
         return val
       })
-      resolve(resolved)
+      resolve(resolved as T[])
     })
   }
 
-  static resolve(val?: any) {
-    return new PromiseSync((resolve) => resolve(val))
+  static resolve<T>(val?: T): PromiseSync<T> {
+    return new PromiseSync<T>((resolve) => resolve(val as T))
   }
 
-  static reject(error: any) {
-    return new PromiseSync((resolve, reject) => reject(error))
+  static reject(error: unknown): PromiseSync<never> {
+    return new PromiseSync((_, reject) => reject(error))
   }
 }
 

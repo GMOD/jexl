@@ -71,3 +71,30 @@ export interface ConditionalExpression extends AstNode {
   consequent?: AstNode
   alternate?: AstNode
 }
+
+export interface SequenceExpression extends AstNode {
+  type: 'SequenceExpression'
+  expressions: AstNode[]
+}
+
+export interface AssignmentExpression extends AstNode {
+  type: 'AssignmentExpression'
+  operator: '='
+  left: Identifier
+  right: AstNode
+}
+
+export type AstNodeUnion =
+  | Literal
+  | Identifier
+  | BinaryExpression
+  | UnaryExpression
+  | ArrayLiteral
+  | ObjectLiteral
+  | FunctionCall
+  | FilterExpression
+  | ConditionalExpression
+  | SequenceExpression
+  | AssignmentExpression
+
+export type NodeByType<T extends AstNodeUnion['type']> = Extract<AstNodeUnion, { type: T }>

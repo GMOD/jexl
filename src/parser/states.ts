@@ -76,7 +76,8 @@ export const states: States = {
       binaryOp: { toState: 'expectOperand' },
       pipe: { toState: 'expectTransform' },
       dot: { toState: 'traverse' },
-      question: { toState: 'ternaryMid', handler: h.ternaryStart }
+      question: { toState: 'ternaryMid', handler: h.ternaryStart },
+      semicolon: { handler: h.semicolon }
     },
     completable: true
   },
