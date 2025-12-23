@@ -52,6 +52,7 @@
   "homepage": "https://github.com/TomFrost/jexl",
   "devDependencies": {
     "@types/node": "^25.0.3",
+    "@vitest/coverage-v8": "^4.0.16",
     "eslint": "^9.39.2",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-unicorn": "^62.0.0",

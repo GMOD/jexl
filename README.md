@@ -2,6 +2,16 @@
 
 A fork of the jexl lang for jbrowse
 
+## What's New in v3.0
+
+Version 3.0 is a major simplification of Jexl with breaking changes:
+
+- **Synchronous only** - All evaluation is synchronous. No async/await needed.
+- **No transforms** - The pipe operator (`|`) has been removed. Use functions instead.
+- **No filter expressions** - Relative filter syntax like `array[.property == value]` has been removed. Regular bracket notation for indexing (`array[0]`, `object["key"]`) still works.
+
+See [CHANGELOG.md](CHANGELOG.md) for migration guide.
+
 ## Quick Examples
 
 ```javascript
@@ -21,10 +31,6 @@ jexl.eval('`Hello ${name.first} ${name.last}`', context)
 
 jexl.eval('`Age in 5 years: ${age + 5}`', context)
 // "Age in 5 years: 41"
-
-// Filter arrays
-jexl.eval('assoc[.first == "Lana"].last', context)
-// "Kane"
 
 // Math operations
 jexl.eval('age * (3 - 1)', context)
@@ -109,45 +115,6 @@ jexl.eval('exes[2]', context) // "Burt"
 jexl.eval('exes[lastEx - 1]', context) // "Len"
 ```
 
-### Filtering Collections
-
-Filter arrays using expressions in brackets. Reference properties with a leading dot:
-
-```javascript
-const context = {
-  employees: [
-    { first: 'Sterling', last: 'Archer', age: 36 },
-    { first: 'Malory', last: 'Archer', age: 75 },
-    { first: 'Lana', last: 'Kane', age: 33 },
-    { first: 'Cyril', last: 'Figgis', age: 45 }
-  ]
-}
-
-jexl.eval('employees[.first == "Sterling"]', context)
-// [{ first: 'Sterling', last: 'Archer', age: 36 }]
-
-jexl.eval('employees[.age >= 30 && .age < 40]', context)
-// [{ first: 'Sterling', ... }, { first: 'Lana', ... }]
-
-jexl.eval('employees[.last == "Kane"].first', context)
-// "Lana"
-```
-
-### Transforms
-
-Apply transforms to values using the pipe operator:
-
-```javascript
-jexl.addTransform('upper', (val) => val.toUpperCase())
-jexl.addTransform('split', (val, char) => val.split(char))
-
-jexl.eval('"hello"|upper')
-// "HELLO"
-
-jexl.eval('"firstName lastName"|split(" ")[0]')
-// "firstName"
-```
-
 ### Functions
 
 Call functions in expressions:
@@ -195,7 +162,9 @@ jexl.eval('x = 5; y = x * 2; y', context)
 // context is now { x: 5, y: 10 }
 ```
 
-## Usage
+## API
+
+### Evaluation
 
 ```javascript
 import jexl from '@jbrowse/jexl'
@@ -206,6 +175,42 @@ const result = jexl.eval('expression', context)
 // Compile once, evaluate many times
 const expr = jexl.compile('name.first + " " + name.last')
 const result = expr.eval({ name: { first: 'John', last: 'Doe' } })
+```
+
+### Adding Custom Functions
+
+```javascript
+// Add a single function
+jexl.addFunction('round', Math.round)
+jexl.addFunction('lower', (str) => str.toLowerCase())
+
+// Add multiple functions
+jexl.addFunctions({
+  min: Math.min,
+  max: Math.max,
+  abs: Math.abs
+})
+
+// Use in expressions
+jexl.eval('round(3.7)') // 4
+jexl.eval('lower(name)', { name: 'HELLO' }) // "hello"
+jexl.eval('max(1, 5, 3)') // 5
+```
+
+### Adding Custom Operators
+
+```javascript
+// Add a binary operator
+jexl.addBinaryOp('~=', 20, (left, right) =>
+  left.toLowerCase() === right.toLowerCase()
+)
+
+jexl.eval('"Hello" ~= "hello"') // true
+
+// Add a unary operator
+jexl.addUnaryOp('~', (right) => Math.floor(right))
+
+jexl.eval('~3.7') // 3
 ```
 
 ## License

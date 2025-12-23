@@ -43,28 +43,6 @@ describe('Jexl', () => {
     it('passes context', () => {
       expect(inst.eval('foo', { foo: 'bar' })).toBe('bar')
     })
-    it('throws if transform fails', () => {
-      inst.addTransform('abort', () => {
-        throw new Error('oops')
-      })
-      expect(inst.eval.bind(inst, '"hello"|abort')).toThrow(/oops/)
-    })
-    it('throws if nested transform fails', () => {
-      inst.addTransform('q1', () => {
-        throw new Error('oops')
-      })
-      inst.addBinaryOp('is', 100, () => true)
-      expect(inst.eval.bind(inst, '"hello"|q1 is asdf')).toThrow(/oops/)
-    })
-    it('filters collections as expected (issue #61)', () => {
-      const context = {
-        a: [{ b: 'A' }, { b: 'B' }, { b: 'C' }]
-      }
-      expect(inst.eval('a[.b in ["A","B"]]', context)).toEqual([
-        { b: 'A' },
-        { b: 'B' }
-      ])
-    })
     it('early-exits boolean AND when the left is false (issue #64)', () => {
       const context = { a: null }
       const expr = 'a != null && a.b'
@@ -109,27 +87,6 @@ describe('Jexl', () => {
       expect(inst.eval('add1(add2(2))')).toBe(5)
     })
   })
-  describe('addTransform', () => {
-    it('allows transforms to be defined', () => {
-      inst.addTransform('toCase', (val, args) =>
-        args.case === 'upper' ? val.toUpperCase() : val.toLowerCase()
-      )
-      expect(inst.eval('"hello"|toCase({case:"upper"})')).toBe('HELLO')
-    })
-    it('allows transforms to be retrieved', () => {
-      inst.addTransform('ret2', () => 2)
-      const t = inst.getTransform('ret2')
-      expect(t).toBeDefined()
-      expect(t()).toBe(2)
-    })
-    it('allows transforms to be set in batch', () => {
-      inst.addTransforms({
-        add1: (val) => val + 1,
-        add2: (val) => val + 2
-      })
-      expect(inst.eval('2|add1|add2')).toBe(5)
-    })
-  })
   describe('addBinaryOp', () => {
     it('allows binaryOps to be defined', () => {
       inst.addBinaryOp(
@@ -158,16 +115,8 @@ describe('Jexl', () => {
         },
         true
       )
-      let count = 0
-      inst.addTransform('inc', (elem) => {
-        count++
-        return elem
-      })
-      expect(inst.eval('-2|inc $$ 5|inc')).toEqual(5)
-      expect(count).toEqual(2)
-      count = 0
-      expect(inst.eval('2|inc $$ -5|inc')).toEqual(2)
-      expect(count).toEqual(1)
+      expect(inst.eval('-2 $$ 5')).toEqual(5)
+      expect(inst.eval('2 $$ -5')).toEqual(2)
     })
   })
   describe('addUnaryOp', () => {

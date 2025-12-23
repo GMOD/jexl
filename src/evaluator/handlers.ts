@@ -7,8 +7,7 @@ import type { AstNode } from '../types.ts'
 import type Evaluator from './Evaluator.ts'
 
 const poolNames: Record<string, string> = {
-  functions: 'Jexl Function',
-  transforms: 'Transform'
+  functions: 'Jexl Function'
 }
 
 /**
@@ -67,19 +66,21 @@ export function ConditionalExpression(this: Evaluator, ast: any) {
 }
 
 /**
- * Evaluates a FilterExpression by applying it to the subject value.
+ * Evaluates a FilterExpression by applying bracket notation for array/object access.
+ * Note: Relative filtering (with leading dot) is not supported.
  * @param {{type: 'FilterExpression', relative: <boolean>, expr: {},
  *      subject: {}}} ast An expression tree with a FilterExpression as the top
  *      node
- * @returns {*} the value of the FilterExpression.
+ * @returns {*} the value at the specified index/property.
  * @private
  */
 export function FilterExpression(this: Evaluator, ast: any) {
   const subject = this.eval(ast.subject)
   if (ast.relative) {
-    return this._filterRelative(subject, ast.expr)
+    throw new Error('Relative filter expressions are not supported')
   }
-  return this._filterStatic(subject, ast.expr)
+  const index = this.eval(ast.expr)
+  return subject?.[index]
 }
 
 /**

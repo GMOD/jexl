@@ -32,11 +32,7 @@ class Evaluator {
   _context: any
   _relContext: any
 
-  constructor(
-    grammar: Grammar,
-    context?: any,
-    relativeContext?: any
-  ) {
+  constructor(grammar: Grammar, context?: any, relativeContext?: any) {
     this._grammar = grammar
     this._context = context || {}
     this._relContext = relativeContext || this._context
@@ -73,59 +69,6 @@ class Evaluator {
     const entries = Object.entries(map)
     const vals = entries.map(([_, ast]) => this.eval(ast))
     return Object.fromEntries(entries.map(([key], idx) => [key, vals[idx]]))
-  }
-
-  /**
-   * Applies a filter expression with relative identifier elements to a subject.
-   * The intent is for the subject to be an array of subjects that will be
-   * individually used as the relative context against the provided expression
-   * tree. Only the elements whose expressions result in a truthy value will be
-   * included in the resulting array.
-   *
-   * If the subject is not an array of values, it will be converted to a single-
-   * element array before running the filter.
-   * @param {*} subject The value to be filtered usually an array. If this value is
-   *      not an array, it will be converted to an array with this value as the
-   *      only element.
-   * @param {{}} expr The expression tree to run against each subject. If the
-   *      tree evaluates to a truthy result, then the value will be included in
-   *      the returned array otherwise, it will be eliminated.
-   * @returns {Array} an array of values that passed the expression filter.
-   * @private
-   */
-  _filterRelative(subject: any, expr: AstNode) {
-    const arr = Array.isArray(subject)
-      ? subject
-      : subject == null
-        ? []
-        : [subject]
-
-    return arr.filter((elem) =>
-      new Evaluator(this._grammar, this._context, elem).eval(expr)
-    )
-  }
-
-  /**
-   * Applies a static filter expression to a subject value.  If the filter
-   * expression evaluates to boolean true, the subject is returned if false,
-   * undefined.
-   *
-   * For any other resulting value of the expression, this function will attempt
-   * to respond with the property at that name or index of the subject.
-   * @param {*} subject The value to be filtered.  Usually an Array (for which
-   *      the expression would generally resolve to a numeric index) or an
-   *      Object (for which the expression would generally resolve to a string
-   *      indicating a property name)
-   * @param {{}} expr The expression tree to run against the subject
-   * @returns {*} the value of the drill-down.
-   * @private
-   */
-  _filterStatic(subject: any, expr: AstNode) {
-    const res = this.eval(expr)
-    if (typeof res === 'boolean') {
-      return res ? subject : undefined
-    }
-    return subject?.[res]
   }
 }
 

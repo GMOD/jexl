@@ -9,7 +9,6 @@ import { getGrammar } from './grammar.ts'
 interface Grammar {
   elements: Record<string, any>
   functions: Record<string, (...args: any[]) => any>
-  transforms: Record<string, (val: any, ...args: any[]) => any>
 }
 
 /**
@@ -97,28 +96,6 @@ class Jexl {
   }
 
   /**
-   * Adds or replaces a transform function in this Jexl instance.
-   * @param {string} name The name of the transform function, as it will be used
-   *      within Jexl expressions
-   * @param {function} fn The function to be executed when this transform is
-   *      invoked. It will be provided with at least one argument:
-   *          - {*} value: The value to be transformed
-   *          - {...*} args: The arguments for this transform
-   */
-  addTransform(name: string, fn: (val: any, ...args: any[]) => any) {
-    this._grammar.transforms[name] = fn
-  }
-
-  /**
-   * Syntactic sugar for calling {@link #addTransform} repeatedly.  This function
-   * accepts a map of one or more transform names to their transform function.
-   * @param {{}} map A map of transform names to transform functions
-   */
-  addTransforms(map: Record<string, (val: any, ...args: any[]) => any>) {
-    Object.assign(this._grammar.transforms, map)
-  }
-
-  /**
    * Creates an Expression object from the given Jexl expression string, and
    * immediately compiles it. The returned Expression object can then be
    * evaluated multiple times with new contexts, without generating any
@@ -148,15 +125,6 @@ class Jexl {
    */
   getFunction(name: string) {
     return this._grammar.functions[name]
-  }
-
-  /**
-   * Retrieves a previously set transform function.
-   * @param {string} name The name of the transform function
-   * @returns {function} The transform function
-   */
-  getTransform(name: string) {
-    return this._grammar.transforms[name]
   }
 
   /**

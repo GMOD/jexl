@@ -15,9 +15,6 @@ describe('Template Strings with Complex Expressions', () => {
   jexl.addFunction('get', (obj, prop) => obj?.[prop])
 
   // Add some transforms
-  jexl.addTransform('upper', (val) => val.toUpperCase())
-  jexl.addTransform('lower', (val) => val.toLowerCase())
-  jexl.addTransform('round', (val) => Math.round(val))
 
   const context = {
     feature: {
@@ -46,11 +43,6 @@ describe('Template Strings with Complex Expressions', () => {
     expect(result).toBe('Start position: 1000')
   })
 
-  it('evaluates transforms in template strings', () => {
-    const result = jexl.eval('`Type: ${feature.type|upper}`', context)
-    expect(result).toBe('Type: GENE')
-  })
-
   it('evaluates math expressions in template strings', () => {
     const result = jexl.eval(
       '`Length: ${feature.location.end - feature.location.start}`',
@@ -69,10 +61,10 @@ describe('Template Strings with Complex Expressions', () => {
 
   it('evaluates multiple complex expressions in one template', () => {
     const result = jexl.eval(
-      '`${user.firstName|upper} ${user.lastName|upper}: ${get(feature, "name")} (${feature.score|round})`',
+      '`${user.firstName} ${user.lastName}: ${get(feature, "name")} (${feature.score})`',
       context
     )
-    expect(result).toBe('JANE DOE: BRCA1 (96)')
+    expect(result).toBe('Jane Doe: BRCA1 (95.7)')
   })
 
   it('evaluates function calls with expression arguments', () => {
@@ -94,31 +86,12 @@ describe('Template Strings with Complex Expressions', () => {
     expect(result).toBe('First: TP53, Second: BRCA2')
   })
 
-  it('evaluates filter expressions in template strings', () => {
-    const contextWithArray = {
-      features: [
-        { name: 'TP53', score: 90 },
-        { name: 'BRCA2', score: 85 }
-      ]
-    }
-    const result = jexl.eval(
-      '`High scores: ${features[.score >= 88].name}`',
-      contextWithArray
-    )
-    expect(result).toBe('High scores: TP53')
-  })
-
   it('evaluates multiple property accesses in template strings', () => {
     const result = jexl.eval(
       '`Feature: ${feature.name}, Range: ${feature.location.start}-${feature.location.end}`',
       context
     )
     expect(result).toBe('Feature: BRCA1, Range: 1000-2000')
-  })
-
-  it('evaluates chained transforms in template strings', () => {
-    const result = jexl.eval('`Name: ${feature.name|lower|upper}`', context)
-    expect(result).toBe('Name: BRCA1')
   })
 
   it('evaluates nested object construction in template strings', () => {
@@ -139,7 +112,7 @@ describe('Template Strings with Complex Expressions', () => {
 
   it('evaluates complex nested expressions', () => {
     const result = jexl.eval(
-      '`Result: ${(feature.score > threshold ? feature.name : "N/A")|upper}`',
+      '`Result: ${(feature.score > threshold ? feature.name : "N/A")}`',
       context
     )
     expect(result).toBe('Result: BRCA1')

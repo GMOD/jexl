@@ -27,7 +27,6 @@ export type GrammarElement = BinaryOp | UnaryOp | SimpleElement
 export interface Grammar {
   elements: Record<string, GrammarElement>
   functions: Record<string, (...args: any[]) => any>
-  transforms: Record<string, (val: any, ...args: any[]) => any>
 }
 
 export const getGrammar = (): Grammar => ({
@@ -40,7 +39,6 @@ export const getGrammar = (): Grammar => ({
     '.': { type: 'dot' },
     '[': { type: 'openBracket' },
     ']': { type: 'closeBracket' },
-    '|': { type: 'pipe' },
     '{': { type: 'openCurl' },
     '}': { type: 'closeCurl' },
     ':': { type: 'colon' },
@@ -119,7 +117,9 @@ export const getGrammar = (): Grammar => ({
       precedence: 10,
       evalOnDemand: (left, right) => {
         const leftVal = left.eval()
-        if (!leftVal) {return leftVal}
+        if (!leftVal) {
+          return leftVal
+        }
         return right.eval()
       }
     },
@@ -128,7 +128,9 @@ export const getGrammar = (): Grammar => ({
       precedence: 10,
       evalOnDemand: (left, right) => {
         const leftVal = left.eval()
-        if (leftVal) {return leftVal}
+        if (leftVal) {
+          return leftVal
+        }
         return right.eval()
       }
     },
@@ -173,22 +175,5 @@ export const getGrammar = (): Grammar => ({
    * than throw. An error is only appropriate when the function would normally
    * return a value, but cannot due to some other failure.
    */
-  functions: {},
-
-  /**
-   * A map of transform names to transform functions. A transform function
-   * takes one ore more arguemnts:
-   *
-   *     - {*} val: A value to be transformed
-   *     - {*} ...args: A variable number of arguments passed to this transform.
-   *       All of these are pre-evaluated to their actual values before calling
-   *       the function.
-   *
-   * The transform function should return the transformed value, or throw when
-   * an unrecoverable error occurs. Transforms should generally return undefined
-   * when they don't make sense to be used on the given value type, rather than
-   * throw. An error is only appropriate when the transform would normally
-   * return a value, but cannot due to some other failure.
-   */
-  transforms: {}
+  functions: {}
 })
