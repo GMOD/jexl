@@ -1,6 +1,6 @@
 {
   "name": "@jbrowse/jexl",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "A fork of the jexl lang for jbrowse",
   "type": "module",
   "types": "./dist/index.d.ts",
