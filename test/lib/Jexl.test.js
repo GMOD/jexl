@@ -3,9 +3,10 @@
  * Copyright 2020 Tom Shawver
  */
 
-import { describe, beforeEach, it, expect } from 'vitest'
-import { Jexl } from '../../src/Jexl'
-import Expression from '../../src/Expression'
+import { beforeEach, describe, expect, it } from 'vitest'
+
+import Expression from '../../src/Expression.ts'
+import { Jexl } from '../../src/Jexl.ts'
 let inst
 
 describe('Jexl', () => {
@@ -173,7 +174,9 @@ describe('Jexl', () => {
         50,
         (left, right) => {
           return left.eval().then((val) => {
-            if (val > 0) return val
+            if (val > 0) {
+              return val
+            }
             return right.eval()
           })
         },

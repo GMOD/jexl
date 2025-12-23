@@ -3,9 +3,10 @@
  * Copyright 2020 Tom Shawver
  */
 
-import { describe, beforeEach, it, expect } from 'vitest'
-import { getGrammar } from '../../src/grammar'
-import Lexer from '../../src/Lexer'
+import { beforeEach, describe, expect, it } from 'vitest'
+
+import Lexer from '../../src/Lexer.ts'
+import { getGrammar } from '../../src/grammar.ts'
 
 const grammar = getGrammar()
 let inst
@@ -28,25 +29,25 @@ describe('Lexer', () => {
       expect(elems[0]).toEqual(str)
     })
     it('supports escaping double-quotes', () => {
-      const str = '"f\\"oo"'
+      const str = String.raw`"f\"oo"`
       const elems = inst.getElements(str)
       expect(elems).toHaveLength(1)
       expect(elems[0]).toEqual(str)
     })
     it('supports escaped double-quotes at the end of strings', () => {
-      const str = '"foo\\""'
+      const str = String.raw`"foo\""`
       const elems = inst.getElements(str)
       expect(elems).toHaveLength(1)
       expect(elems[0]).toEqual(str)
     })
     it('supports escaping single-quotes', () => {
-      const str = "'f\\'oo'"
+      const str = String.raw`'f\'oo'`
       const elems = inst.getElements(str)
       expect(elems).toHaveLength(1)
       expect(elems[0]).toEqual(str)
     })
     it('supports escaped single-quotes at the end of strings', () => {
-      const str = "'foo\\''"
+      const str = String.raw`'foo\''`
       const elems = inst.getElements(str)
       expect(elems).toHaveLength(1)
       expect(elems[0]).toEqual(str)
@@ -79,12 +80,12 @@ describe('Lexer', () => {
   })
   describe('Tokens', () => {
     it('unquotes string elements', () => {
-      const tokens = inst.getTokens(['"foo \\"bar\\\\"'])
+      const tokens = inst.getTokens([String.raw`"foo \"bar\\"`])
       expect(tokens).toEqual([
         {
           type: 'literal',
           value: 'foo "bar\\',
-          raw: '"foo \\"bar\\\\"'
+          raw: String.raw`"foo \"bar\\"`
         }
       ])
     })
@@ -164,7 +165,9 @@ describe('Lexer', () => {
     })
   })
   it('tokenizes a full expression', () => {
-    const tokens = inst.tokenize('6+x -  -17.55*y<= !foo.bar["baz\\"foz"]')
+    const tokens = inst.tokenize(
+      String.raw`6+x -  -17.55*y<= !foo.bar["baz\"foz"]`
+    )
     expect(tokens).toEqual([
       { type: 'literal', value: 6, raw: '6' },
       { type: 'binaryOp', value: '+', raw: '+' },
@@ -179,7 +182,7 @@ describe('Lexer', () => {
       { type: 'dot', value: '.', raw: '.' },
       { type: 'identifier', value: 'bar', raw: 'bar' },
       { type: 'openBracket', value: '[', raw: '[' },
-      { type: 'literal', value: 'baz"foz', raw: '"baz\\"foz"' },
+      { type: 'literal', value: 'baz"foz', raw: String.raw`"baz\"foz"` },
       { type: 'closeBracket', value: ']', raw: ']' }
     ])
   })
@@ -206,7 +209,10 @@ describe('Lexer', () => {
       expect(tokens[0].type).toBe('templateString')
       expect(tokens[0].value).toHaveLength(2)
       expect(tokens[0].value[0]).toEqual({ type: 'static', value: 'hello ' })
-      expect(tokens[0].value[1]).toEqual({ type: 'interpolation', value: 'name' })
+      expect(tokens[0].value[1]).toEqual({
+        type: 'interpolation',
+        value: 'name'
+      })
     })
     it('tokenizes a template string with multiple interpolations', () => {
       const tokens = inst.tokenize('`${a} + ${b} = ${c}`')
@@ -226,7 +232,7 @@ describe('Lexer', () => {
     it('handles escaped dollar signs', () => {
       const tokens = inst.tokenize('`price: \\$100`')
       expect(tokens[0].value).toEqual([
-        { type: 'static', value: 'price: \\$100' }
+        { type: 'static', value: String.raw`price: \$100` }
       ])
     })
     it('handles nested braces in interpolations', () => {
@@ -238,7 +244,9 @@ describe('Lexer', () => {
       expect(tokens[0].value[1].value).toBe('price * quantity')
     })
     it('throws on unclosed interpolation', () => {
-      expect(() => inst.tokenize('`unclosed: ${1 + 2`')).toThrow(/Unclosed interpolation/)
+      expect(() => inst.tokenize('`unclosed: ${1 + 2`')).toThrow(
+        /Unclosed interpolation/
+      )
     })
   })
 })

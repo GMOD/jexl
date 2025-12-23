@@ -3,16 +3,15 @@
  * Copyright 2020 Tom Shawver
  */
 
-import Evaluator from './evaluator/Evaluator'
-import Lexer from './Lexer'
-import Parser from './parser/Parser'
-import PromiseSync from './PromiseSync'
-import type { AstNode } from './types'
+import Lexer from './Lexer.ts'
+import PromiseSync from './PromiseSync.ts'
+import Evaluator from './evaluator/Evaluator.ts'
+import Parser from './parser/Parser.ts'
+
+import type { AstNode } from './types.ts'
 
 interface Grammar {
-  elements: {
-    [key: string]: any
-  }
+  elements: Record<string, any>
   [key: string]: any
 }
 
@@ -63,7 +62,12 @@ class Expression {
    */
   evalSync(context = {}) {
     const res = this._eval(context, PromiseSync as any) as PromiseSync
-    if (res.error) throw res.error
+    if (res.error) {
+      if (res.error instanceof Error) {
+        throw res.error
+      }
+      throw new Error(typeof res.error === 'string' ? res.error : JSON.stringify(res.error))
+    }
     return res.value
   }
 
@@ -81,7 +85,9 @@ class Expression {
   }
 
   _getAst() {
-    if (!this._ast) this.compile()
+    if (!this._ast) {
+      this.compile()
+    }
     return this._ast
   }
 }

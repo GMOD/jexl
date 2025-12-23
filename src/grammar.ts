@@ -25,15 +25,9 @@ export interface SimpleElement {
 export type GrammarElement = BinaryOp | UnaryOp | SimpleElement
 
 export interface Grammar {
-  elements: {
-    [key: string]: GrammarElement
-  }
-  functions: {
-    [key: string]: (...args: any[]) => any
-  }
-  transforms: {
-    [key: string]: (val: any, ...args: any[]) => any
-  }
+  elements: Record<string, GrammarElement>
+  functions: Record<string, (...args: any[]) => any>
+  transforms: Record<string, (val: any, ...args: any[]) => any>
 }
 
 export const getGrammar = (): Grammar => ({
@@ -125,7 +119,7 @@ export const getGrammar = (): Grammar => ({
       precedence: 10,
       evalOnDemand: (left, right) => {
         return left.eval().then((leftVal) => {
-          if (!leftVal) return leftVal
+          if (!leftVal) {return leftVal}
           return right.eval()
         })
       }
@@ -135,7 +129,7 @@ export const getGrammar = (): Grammar => ({
       precedence: 10,
       evalOnDemand: (left, right) => {
         return left.eval().then((leftVal) => {
-          if (leftVal) return leftVal
+          if (leftVal) {return leftVal}
           return right.eval()
         })
       }
@@ -145,10 +139,10 @@ export const getGrammar = (): Grammar => ({
       precedence: 20,
       eval: (left, right) => {
         if (typeof right === 'string') {
-          return right.indexOf(left) !== -1
+          return right.includes(left)
         }
         if (Array.isArray(right)) {
-          return right.some((elem) => elem === left)
+          return right.includes(left)
         }
         return false
       }
@@ -161,7 +155,7 @@ export const getGrammar = (): Grammar => ({
     '=': {
       type: 'binaryOp',
       precedence: 2,
-      eval: (left, right) => {
+      eval: (_left, _right) => {
         throw new Error('Assignment handled specially')
       }
     }

@@ -3,19 +3,13 @@
  * Copyright 2020 Tom Shawver
  */
 
-import Expression from './Expression'
-import { getGrammar } from './grammar'
+import Expression from './Expression.ts'
+import { getGrammar } from './grammar.ts'
 
 interface Grammar {
-  elements: {
-    [key: string]: any
-  }
-  functions: {
-    [key: string]: (...args: any[]) => any
-  }
-  transforms: {
-    [key: string]: (val: any, ...args: any[]) => any
-  }
+  elements: Record<string, any>
+  functions: Record<string, (...args: any[]) => any>
+  transforms: Record<string, (val: any, ...args: any[]) => any>
 }
 
 /**
@@ -53,7 +47,12 @@ class Jexl {
    *      that operand's actual value. This is useful to conditionally evaluate
    *      operands.
    */
-  addBinaryOp(operator: string, precedence: number, fn: (left: any, right: any) => any, manualEval?: boolean) {
+  addBinaryOp(
+    operator: string,
+    precedence: number,
+    fn: (left: any, right: any) => any,
+    manualEval?: boolean
+  ) {
     this._addGrammarElement(operator, {
       type: 'binaryOp',
       precedence: precedence,
@@ -79,7 +78,7 @@ class Jexl {
    * function counterpart.
    * @param {{}} map A map of expression function names to javascript functions
    */
-  addFunctions(map: { [key: string]: (...args: any[]) => any }) {
+  addFunctions(map: Record<string, (...args: any[]) => any>) {
     Object.assign(this._grammar.functions, map)
   }
 
@@ -118,7 +117,7 @@ class Jexl {
    * accepts a map of one or more transform names to their transform function.
    * @param {{}} map A map of transform names to transform functions
    */
-  addTransforms(map: { [key: string]: (val: any, ...args: any[]) => any }) {
+  addTransforms(map: Record<string, (val: any, ...args: any[]) => any>) {
     Object.assign(this._grammar.transforms, map)
   }
 
@@ -195,11 +194,13 @@ class Jexl {
    * @param  {...any} args
    */
   expr(strs: TemplateStringsArray, ...args: any[]) {
-    const exprStr = strs.reduce((acc, str, idx) => {
-      const arg = idx < args.length ? args[idx] : ''
-      acc += str + arg
-      return acc
-    }, '')
+    let exprStr = ''
+    for (let idx = 0; idx < strs.length; idx++) {
+      exprStr += strs[idx]
+      if (idx < args.length) {
+        exprStr += args[idx]
+      }
+    }
     return this.createExpression(exprStr)
   }
 
@@ -208,12 +209,9 @@ class Jexl {
    * @param {string} operator The operator string to be removed
    */
   removeOp(operator: string) {
-    if (
-      this._grammar.elements[operator] &&
-      (this._grammar.elements[operator].type === 'binaryOp' ||
-        this._grammar.elements[operator].type === 'unaryOp')
-    ) {
-      delete this._grammar.elements[operator]
+    const elem = this._grammar.elements[operator]
+    if (elem && (elem.type === 'binaryOp' || elem.type === 'unaryOp')) {
+      Reflect.deleteProperty(this._grammar.elements, operator)
     }
   }
 

@@ -3,15 +3,14 @@
  * Copyright 2020 Tom Shawver
  */
 
-import * as handlers from './handlers'
-import { states } from './states'
-import type { AstNode, Token } from '../types'
-import type Lexer from '../Lexer'
+import * as handlers from './handlers.ts'
+import { states } from './states.ts'
+
+import type Lexer from '../Lexer.ts'
+import type { AstNode, Token } from '../types.ts'
 
 interface Grammar {
-  elements: {
-    [key: string]: any
-  }
+  elements: Record<string, any>
 }
 
 /**
@@ -38,7 +37,7 @@ class Parser {
   _tree: AstNode | null
   _exprStr: string
   _relative: boolean
-  _stopMap: { [tokenType: string]: any }
+  _stopMap: Record<string, any>
   _cursor?: AstNode | null
   _subParser?: Parser
   _parentStop?: boolean
@@ -47,7 +46,12 @@ class Parser {
   _curObjKey?: string
   _sequenceExpressions?: AstNode[]
 
-  constructor(grammar: Grammar, lexer: Lexer, prefix?: string, stopMap?: { [tokenType: string]: any }) {
+  constructor(
+    grammar: Grammar,
+    lexer: Lexer,
+    prefix?: string,
+    stopMap?: Record<string, any>
+  ) {
     this._grammar = grammar
     this._lexer = lexer
     this._state = 'expectOperand'
@@ -81,7 +85,9 @@ class Parser {
       const stopState = this._subParser!.addToken(token)
       if (stopState) {
         this._endSubExpression()
-        if (this._parentStop) return stopState
+        if (this._parentStop) {
+          return stopState
+        }
         this._state = stopState
       }
     } else if (state.tokenTypes?.[token.type]) {
@@ -113,7 +119,7 @@ class Parser {
    *      the {@link Lexer#tokenize} function.
    */
   addTokens(tokens: Token[]) {
-    tokens.forEach(this.addToken, this)
+    tokens.forEach((token) => this.addToken(token))
   }
 
   /**
@@ -175,7 +181,7 @@ class Parser {
     if (!this._cursor) {
       this._tree = node
     } else {
-      (this._cursor as any).right = node
+      ;(this._cursor as any).right = node
       this._setParent(node, this._cursor)
     }
     this._cursor = node

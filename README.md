@@ -86,8 +86,11 @@ jexl.evalSync('`Price: \\$100`')
 - Arithmetic: `+`, `-`, `*`, `/`, `//` (floor division), `%`, `^` (power)
 - Comparison: `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`
 - Logical: `&&`, `||`
+- Assignment: `=` (assigns value to variable)
 
 **Ternary:** `condition ? consequent : alternate`
+
+**Sequence:** `;` (separates multiple expressions)
 
 ### Identifiers
 
@@ -158,6 +161,38 @@ jexl.evalSync('min(5, 2, 9)')
 
 jexl.evalSync('max(temperature, threshold)')
 // evaluates with context
+```
+
+### Multiple Expressions
+
+Separate multiple expressions with semicolons. The result is the value of the last expression:
+
+```javascript
+jexl.evalSync('5; 10; 15')
+// 15
+
+jexl.evalSync('1 + 1; 2 + 2; 3 + 3')
+// 6
+```
+
+### Variable Assignment
+
+Assign values to variables using `=` (no `let`, `var`, or `const` needed). Assignments mutate the context and return the assigned value:
+
+```javascript
+jexl.evalSync('x = 5')
+// 5
+
+jexl.evalSync('x = 5; x * 2')
+// 10
+
+jexl.evalSync('x = 5; y = 10; x + y')
+// 15
+
+const context = {}
+jexl.evalSync('x = 5; y = x * 2; y', context)
+// 10
+// context is now { x: 5, y: 10 }
 ```
 
 ## Usage

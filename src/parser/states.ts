@@ -3,9 +3,10 @@
  * Copyright 2020 Tom Shawver
  */
 
-import * as h from './handlers'
-import type { AstNode } from '../types'
-import type Parser from './Parser'
+import * as h from './handlers.ts'
+
+import type { AstNode } from '../types.ts'
+import type Parser from './Parser.ts'
 
 interface TokenTypeOptions {
   toState?: string
@@ -13,19 +14,13 @@ interface TokenTypeOptions {
 }
 
 interface StateDefinition {
-  tokenTypes?: {
-    [tokenType: string]: TokenTypeOptions
-  }
+  tokenTypes?: Record<string, TokenTypeOptions>
   subHandler?: (this: Parser, ast: AstNode | null) => void
-  endStates?: {
-    [tokenType: string]: string
-  }
+  endStates?: Record<string, string>
   completable?: boolean
 }
 
-interface States {
-  [state: string]: StateDefinition
-}
+type States = Record<string, StateDefinition>
 
 /**
  * A mapping of all states in the finite state machine to a set of instructions
@@ -105,7 +100,8 @@ export const states: States = {
       binaryOp: { toState: 'expectOperand' },
       dot: { toState: 'traverse' },
       openBracket: { toState: 'filter' },
-      pipe: { toState: 'expectTransform' }
+      pipe: { toState: 'expectTransform' },
+      question: { toState: 'ternaryMid', handler: h.ternaryStart }
     },
     completable: true
   },
@@ -114,7 +110,8 @@ export const states: States = {
       binaryOp: { toState: 'expectOperand' },
       dot: { toState: 'traverse' },
       openBracket: { toState: 'filter' },
-      pipe: { toState: 'expectTransform' }
+      pipe: { toState: 'expectTransform' },
+      question: { toState: 'ternaryMid', handler: h.ternaryStart }
     },
     completable: true
   },

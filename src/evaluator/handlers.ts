@@ -3,10 +3,10 @@
  * Copyright 2020 Tom Shawver
  */
 
-import type { AstNode } from '../types'
-import type Evaluator from './Evaluator'
+import type { AstNode } from '../types.ts'
+import type Evaluator from './Evaluator.ts'
 
-const poolNames: { [key: string]: string } = {
+const poolNames: Record<string, string> = {
   functions: 'Jexl Function',
   transforms: 'Transform'
 }
@@ -43,10 +43,9 @@ export function BinaryExpression(this: Evaluator, ast: any) {
     const wrap = (subAst: AstNode) => ({ eval: () => this.eval(subAst) })
     return grammarOp.evalOnDemand(wrap(ast.left), wrap(ast.right))
   }
-  return this.Promise.all([
-    this.eval(ast.left),
-    this.eval(ast.right)
-  ]).then((arr: any[]) => grammarOp.eval(arr[0], arr[1]))
+  return this.Promise.all([this.eval(ast.left), this.eval(ast.right)]).then(
+    (arr: any[]) => grammarOp.eval(arr[0], arr[1])
+  )
 }
 
 /**
@@ -104,7 +103,9 @@ export function Identifier(this: Evaluator, ast: any) {
     return contextSource[ast.value]
   }
   return this.eval(ast.from).then((context: any) => {
-    if (context == null) return undefined
+    if (context == null) {
+      return undefined
+    }
     const ctx = Array.isArray(context) ? context[0] : context
     return ctx?.[ast.value]
   })
@@ -135,7 +136,9 @@ export function TemplateLiteral(this: Evaluator, ast: any) {
       return this.Promise.resolve(part.value)
     }
     return this.eval(part.value).then((result: any) => {
-      if (result == null) return ''
+      if (result == null) {
+        return ''
+      }
       return String(result)
     })
   })

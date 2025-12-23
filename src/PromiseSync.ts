@@ -22,6 +22,7 @@ class PromiseSync<T = unknown> {
     return this as any
   }
 
+  // eslint-disable-next-line unicorn/no-thenable
   then<TResult1 = T, TResult2 = never>(
     resolved: (val: T) => TResult1,
     rejected?: (error: unknown) => TResult2
@@ -33,7 +34,7 @@ class PromiseSync<T = unknown> {
         this._reject(e)
       }
     }
-    if (rejected) this.catch(rejected)
+    if (rejected) {this.catch(rejected)}
     return this as any
   }
 
@@ -59,21 +60,26 @@ class PromiseSync<T = unknown> {
     return new PromiseSync((resolve) => {
       const resolved = vals.map((val) => {
         while (val instanceof PromiseSync) {
-          if (val.error) throw Error(String(val.error))
+          if (val.error) {
+            if (val.error instanceof Error) {
+              throw val.error
+            }
+            throw new Error(typeof val.error === 'string' ? val.error : JSON.stringify(val.error))
+          }
           val = val.value as T
         }
         return val
       })
-      resolve(resolved as T[])
+      resolve(resolved)
     })
   }
 
   static resolve<T>(val?: T): PromiseSync<T> {
-    return new PromiseSync<T>((resolve) => resolve(val as T))
+    return new PromiseSync<T>((resolve) => { resolve(val as T) })
   }
 
   static reject(error: unknown): PromiseSync<never> {
-    return new PromiseSync((_, reject) => reject(error))
+    return new PromiseSync((_, reject) => { reject(error) })
   }
 }
 

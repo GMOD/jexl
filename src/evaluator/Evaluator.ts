@@ -3,16 +3,16 @@
  * Copyright 2020 Tom Shawver
  */
 
-import * as handlers from './handlers'
-import type { AstNode } from '../types'
+import * as handlers from './handlers.ts'
+
+import type { AstNode } from '../types.ts'
 
 interface Grammar {
-  elements: {
-    [key: string]: any
-  }
+  elements: Record<string, any>
   [key: string]: any
 }
 
+// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
 type PromiseConstructor = typeof Promise | any
 
 /**
@@ -40,7 +40,12 @@ class Evaluator {
   _relContext: any
   Promise: PromiseConstructor
 
-  constructor(grammar: Grammar, context?: any, relativeContext?: any, promise: PromiseConstructor = Promise) {
+  constructor(
+    grammar: Grammar,
+    context?: any,
+    relativeContext?: any,
+    promise: PromiseConstructor = Promise
+  ) {
     this._grammar = grammar
     this._context = context || {}
     this._relContext = relativeContext || this._context
@@ -77,7 +82,7 @@ class Evaluator {
    *      evaluated
    * @returns {Promise<{}>} resolves with the result map.
    */
-  evalMap(map: { [key: string]: AstNode }) {
+  evalMap(map: Record<string, AstNode>) {
     const entries = Object.entries(map)
     const promises = entries.map(([_, ast]) => this.eval(ast))
     return this.Promise.all(promises).then((vals: any[]) =>
@@ -105,9 +110,13 @@ class Evaluator {
    * @private
    */
   _filterRelative(subject: any, expr: AstNode) {
-    const arr = Array.isArray(subject) ? subject : (subject == null ? [] : [subject])
+    const arr = Array.isArray(subject)
+      ? subject
+      : subject == null
+        ? []
+        : [subject]
 
-    const promises = arr.map(elem =>
+    const promises = arr.map((elem) =>
       new Evaluator(this._grammar, this._context, elem, this.Promise).eval(expr)
     )
 

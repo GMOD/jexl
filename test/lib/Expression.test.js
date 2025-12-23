@@ -3,8 +3,9 @@
  * Copyright 2020 Tom Shawver
  */
 
-import { vi, describe, beforeEach, it, expect } from 'vitest'
-import { Jexl } from '../../src/Jexl'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { Jexl } from '../../src/Jexl.ts'
 let inst
 
 describe('Expression', () => {

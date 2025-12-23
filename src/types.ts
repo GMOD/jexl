@@ -46,17 +46,15 @@ export interface ArrayLiteral extends AstNode {
 
 export interface ObjectLiteral extends AstNode {
   type: 'ObjectLiteral'
-  value: {
-    [key: string]: AstNode
-  }
+  value: Record<string, AstNode>
 }
 
 export interface TemplateLiteral extends AstNode {
   type: 'TemplateLiteral'
-  parts: Array<{
+  parts: {
     type: 'static' | 'expression'
     value: string | AstNode
-  }>
+  }[]
 }
 
 export interface FunctionCall extends AstNode {

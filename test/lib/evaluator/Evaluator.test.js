@@ -3,12 +3,13 @@
  * Copyright 2020 Tom Shawver
  */
 
-import { describe, it, expect } from 'vitest'
-import Lexer from '../../../src/Lexer'
-import Parser from '../../../src/parser/Parser'
-import Evaluator from '../../../src/evaluator/Evaluator'
-import { getGrammar } from '../../../src/grammar'
-import PromiseSync from '../../../src/PromiseSync'
+import { describe, expect, it } from 'vitest'
+
+import Lexer from '../../../src/Lexer.ts'
+import PromiseSync from '../../../src/PromiseSync.ts'
+import Evaluator from '../../../src/evaluator/Evaluator.ts'
+import { getGrammar } from '../../../src/grammar.ts'
+import Parser from '../../../src/parser/Parser.ts'
 const grammar = getGrammar()
 
 const lexer = new Lexer(grammar)
@@ -30,9 +31,9 @@ describe('Evaluator', () => {
   })
   it('evaluates a string concat', async () => {
     const e = new Evaluator(grammar)
-    return expect(e.eval(toTree('"Hello" + (4+4) + "Wo\\"rld"'))).resolves.toBe(
-      'Hello8Wo"rld'
-    )
+    return expect(
+      e.eval(toTree(String.raw`"Hello" + (4+4) + "Wo\"rld"`))
+    ).resolves.toBe('Hello8Wo"rld')
   })
   it('evaluates a true comparison expression', async () => {
     const e = new Evaluator(grammar)
@@ -195,47 +196,71 @@ describe('Evaluator', () => {
   describe('Template Strings', () => {
     it('evaluates a simple template string', async () => {
       const e = new Evaluator(grammar, { name: 'World' })
-      return expect(e.eval(toTree('`Hello ${name}`'))).resolves.toBe('Hello World')
+      return expect(e.eval(toTree('`Hello ${name}`'))).resolves.toBe(
+        'Hello World'
+      )
     })
     it('evaluates template string with expression', async () => {
       const e = new Evaluator(grammar, { price: 10, quantity: 3 })
-      return expect(e.eval(toTree('`Total: ${price * quantity}`'))).resolves.toBe('Total: 30')
+      return expect(
+        e.eval(toTree('`Total: ${price * quantity}`'))
+      ).resolves.toBe('Total: 30')
     })
     it('evaluates template string with multiple interpolations', async () => {
       const e = new Evaluator(grammar, { a: 5, b: 3, c: 8 })
-      return expect(e.eval(toTree('`${a} + ${b} = ${c}`'))).resolves.toBe('5 + 3 = 8')
+      return expect(e.eval(toTree('`${a} + ${b} = ${c}`'))).resolves.toBe(
+        '5 + 3 = 8'
+      )
     })
     it('evaluates template string with null value', async () => {
       const e = new Evaluator(grammar, {})
-      return expect(e.eval(toTree('`Value: ${missing}`'))).resolves.toBe('Value: ')
+      return expect(e.eval(toTree('`Value: ${missing}`'))).resolves.toBe(
+        'Value: '
+      )
     })
     it('evaluates template string with undefined value', async () => {
       const e = new Evaluator(grammar, { obj: {} })
-      return expect(e.eval(toTree('`Value: ${obj.missing}`'))).resolves.toBe('Value: ')
+      return expect(e.eval(toTree('`Value: ${obj.missing}`'))).resolves.toBe(
+        'Value: '
+      )
     })
     it('evaluates template string with ternary expression', async () => {
       const e = new Evaluator(grammar, { age: 20 })
-      return expect(e.eval(toTree('`Status: ${age >= 18 ? "adult" : "minor"}`'))).resolves.toBe('Status: adult')
+      return expect(
+        e.eval(toTree('`Status: ${age >= 18 ? "adult" : "minor"}`'))
+      ).resolves.toBe('Status: adult')
     })
     it('evaluates template string with array access', async () => {
       const e = new Evaluator(grammar, { items: ['a', 'b', 'c'] })
-      return expect(e.eval(toTree('`First: ${items[0]}`'))).resolves.toBe('First: a')
+      return expect(e.eval(toTree('`First: ${items[0]}`'))).resolves.toBe(
+        'First: a'
+      )
     })
     it('evaluates template string with object access', async () => {
-      const e = new Evaluator(grammar, { user: { firstName: 'John', lastName: 'Doe' } })
-      return expect(e.eval(toTree('`Name: ${user.firstName + " " + user.lastName}`'))).resolves.toBe('Name: John Doe')
+      const e = new Evaluator(grammar, {
+        user: { firstName: 'John', lastName: 'Doe' }
+      })
+      return expect(
+        e.eval(toTree('`Name: ${user.firstName + " " + user.lastName}`'))
+      ).resolves.toBe('Name: John Doe')
     })
     it('evaluates template string with escaped backticks', async () => {
       const e = new Evaluator(grammar)
-      return expect(e.eval(toTree('`Code: \\`example\\``'))).resolves.toBe('Code: `example`')
+      return expect(e.eval(toTree('`Code: \\`example\\``'))).resolves.toBe(
+        'Code: `example`'
+      )
     })
     it('evaluates template string with escaped dollar signs', async () => {
       const e = new Evaluator(grammar)
-      return expect(e.eval(toTree('`Price: \\$100`'))).resolves.toBe('Price: $100')
+      return expect(e.eval(toTree('`Price: \\$100`'))).resolves.toBe(
+        'Price: $100'
+      )
     })
     it('evaluates static template string with no interpolations', async () => {
       const e = new Evaluator(grammar)
-      return expect(e.eval(toTree('`just a string`'))).resolves.toBe('just a string')
+      return expect(e.eval(toTree('`just a string`'))).resolves.toBe(
+        'just a string'
+      )
     })
   })
 })

@@ -3,10 +3,11 @@
  * Copyright 2020 Tom Shawver
  */
 
-import { describe, beforeEach, it, expect } from 'vitest'
-import Lexer from '../../../src/Lexer'
-import Parser from '../../../src/parser/Parser'
-import { getGrammar } from '../../../src/grammar'
+import { beforeEach, describe, expect, it } from 'vitest'
+
+import Lexer from '../../../src/Lexer.ts'
+import { getGrammar } from '../../../src/grammar.ts'
+import Parser from '../../../src/parser/Parser.ts'
 
 const grammar = getGrammar()
 

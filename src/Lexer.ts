@@ -3,43 +3,42 @@
  * Copyright 2020 Tom Shawver
  */
 
-import type { Token } from './types'
+import type { Token } from './types.ts'
 
 const numericRegex = /^-?(?:(?:[0-9]*\.[0-9]+)|[0-9]+)$/
-const identRegex = /^[a-zA-Zа-яА-Я_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF$][a-zA-Zа-яА-Я0-9_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF$]*$/
+const identRegex =
+  /^[a-zA-Zа-яА-Я_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF$][a-zA-Zа-яА-Я0-9_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF$]*$/
 const escEscRegex = /\\\\/
 const whitespaceRegex = /^\s*$/
 const preOpRegexElems = [
   // Template strings
   '`(?:[^`\\\\]|\\\\.)*`',
   // Strings
-  "'(?:(?:\\\\')|[^'])*'",
-  '"(?:(?:\\\\")|[^"])*"',
+  String.raw`'(?:(?:\\')|[^'])*'`,
+  String.raw`"(?:(?:\\")|[^"])*"`,
   // Whitespace
-  '\\s+',
+  String.raw`\s+`,
   // Booleans
-  '\\btrue\\b',
-  '\\bfalse\\b'
+  String.raw`\btrue\b`,
+  String.raw`\bfalse\b`
 ]
 const postOpRegexElems = [
   // Identifiers
   '[a-zA-Zа-яА-Я_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\\$][a-zA-Z0-9а-яА-Я_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\\$]*',
   // Numerics (without negative symbol)
-  '(?:(?:[0-9]*\\.[0-9]+)|[0-9]+)'
+  String.raw`(?:(?:[0-9]*\.[0-9]+)|[0-9]+)`
 ]
-const minusNegatesAfter = [
+const minusNegatesAfter = new Set([
   'binaryOp',
   'unaryOp',
   'openParen',
   'openBracket',
   'question',
   'colon'
-]
+])
 
 interface Grammar {
-  elements: {
-    [key: string]: any
-  }
+  elements: Record<string, any>
 }
 
 /**
@@ -55,7 +54,7 @@ interface Grammar {
 class Lexer {
   _grammar: Grammar
   _splitRegex?: RegExp
-  _escQuoteRegexCache: Map<string, RegExp> = new Map()
+  _escQuoteRegexCache = new Map<string, RegExp>()
 
   constructor(grammar: Grammar) {
     this._grammar = grammar
@@ -69,10 +68,7 @@ class Lexer {
    */
   getElements(str: string) {
     const regex = this._getSplitRegex()
-    return str.split(regex).filter((elem) => {
-      // Remove empty strings
-      return elem
-    })
+    return str.split(regex).filter(Boolean)
   }
 
   /**
@@ -158,19 +154,19 @@ class Lexer {
       value: element,
       raw: element
     }
-    if (element[0] === '`') {
+    if (element.startsWith('`')) {
       token.type = 'templateString'
       token.value = this._parseTemplateString(element)
       return token
-    } else if (element[0] === '"' || element[0] === "'") {
+    } else if (element.startsWith('"') || element.startsWith("'")) {
       token.value = this._unquote(element)
-    } else if (element.match(numericRegex)) {
+    } else if (numericRegex.exec(element)) {
       token.value = parseFloat(element)
     } else if (element === 'true' || element === 'false') {
       token.value = element === 'true'
     } else if (this._grammar.elements[element]) {
       token.type = this._grammar.elements[element].type
-    } else if (element.match(identRegex)) {
+    } else if (identRegex.exec(element)) {
       token.type = 'identifier'
     } else {
       throw new Error(`Invalid expression token: ${element}`)
@@ -187,9 +183,9 @@ class Lexer {
    * @private
    */
   _escapeRegExp(str: string) {
-    str = str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    if (str.match(identRegex)) {
-      str = '\\b' + str + '\\b'
+    str = str.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
+    if (identRegex.exec(str)) {
+      str = String.raw`\b` + str + String.raw`\b`
     }
     return str
   }
@@ -209,7 +205,7 @@ class Lexer {
         })
         .map((elem) => {
           return this._escapeRegExp(elem)
-        }, this)
+        })
       this._splitRegex = new RegExp(
         '(' +
           [
@@ -233,10 +229,10 @@ class Lexer {
    * @private
    */
   _isNegative(tokens: Token[]) {
-    if (!tokens.length) return true
-    return minusNegatesAfter.some(
-      (type) => type === tokens[tokens.length - 1].type
-    )
+    if (!tokens.length) {
+      return true
+    }
+    return minusNegatesAfter.has(tokens[tokens.length - 1].type)
   }
 
   /**
@@ -248,7 +244,7 @@ class Lexer {
    * @private
    */
   _isWhitespace(str: string) {
-    return !!str.match(whitespaceRegex)
+    return !!whitespaceRegex.exec(str)
   }
 
   /**
@@ -276,7 +272,7 @@ class Lexer {
   }
 
   _parseTemplateString(str: string) {
-    const parts: Array<{ type: 'static' | 'interpolation'; value: string }> = []
+    const parts: { type: 'static' | 'interpolation'; value: string }[] = []
     let current = 1
     let staticStart = 1
 
@@ -303,8 +299,12 @@ class Lexer {
             current += 2
             continue
           }
-          if (str[current] === '{') braceDepth++
-          if (str[current] === '}') braceDepth--
+          if (str[current] === '{') {
+            braceDepth++
+          }
+          if (str[current] === '}') {
+            braceDepth--
+          }
           current++
         }
 
@@ -335,9 +335,9 @@ class Lexer {
 
   _unescapeTemplateString(str: string) {
     return str
-      .replace(/\\`/g, '`')
-      .replace(/\\\$/g, '$')
-      .replace(/\\\\/g, '\\')
+      .replaceAll('\\`', '`')
+      .replaceAll(String.raw`\$`, '$')
+      .replaceAll('\\\\', '\\')
   }
 }
 

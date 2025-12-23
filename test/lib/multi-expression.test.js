@@ -3,8 +3,9 @@
  * Copyright 2020 Tom Shawver
  */
 
-import { describe, it, expect } from 'vitest'
-import { Jexl } from '../../src/Jexl'
+import { describe, expect, it } from 'vitest'
+
+import { Jexl } from '../../src/Jexl.ts'
 
 const jexl = new Jexl()
 
@@ -59,7 +60,9 @@ describe('Multi-Expression Support', () => {
 
   describe('Error Handling', () => {
     it('assignment to non-identifier throws error', () => {
-      expect(() => jexl.evalSync('5 = 10')).toThrow('Left side of assignment must be a variable name')
+      expect(() => jexl.evalSync('5 = 10')).toThrow(
+        'Left side of assignment must be a variable name'
+      )
     })
   })
 })
