@@ -39,13 +39,11 @@ class Jexl {
    * @param {number} precedence The operator's precedence
    * @param {function} fn A function to run to calculate the result. The function
    *      will be called with two arguments: left and right, denoting the values
-   *      on either side of the operator. It should return either the resulting
-   *      value, or a Promise that resolves with the resulting value.
+   *      on either side of the operator. It should return the resulting value.
    * @param {boolean} [manualEval] If true, the `left` and `right` arguments
    *      will be wrapped in objects with an `eval` function. Calling
-   *      left.eval() or right.eval() will return a promise that resolves to
-   *      that operand's actual value. This is useful to conditionally evaluate
-   *      operands.
+   *      left.eval() or right.eval() will return that operand's actual value.
+   *      This is useful to conditionally evaluate operands.
    */
   addBinaryOp(
     operator: string,
@@ -88,8 +86,7 @@ class Jexl {
    * @param {string} operator The operator string to be added
    * @param {function} fn A function to run to calculate the result. The function
    *      will be called with one argument: the literal value to the right of the
-   *      operator. It should return either the resulting value, or a Promise
-   *      that resolves with the resulting value.
+   *      operator. It should return the resulting value.
    */
   addUnaryOp(operator: string, fn: (right: any) => any) {
     this._addGrammarElement(operator, {
@@ -163,28 +160,16 @@ class Jexl {
   }
 
   /**
-   * Asynchronously evaluates a Jexl string within an optional context.
-   * @param {string} expression The Jexl expression to be evaluated
-   * @param {Object} [context] A mapping of variables to values, which will be
-   *      made accessible to the Jexl expression when evaluating it
-   * @returns {Promise<*>} resolves with the result of the evaluation.
-   */
-  eval(expression: string, context = {}) {
-    const exprObj = this.createExpression(expression)
-    return exprObj.eval(context)
-  }
-
-  /**
-   * Synchronously evaluates a Jexl string within an optional context.
+   * Evaluates a Jexl string within an optional context.
    * @param {string} expression The Jexl expression to be evaluated
    * @param {Object} [context] A mapping of variables to values, which will be
    *      made accessible to the Jexl expression when evaluating it
    * @returns {*} the result of the evaluation.
    * @throws {*} on error
    */
-  evalSync(expression: string, context = {}) {
+  eval(expression: string, context = {}) {
     const exprObj = this.createExpression(expression)
-    return exprObj.evalSync(context)
+    return exprObj.eval(context)
   }
 
   /**

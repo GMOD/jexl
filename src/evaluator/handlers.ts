@@ -16,7 +16,7 @@ const poolNames: Record<string, string> = {
  * independently run through the evaluator.
  * @param {{type: 'ObjectLiteral', value: <{}>}} ast An expression tree with an
  *      ObjectLiteral as the top node
- * @returns {Promise.<[]>} resolves to a map contained evaluated values.
+ * @returns {[]} an array of evaluated values.
  * @private
  */
 export function ArrayLiteral(this: Evaluator, ast: any) {
@@ -29,12 +29,12 @@ export function ArrayLiteral(this: Evaluator, ast: any) {
  * evaluators: `eval` is called with the left and right operands pre-evaluated.
  * `evalOnDemand`, if it exists, will be called with the left and right operands
  * each individually wrapped in an object with an "eval" function that returns
- * a promise with the resulting value. This allows the binary expression to
- * evaluate the operands conditionally.
+ * the resulting value. This allows the binary expression to evaluate the
+ * operands conditionally.
  * @param {{type: 'BinaryExpression', operator: <string>, left: {},
  *      right: {}}} ast An expression tree with a BinaryExpression as the top
  *      node
- * @returns {Promise<*>} resolves with the value of the BinaryExpression.
+ * @returns {*} the value of the BinaryExpression.
  * @private
  */
 export function BinaryExpression(this: Evaluator, ast: any) {
@@ -43,31 +43,27 @@ export function BinaryExpression(this: Evaluator, ast: any) {
     const wrap = (subAst: AstNode) => ({ eval: () => this.eval(subAst) })
     return grammarOp.evalOnDemand(wrap(ast.left), wrap(ast.right))
   }
-  return this.Promise.all([this.eval(ast.left), this.eval(ast.right)]).then(
-    (arr: any[]) => grammarOp.eval(arr[0], arr[1])
-  )
+  const left = this.eval(ast.left)
+  const right = this.eval(ast.right)
+  return grammarOp.eval(left, right)
 }
 
 /**
  * Evaluates a ConditionalExpression node by first evaluating its test branch,
- * and resolving with the consequent branch if the test is truthy, or the
- * alternate branch if it is not. If there is no consequent branch, the test
- * result will be used instead.
+ * and returning the consequent branch if the test is truthy, or the alternate
+ * branch if it is not. If there is no consequent branch, the test result will
+ * be used instead.
  * @param {{type: 'ConditionalExpression', test: {}, consequent: {},
  *      alternate: {}}} ast An expression tree with a ConditionalExpression as
  *      the top node
  * @private
  */
 export function ConditionalExpression(this: Evaluator, ast: any) {
-  return this.eval(ast.test).then((res: any) => {
-    if (res) {
-      if (ast.consequent) {
-        return this.eval(ast.consequent)
-      }
-      return res
-    }
-    return this.eval(ast.alternate)
-  })
+  const res = this.eval(ast.test)
+  if (res) {
+    return ast.consequent ? this.eval(ast.consequent) : res
+  }
+  return this.eval(ast.alternate)
 }
 
 /**
@@ -75,16 +71,15 @@ export function ConditionalExpression(this: Evaluator, ast: any) {
  * @param {{type: 'FilterExpression', relative: <boolean>, expr: {},
  *      subject: {}}} ast An expression tree with a FilterExpression as the top
  *      node
- * @returns {Promise<*>} resolves with the value of the FilterExpression.
+ * @returns {*} the value of the FilterExpression.
  * @private
  */
 export function FilterExpression(this: Evaluator, ast: any) {
-  return this.eval(ast.subject).then((subject: any) => {
-    if (ast.relative) {
-      return this._filterRelative(subject, ast.expr)
-    }
-    return this._filterStatic(subject, ast.expr)
-  })
+  const subject = this.eval(ast.subject)
+  if (ast.relative) {
+    return this._filterRelative(subject, ast.expr)
+  }
+  return this._filterStatic(subject, ast.expr)
 }
 
 /**
@@ -93,8 +88,7 @@ export function FilterExpression(this: Evaluator, ast: any) {
  * constructed.
  * @param {{type: 'Identifier', value: <string>, [from]: {}}} ast An expression
  *      tree with an Identifier as the top node
- * @returns {Promise<*>|*} either the identifier's value, or a Promise that
- *      will resolve with the identifier's value.
+ * @returns {*} the identifier's value.
  * @private
  */
 export function Identifier(this: Evaluator, ast: any) {
@@ -102,13 +96,12 @@ export function Identifier(this: Evaluator, ast: any) {
     const contextSource = ast.relative ? this._relContext : this._context
     return contextSource[ast.value]
   }
-  return this.eval(ast.from).then((context: any) => {
-    if (context == null) {
-      return undefined
-    }
-    const ctx = Array.isArray(context) ? context[0] : context
-    return ctx?.[ast.value]
-  })
+  const context = this.eval(ast.from)
+  if (context == null) {
+    return undefined
+  }
+  const ctx = Array.isArray(context) ? context[0] : context
+  return ctx?.[ast.value]
 }
 
 /**
@@ -127,23 +120,22 @@ export function Literal(this: Evaluator, ast: any) {
  * and concatenating all parts into a final string.
  * @param {{type: 'TemplateLiteral', parts: Array<{}>}} ast An expression
  *      tree with a TemplateLiteral as the top node
- * @returns {Promise<string>} resolves with the final interpolated string
+ * @returns {string} the final interpolated string
  * @private
  */
 export function TemplateLiteral(this: Evaluator, ast: any) {
-  const promises = ast.parts.map((part: any) => {
+  const values = ast.parts.map((part: any) => {
     if (part.type === 'static') {
-      return this.Promise.resolve(part.value)
+      return part.value
     }
-    return this.eval(part.value).then((result: any) => {
-      if (result == null) {
-        return ''
-      }
-      return String(result)
-    })
+    const result = this.eval(part.value)
+    if (result == null) {
+      return ''
+    }
+    return String(result)
   })
 
-  return this.Promise.all(promises).then((values: string[]) => values.join(''))
+  return values.join('')
 }
 
 /**
@@ -151,7 +143,7 @@ export function TemplateLiteral(this: Evaluator, ast: any) {
  * independently run through the evaluator.
  * @param {{type: 'ObjectLiteral', value: <{}>}} ast An expression tree with an
  *      ObjectLiteral as the top node
- * @returns {Promise<{}>} resolves to a map contained evaluated values.
+ * @returns {{}} a map of evaluated values.
  * @private
  */
 export function ObjectLiteral(this: Evaluator, ast: any) {
@@ -163,8 +155,7 @@ export function ObjectLiteral(this: Evaluator, ast: any) {
  * function defined in one of the grammar's function pools.
  * @param {{type: 'FunctionCall', name: <string>}} ast An
  *      expression tree with a FunctionCall as the top node
- * @returns {Promise<*>|*} the value of the function call, or a Promise that
- *      will resolve with the resulting value.
+ * @returns {*} the value of the function call.
  * @private
  */
 export function FunctionCall(this: Evaluator, ast: any) {
@@ -177,7 +168,8 @@ export function FunctionCall(this: Evaluator, ast: any) {
   if (!func) {
     throw new Error(`${poolName} ${ast.name} is not defined.`)
   }
-  return this.evalArray(ast.args || []).then((args: any[]) => func(...args))
+  const args = this.evalArray(ast.args || [])
+  return func(...args)
 }
 
 /**
@@ -185,13 +177,12 @@ export function FunctionCall(this: Evaluator, ast: any) {
  * operator's eval function.
  * @param {{type: 'UnaryExpression', operator: <string>, right: {}}} ast An
  *      expression tree with a UnaryExpression as the top node
- * @returns {Promise<*>} resolves with the value of the UnaryExpression.
+ * @returns {*} the value of the UnaryExpression.
  * @constructor
  */
 export function UnaryExpression(this: Evaluator, ast: any) {
-  return this.eval(ast.right).then((right: any) =>
-    this._grammar.elements[ast.operator].eval(right)
-  )
+  const right = this.eval(ast.right)
+  return this._grammar.elements[ast.operator].eval(right)
 }
 
 /**
@@ -200,17 +191,12 @@ export function UnaryExpression(this: Evaluator, ast: any) {
  */
 export function SequenceExpression(this: Evaluator, ast: any) {
   let lastValue: any
-  let promise = this.Promise.resolve()
 
   for (const expr of ast.expressions) {
-    promise = promise.then(() =>
-      this.eval(expr).then((val: any) => {
-        lastValue = val
-      })
-    )
+    lastValue = this.eval(expr)
   }
 
-  return promise.then(() => lastValue)
+  return lastValue
 }
 
 /**
@@ -218,9 +204,8 @@ export function SequenceExpression(this: Evaluator, ast: any) {
  * and assigning it to the variable name on the left side.
  */
 export function AssignmentExpression(this: Evaluator, ast: any) {
-  return this.eval(ast.right).then((value: any) => {
-    const varName = ast.left.value
-    this._context[varName] = value
-    return value
-  })
+  const value = this.eval(ast.right)
+  const varName = ast.left.value
+  this._context[varName] = value
+  return value
 }

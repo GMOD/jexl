@@ -9,7 +9,7 @@ export interface BinaryOp {
   type: 'binaryOp'
   precedence: number
   eval?: (left: any, right: any) => any
-  evalOnDemand?: (left: { eval: () => Promise<any> }, right: { eval: () => Promise<any> }) => Promise<any>
+  evalOnDemand?: (left: { eval: () => any }, right: { eval: () => any }) => any
 }
 
 export interface UnaryOp {
@@ -118,20 +118,18 @@ export const getGrammar = (): Grammar => ({
       type: 'binaryOp',
       precedence: 10,
       evalOnDemand: (left, right) => {
-        return left.eval().then((leftVal) => {
-          if (!leftVal) {return leftVal}
-          return right.eval()
-        })
+        const leftVal = left.eval()
+        if (!leftVal) {return leftVal}
+        return right.eval()
       }
     },
     '||': {
       type: 'binaryOp',
       precedence: 10,
       evalOnDemand: (left, right) => {
-        return left.eval().then((leftVal) => {
-          if (leftVal) {return leftVal}
-          return right.eval()
-        })
+        const leftVal = left.eval()
+        if (leftVal) {return leftVal}
+        return right.eval()
       }
     },
     in: {
@@ -169,13 +167,11 @@ export const getGrammar = (): Grammar => ({
    *       All of these are pre-evaluated to their actual values before calling
    *       the function.
    *
-   * The Jexl function should return either the transformed value, or
-   * a Promises/A+ Promise object that resolves with the value and rejects
-   * or throws only when an unrecoverable error occurs. Functions should
-   * generally return undefined when they don't make sense to be used on the
-   * given value type, rather than throw/reject. An error is only
-   * appropriate when the function would normally return a value, but
-   * cannot due to some other failure.
+   * The Jexl function should return the resulting value, or throw when an
+   * unrecoverable error occurs. Functions should generally return undefined
+   * when they don't make sense to be used on the given value type, rather
+   * than throw. An error is only appropriate when the function would normally
+   * return a value, but cannot due to some other failure.
    */
   functions: {},
 
@@ -188,13 +184,11 @@ export const getGrammar = (): Grammar => ({
    *       All of these are pre-evaluated to their actual values before calling
    *       the function.
    *
-   * The transform function should return either the transformed value, or
-   * a Promises/A+ Promise object that resolves with the value and rejects
-   * or throws only when an unrecoverable error occurs. Transforms should
-   * generally return undefined when they don't make sense to be used on the
-   * given value type, rather than throw/reject. An error is only
-   * appropriate when the transform would normally return a value, but
-   * cannot due to some other failure.
+   * The transform function should return the transformed value, or throw when
+   * an unrecoverable error occurs. Transforms should generally return undefined
+   * when they don't make sense to be used on the given value type, rather than
+   * throw. An error is only appropriate when the transform would normally
+   * return a value, but cannot due to some other failure.
    */
   transforms: {}
 })

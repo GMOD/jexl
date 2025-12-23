@@ -6,6 +6,28 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 Nothing yet!
 
+## [v3.0.0]
+
+### BREAKING CHANGES
+
+- **Removed async evaluation support**: Jexl now only supports synchronous evaluation
+- **Renamed methods**: `evalSync()` has been renamed to `eval()`. The async `eval()` method has been removed.
+- **Removed PromiseSync class**: Internal implementation detail removed
+- **Synchronous transforms/functions only**: Custom transforms and functions must now be synchronous. They should return values directly rather than Promises.
+
+### Changed
+
+- Simplified codebase by removing Promise/PromiseSync abstraction layer
+- All evaluation is now synchronous, improving performance and simplifying error handling
+- Errors are now thrown directly rather than being rejected Promises
+
+### Migration Guide
+
+- Replace `await jexl.eval(expr)` with `jexl.eval(expr)` (remove await)
+- Replace `jexl.evalSync(expr)` with `jexl.eval(expr)` (remove Sync suffix)
+- Update custom transforms/functions to be synchronous
+- Replace `.catch()` error handling with `try/catch` blocks
+
 ## [v2.3.0]
 
 ### Added

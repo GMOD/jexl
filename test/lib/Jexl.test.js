@@ -34,53 +34,33 @@ describe('Jexl', () => {
     })
   })
   describe('eval', () => {
-    it('resolves Promise on success', async () => {
-      await expect(inst.eval('2+2')).resolves.toBe(4)
-    })
-    it('rejects Promise on error', async () => {
-      await expect(inst.eval('2++2')).rejects.toThrow(/unexpected/)
-    })
-    it('passes context', async () => {
-      await expect(inst.eval('foo', { foo: 'bar' })).resolves.toBe('bar')
-    })
-    it('filters collections as expected (issue #61)', async () => {
-      const context = {
-        a: [{ b: 'A' }, { b: 'B' }, { b: 'C' }]
-      }
-      await expect(inst.eval('a[.b in ["A","B"]]', context)).resolves.toEqual([
-        { b: 'A' },
-        { b: 'B' }
-      ])
-    })
-  })
-  describe('evalSync', () => {
     it('returns success', () => {
-      expect(inst.evalSync('2+2')).toBe(4)
+      expect(inst.eval('2+2')).toBe(4)
     })
     it('throws on error', () => {
-      expect(inst.evalSync.bind(inst, '2++2')).toThrow(/unexpected/)
+      expect(inst.eval.bind(inst, '2++2')).toThrow(/unexpected/)
     })
     it('passes context', () => {
-      expect(inst.evalSync('foo', { foo: 'bar' })).toBe('bar')
+      expect(inst.eval('foo', { foo: 'bar' })).toBe('bar')
     })
     it('throws if transform fails', () => {
       inst.addTransform('abort', () => {
         throw new Error('oops')
       })
-      expect(inst.evalSync.bind(inst, '"hello"|abort')).toThrow(/oops/)
+      expect(inst.eval.bind(inst, '"hello"|abort')).toThrow(/oops/)
     })
     it('throws if nested transform fails', () => {
       inst.addTransform('q1', () => {
         throw new Error('oops')
       })
       inst.addBinaryOp('is', 100, () => true)
-      expect(inst.evalSync.bind(inst, '"hello"|q1 is asdf')).toThrow(/oops/)
+      expect(inst.eval.bind(inst, '"hello"|q1 is asdf')).toThrow(/oops/)
     })
     it('filters collections as expected (issue #61)', () => {
       const context = {
         a: [{ b: 'A' }, { b: 'B' }, { b: 'C' }]
       }
-      expect(inst.evalSync('a[.b in ["A","B"]]', context)).toEqual([
+      expect(inst.eval('a[.b in ["A","B"]]', context)).toEqual([
         { b: 'A' },
         { b: 'B' }
       ])
@@ -88,32 +68,32 @@ describe('Jexl', () => {
     it('early-exits boolean AND when the left is false (issue #64)', () => {
       const context = { a: null }
       const expr = 'a != null && a.b'
-      expect(inst.evalSync.bind(inst, expr, context)).not.toThrow()
+      expect(inst.eval.bind(inst, expr, context)).not.toThrow()
     })
   })
   describe('expr', () => {
     it('returns an evaluatable instance of Expression', () => {
       const expr = inst.expr`2+2`
       expect(expr).toEqual(expect.any(Expression))
-      expect(expr.evalSync()).toEqual(4)
+      expect(expr.eval()).toEqual(4)
     })
     it('functions as a template string', () => {
       const myVar = 'foo'
       const expr = inst.expr`'myVar' + ${myVar} + 'Car'`
-      expect(expr.evalSync({ foo: 'Bar' })).toEqual('myVarBarCar')
+      expect(expr.eval({ foo: 'Bar' })).toEqual('myVarBarCar')
     })
     it('works outside of the instance context', () => {
       const myVar = '##'
       inst.addUnaryOp('##', (val) => val * 2)
       const { expr } = inst
       const e = expr`${myVar}5`
-      expect(e.evalSync()).toBe(10)
+      expect(e.eval()).toBe(10)
     })
   })
   describe('addFunction', () => {
-    it('allows functions to be defined', async () => {
+    it('allows functions to be defined', () => {
       inst.addFunction('sayHi', () => 'Hello')
-      await expect(inst.eval('sayHi()')).resolves.toBe('Hello')
+      expect(inst.eval('sayHi()')).toBe('Hello')
     })
     it('allows functions to be retrieved', () => {
       inst.addFunction('ret2', () => 2)
@@ -121,22 +101,20 @@ describe('Jexl', () => {
       expect(f).toBeDefined()
       expect(f()).toBe(2)
     })
-    it('allows functions to be set in batch', async () => {
+    it('allows functions to be set in batch', () => {
       inst.addFunctions({
         add1: (val) => val + 1,
         add2: (val) => val + 2
       })
-      await expect(inst.eval('add1(add2(2))')).resolves.toBe(5)
+      expect(inst.eval('add1(add2(2))')).toBe(5)
     })
   })
   describe('addTransform', () => {
-    it('allows transforms to be defined', async () => {
+    it('allows transforms to be defined', () => {
       inst.addTransform('toCase', (val, args) =>
         args.case === 'upper' ? val.toUpperCase() : val.toLowerCase()
       )
-      await expect(inst.eval('"hello"|toCase({case:"upper"})')).resolves.toBe(
-        'HELLO'
-      )
+      expect(inst.eval('"hello"|toCase({case:"upper"})')).toBe('HELLO')
     })
     it('allows transforms to be retrieved', () => {
       inst.addTransform('ret2', () => 2)
@@ -144,41 +122,39 @@ describe('Jexl', () => {
       expect(t).toBeDefined()
       expect(t()).toBe(2)
     })
-    it('allows transforms to be set in batch', async () => {
+    it('allows transforms to be set in batch', () => {
       inst.addTransforms({
         add1: (val) => val + 1,
         add2: (val) => val + 2
       })
-      await expect(inst.eval('2|add1|add2')).resolves.toBe(5)
+      expect(inst.eval('2|add1|add2')).toBe(5)
     })
   })
   describe('addBinaryOp', () => {
-    it('allows binaryOps to be defined', async () => {
+    it('allows binaryOps to be defined', () => {
       inst.addBinaryOp(
         '_=',
         20,
         (left, right) => left.toLowerCase() === right.toLowerCase()
       )
-      await expect(inst.eval('"FoO" _= "fOo"')).resolves.toBe(true)
+      expect(inst.eval('"FoO" _= "fOo"')).toBe(true)
     })
-    it('observes weight on binaryOps', async () => {
+    it('observes weight on binaryOps', () => {
       inst.addBinaryOp('**', 0, (left, right) => left * 2 + right * 2)
       inst.addBinaryOp('***', 1000, (left, right) => left * 2 + right * 2)
-      await expect(
-        Promise.all([inst.eval('1 + 2 ** 3 + 4'), inst.eval('1 + 2 *** 3 + 4')])
-      ).resolves.toEqual([20, 15])
+      expect(inst.eval('1 + 2 ** 3 + 4')).toBe(20)
+      expect(inst.eval('1 + 2 *** 3 + 4')).toBe(15)
     })
     it('allows binaryOps to be defined with manual operand evaluation', () => {
       inst.addBinaryOp(
         '$$',
         50,
         (left, right) => {
-          return left.eval().then((val) => {
-            if (val > 0) {
-              return val
-            }
-            return right.eval()
-          })
+          const val = left.eval()
+          if (val > 0) {
+            return val
+          }
+          return right.eval()
         },
         true
       )
@@ -187,27 +163,27 @@ describe('Jexl', () => {
         count++
         return elem
       })
-      expect(inst.evalSync('-2|inc $$ 5|inc')).toEqual(5)
+      expect(inst.eval('-2|inc $$ 5|inc')).toEqual(5)
       expect(count).toEqual(2)
       count = 0
-      expect(inst.evalSync('2|inc $$ -5|inc')).toEqual(2)
+      expect(inst.eval('2|inc $$ -5|inc')).toEqual(2)
       expect(count).toEqual(1)
     })
   })
   describe('addUnaryOp', () => {
-    it('allows unaryOps to be defined', async () => {
+    it('allows unaryOps to be defined', () => {
       inst.addUnaryOp('~', (right) => Math.floor(right))
-      await expect(inst.eval('~5.7 + 5')).resolves.toBe(10)
+      expect(inst.eval('~5.7 + 5')).toBe(10)
     })
   })
   describe('removeOp', () => {
-    it('allows binaryOps to be removed', async () => {
+    it('allows binaryOps to be removed', () => {
       inst.removeOp('+')
-      await expect(inst.eval('1+2')).rejects.toThrow(/invalid/i)
+      expect(() => inst.eval('1+2')).toThrow(/invalid/i)
     })
-    it('allows unaryOps to be removed', async () => {
+    it('allows unaryOps to be removed', () => {
       inst.removeOp('!')
-      await expect(inst.eval('!true')).rejects.toThrow(/invalid/i)
+      expect(() => inst.eval('!true')).toThrow(/invalid/i)
     })
   })
 })
