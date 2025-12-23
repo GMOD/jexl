@@ -2,6 +2,16 @@
 
 A fork of the jexl lang for jbrowse
 
+## What's New in v3.0
+
+Version 3.0 is a major simplification of Jexl with breaking changes:
+
+- **Synchronous only** - All evaluation is synchronous. No async/await needed.
+- **No transforms** - The pipe operator (`|`) has been removed. Use functions instead.
+- **No filter expressions** - Relative filter syntax like `array[.property == value]` has been removed. Regular bracket notation for indexing (`array[0]`, `object["key"]`) still works.
+
+See [CHANGELOG.md](CHANGELOG.md) for migration guide.
+
 ## Quick Examples
 
 ```javascript
@@ -16,30 +26,26 @@ const context = {
 }
 
 // Template strings with interpolation
-jexl.evalSync('`Hello ${name.first} ${name.last}`', context)
+jexl.eval('`Hello ${name.first} ${name.last}`', context)
 // "Hello Sterling Archer"
 
-jexl.evalSync('`Age in 5 years: ${age + 5}`', context)
+jexl.eval('`Age in 5 years: ${age + 5}`', context)
 // "Age in 5 years: 41"
 
-// Filter arrays
-jexl.evalSync('assoc[.first == "Lana"].last', context)
-// "Kane"
-
 // Math operations
-jexl.evalSync('age * (3 - 1)', context)
+jexl.eval('age * (3 - 1)', context)
 // 72
 
 // String concatenation
-jexl.evalSync('name.first + " " + name.last', context)
+jexl.eval('name.first + " " + name.last', context)
 // "Sterling Archer"
 
 // Conditional logic
-jexl.evalSync('age > 62 ? "retired" : "working"', context)
+jexl.eval('age > 62 ? "retired" : "working"', context)
 // "working"
 
 // Array indexes
-jexl.evalSync('assoc[1].first', context)
+jexl.eval('assoc[1].first', context)
 // "Cyril"
 ```
 
@@ -63,17 +69,17 @@ Template strings use backticks and support expression interpolation with `${}`:
 ```javascript
 const context = { name: 'World', price: 10, qty: 3 }
 
-jexl.evalSync('`Hello ${name}!`', context)
+jexl.eval('`Hello ${name}!`', context)
 // "Hello World!"
 
-jexl.evalSync('`Total: $${price * qty}`', context)
+jexl.eval('`Total: $${price * qty}`', context)
 // "Total: $30"
 
 // Escape backticks and dollar signs with backslash
-jexl.evalSync('`Code: \\`example\\``')
+jexl.eval('`Code: \\`example\\``')
 // "Code: `example`"
 
-jexl.evalSync('`Price: \\$100`')
+jexl.eval('`Price: \\$100`')
 // "Price: $100"
 ```
 
@@ -103,49 +109,10 @@ const context = {
   lastEx: 2
 }
 
-jexl.evalSync('name.first', context) // "Malory"
-jexl.evalSync('name["last"]', context) // "Archer"
-jexl.evalSync('exes[2]', context) // "Burt"
-jexl.evalSync('exes[lastEx - 1]', context) // "Len"
-```
-
-### Filtering Collections
-
-Filter arrays using expressions in brackets. Reference properties with a leading dot:
-
-```javascript
-const context = {
-  employees: [
-    { first: 'Sterling', last: 'Archer', age: 36 },
-    { first: 'Malory', last: 'Archer', age: 75 },
-    { first: 'Lana', last: 'Kane', age: 33 },
-    { first: 'Cyril', last: 'Figgis', age: 45 }
-  ]
-}
-
-jexl.evalSync('employees[.first == "Sterling"]', context)
-// [{ first: 'Sterling', last: 'Archer', age: 36 }]
-
-jexl.evalSync('employees[.age >= 30 && .age < 40]', context)
-// [{ first: 'Sterling', ... }, { first: 'Lana', ... }]
-
-jexl.evalSync('employees[.last == "Kane"].first', context)
-// "Lana"
-```
-
-### Transforms
-
-Apply transforms to values using the pipe operator:
-
-```javascript
-jexl.addTransform('upper', (val) => val.toUpperCase())
-jexl.addTransform('split', (val, char) => val.split(char))
-
-jexl.evalSync('"hello"|upper')
-// "HELLO"
-
-jexl.evalSync('"firstName lastName"|split(" ")[0]')
-// "firstName"
+jexl.eval('name.first', context) // "Malory"
+jexl.eval('name["last"]', context) // "Archer"
+jexl.eval('exes[2]', context) // "Burt"
+jexl.eval('exes[lastEx - 1]', context) // "Len"
 ```
 
 ### Functions
@@ -156,10 +123,10 @@ Call functions in expressions:
 jexl.addFunction('min', Math.min)
 jexl.addFunction('max', Math.max)
 
-jexl.evalSync('min(5, 2, 9)')
+jexl.eval('min(5, 2, 9)')
 // 2
 
-jexl.evalSync('max(temperature, threshold)')
+jexl.eval('max(temperature, threshold)')
 // evaluates with context
 ```
 
@@ -168,10 +135,10 @@ jexl.evalSync('max(temperature, threshold)')
 Separate multiple expressions with semicolons. The result is the value of the last expression:
 
 ```javascript
-jexl.evalSync('5; 10; 15')
+jexl.eval('5; 10; 15')
 // 15
 
-jexl.evalSync('1 + 1; 2 + 2; 3 + 3')
+jexl.eval('1 + 1; 2 + 2; 3 + 3')
 // 6
 ```
 
@@ -180,35 +147,70 @@ jexl.evalSync('1 + 1; 2 + 2; 3 + 3')
 Assign values to variables using `=` (no `let`, `var`, or `const` needed). Assignments mutate the context and return the assigned value:
 
 ```javascript
-jexl.evalSync('x = 5')
+jexl.eval('x = 5')
 // 5
 
-jexl.evalSync('x = 5; x * 2')
+jexl.eval('x = 5; x * 2')
 // 10
 
-jexl.evalSync('x = 5; y = 10; x + y')
+jexl.eval('x = 5; y = 10; x + y')
 // 15
 
 const context = {}
-jexl.evalSync('x = 5; y = x * 2; y', context)
+jexl.eval('x = 5; y = x * 2; y', context)
 // 10
 // context is now { x: 5, y: 10 }
 ```
 
-## Usage
+## API
+
+### Evaluation
 
 ```javascript
 import jexl from '@jbrowse/jexl'
 
-// Synchronous evaluation
-const result = jexl.evalSync('expression', context)
-
-// Asynchronous evaluation (supports async transforms/functions)
-const result = await jexl.eval('expression', context)
+// Evaluate an expression
+const result = jexl.eval('expression', context)
 
 // Compile once, evaluate many times
 const expr = jexl.compile('name.first + " " + name.last')
-expr.evalSync({ name: { first: 'John', last: 'Doe' } })
+const result = expr.eval({ name: { first: 'John', last: 'Doe' } })
+```
+
+### Adding Custom Functions
+
+```javascript
+// Add a single function
+jexl.addFunction('round', Math.round)
+jexl.addFunction('lower', (str) => str.toLowerCase())
+
+// Add multiple functions
+jexl.addFunctions({
+  min: Math.min,
+  max: Math.max,
+  abs: Math.abs
+})
+
+// Use in expressions
+jexl.eval('round(3.7)') // 4
+jexl.eval('lower(name)', { name: 'HELLO' }) // "hello"
+jexl.eval('max(1, 5, 3)') // 5
+```
+
+### Adding Custom Operators
+
+```javascript
+// Add a binary operator
+jexl.addBinaryOp('~=', 20, (left, right) =>
+  left.toLowerCase() === right.toLowerCase()
+)
+
+jexl.eval('"Hello" ~= "hello"') // true
+
+// Add a unary operator
+jexl.addUnaryOp('~', (right) => Math.floor(right))
+
+jexl.eval('~3.7') // 3
 ```
 
 ## License

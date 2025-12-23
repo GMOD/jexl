@@ -6,6 +6,33 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 Nothing yet!
 
+## [v3.0.0]
+
+### BREAKING CHANGES
+
+- **Removed async evaluation support**: Jexl now only supports synchronous evaluation
+- **Renamed methods**: `evalSync()` has been renamed to `eval()`. The async `eval()` method has been removed.
+- **Removed PromiseSync class**: Internal implementation detail removed
+- **Removed transforms**: The transform/pipe operator (`|`) has been completely removed. Use functions instead.
+- **Removed array filtering**: Relative filter expressions (e.g., `array[.property == value]`) have been removed. Bracket notation for array/object access (e.g., `array[0]`, `object["key"]`) still works.
+- **Removed transform methods**: `addTransform()`, `addTransforms()`, and `getTransform()` have been removed.
+
+### Changed
+
+- Simplified codebase by removing Promise/PromiseSync abstraction layer
+- All evaluation is now synchronous, improving performance and simplifying error handling
+- Errors are now thrown directly rather than being rejected Promises
+- Removed pipe operator (`|`) from grammar
+- Removed filter bracket syntax for relative filtering
+
+### Migration Guide
+
+- Replace `await jexl.eval(expr)` with `jexl.eval(expr)` (remove await)
+- Replace `jexl.evalSync(expr)` with `jexl.eval(expr)` (remove Sync suffix)
+- Replace transforms with functions: change `value|transform(arg)` to `transform(value, arg)`
+- Remove uses of relative filtering syntax `array[.prop == value]` (note: direct indexing like `array[0]` still works)
+- Replace `.catch()` error handling with `try/catch` blocks
+
 ## [v2.3.0]
 
 ### Added

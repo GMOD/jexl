@@ -104,4 +104,7 @@ export type AstNodeUnion =
   | SequenceExpression
   | AssignmentExpression
 
-export type NodeByType<T extends AstNodeUnion['type']> = Extract<AstNodeUnion, { type: T }>
+export type NodeByType<T extends AstNodeUnion['type']> = Extract<
+  AstNodeUnion,
+  { type: T }
+>

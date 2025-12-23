@@ -32,44 +32,23 @@ describe('Expression', () => {
     })
   })
   describe('eval', () => {
-    it('resolves Promise on success', async () => {
-      const expr = inst.createExpression('2/2')
-      await expect(expr.eval()).resolves.toBe(1)
-    })
-    it('rejects Promise on error', async () => {
-      const expr = inst.createExpression('2++2')
-      await expect(expr.eval()).rejects.toThrow(/unexpected/)
-    })
-    it('passes context', async () => {
-      const expr = inst.createExpression('foo')
-      await expect(expr.eval({ foo: 'bar' })).resolves.toBe('bar')
-    })
-    it('never compiles more than once', async () => {
-      const expr = inst.createExpression('2*2')
-      const spy = vi.spyOn(expr, 'compile')
-      await expr.eval()
-      await expr.eval()
-      expect(spy).toHaveBeenCalledTimes(1)
-    })
-  })
-  describe('evalSync', () => {
     it('returns success', () => {
       const expr = inst.createExpression('2 % 2')
-      expect(expr.evalSync()).toBe(0)
+      expect(expr.eval()).toBe(0)
     })
     it('throws on error', () => {
       const expr = inst.createExpression('2++2')
-      expect(expr.evalSync.bind(expr)).toThrow(/unexpected/)
+      expect(expr.eval.bind(expr)).toThrow(/unexpected/)
     })
     it('passes context', () => {
       const expr = inst.createExpression('foo')
-      expect(expr.evalSync({ foo: 'bar' })).toBe('bar')
+      expect(expr.eval({ foo: 'bar' })).toBe('bar')
     })
     it('never compiles more than once', () => {
       const expr = inst.createExpression('2*2')
       const spy = vi.spyOn(expr, 'compile')
-      expr.evalSync()
-      expr.evalSync()
+      expr.eval()
+      expr.eval()
       expect(spy).toHaveBeenCalledTimes(1)
     })
   })
