@@ -22,7 +22,7 @@ export function arrayStart(this: Parser) {
   this._placeAtCursor({
     type: 'ArrayLiteral',
     value: []
-  })
+  } as any)
 }
 
 /**
@@ -90,7 +90,7 @@ export function filter(this: Parser, ast: AstNode | null) {
     expr: ast,
     relative: this._subParser!.isRelative(),
     subject: this._cursor
-  })
+  } as any)
 }
 
 /**
@@ -104,7 +104,7 @@ export function functionCall(this: Parser) {
     name: (this._cursor as any).value,
     args: [],
     pool: 'functions'
-  })
+  } as any)
 }
 
 /**
@@ -138,7 +138,7 @@ export function literal(this: Parser, token: Token) {
   this._placeAtCursor({
     type: 'Literal',
     value: token.value
-  })
+  } as any)
 }
 
 /**
@@ -157,7 +157,7 @@ export function objStart(this: Parser) {
   this._placeAtCursor({
     type: 'ObjectLiteral',
     value: {}
-  })
+  } as any)
 }
 
 /**
@@ -203,7 +203,7 @@ export function ternaryStart(this: Parser) {
   this._tree = {
     type: 'ConditionalExpression',
     test: this._tree
-  }
+  } as any
   this._cursor = this._tree
 }
 
@@ -218,7 +218,7 @@ export function transform(this: Parser, token: Token) {
     name: token.value,
     args: [this._cursor],
     pool: 'transforms'
-  })
+  } as any)
 }
 
 /**
@@ -230,5 +230,5 @@ export function unaryOp(this: Parser, token: Token) {
   this._placeAtCursor({
     type: 'UnaryExpression',
     operator: token.value
-  })
+  } as any)
 }

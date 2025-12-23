@@ -62,7 +62,7 @@ class Expression {
    * @throws {*} on error
    */
   evalSync(context = {}) {
-    const res = this._eval(context, PromiseSync as any)
+    const res = this._eval(context, PromiseSync as any) as PromiseSync
     if (res.error) throw res.error
     return res.value
   }

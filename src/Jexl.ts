@@ -26,11 +26,8 @@ interface Grammar {
  */
 class Jexl {
   _grammar: Grammar
-  expr: (strs: TemplateStringsArray, ...args: any[]) => Expression
 
   constructor() {
-    // Allow expr to be called outside of the jexl context
-    this.expr = this.expr.bind(this)
     this._grammar = getGrammar()
   }
 
