@@ -10,6 +10,8 @@ const identRegex = /^[a-zA-Zа-яА-Я_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF$]
 const escEscRegex = /\\\\/
 const whitespaceRegex = /^\s*$/
 const preOpRegexElems = [
+  // Template strings
+  '`(?:[^`\\\\]|\\\\.)*`',
   // Strings
   "'(?:(?:\\\\')|[^'])*'",
   '"(?:(?:\\\\")|[^"])*"',
@@ -156,7 +158,11 @@ class Lexer {
       value: element,
       raw: element
     }
-    if (element[0] === '"' || element[0] === "'") {
+    if (element[0] === '`') {
+      token.type = 'templateString'
+      token.value = this._parseTemplateString(element)
+      return token
+    } else if (element[0] === '"' || element[0] === "'") {
       token.value = this._unquote(element)
     } else if (element.match(numericRegex)) {
       token.value = parseFloat(element)
@@ -267,6 +273,71 @@ class Lexer {
       .slice(1, -1)
       .replace(escQuoteRegex, quote)
       .replace(escEscRegex, '\\')
+  }
+
+  _parseTemplateString(str: string) {
+    const parts: Array<{ type: 'static' | 'interpolation'; value: string }> = []
+    let current = 1
+    let staticStart = 1
+
+    while (current < str.length - 1) {
+      if (str[current] === '\\') {
+        current += 2
+        continue
+      }
+
+      if (str[current] === '$' && str[current + 1] === '{') {
+        if (current > staticStart) {
+          parts.push({
+            type: 'static',
+            value: str.slice(staticStart, current)
+          })
+        }
+
+        let braceDepth = 1
+        const interpStart = current + 2
+        current += 2
+
+        while (current < str.length && braceDepth > 0) {
+          if (str[current] === '\\') {
+            current += 2
+            continue
+          }
+          if (str[current] === '{') braceDepth++
+          if (str[current] === '}') braceDepth--
+          current++
+        }
+
+        if (braceDepth !== 0) {
+          throw new Error(`Unclosed interpolation in template string: ${str}`)
+        }
+
+        parts.push({
+          type: 'interpolation',
+          value: str.slice(interpStart, current - 1)
+        })
+
+        staticStart = current
+      } else {
+        current++
+      }
+    }
+
+    if (current > staticStart) {
+      parts.push({
+        type: 'static',
+        value: str.slice(staticStart, current)
+      })
+    }
+
+    return parts
+  }
+
+  _unescapeTemplateString(str: string) {
+    return str
+      .replace(/\\`/g, '`')
+      .replace(/\\\$/g, '$')
+      .replace(/\\\\/g, '\\')
   }
 }
 

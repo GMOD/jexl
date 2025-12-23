@@ -37,7 +37,7 @@ class Expression {
    */
   compile() {
     const lexer = new Lexer(this._grammar)
-    const parser = new Parser(this._grammar)
+    const parser = new Parser(this._grammar, lexer)
     const tokens = lexer.tokenize(this._exprStr)
     parser.addTokens(tokens)
     this._ast = parser.complete()

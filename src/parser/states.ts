@@ -63,6 +63,7 @@ export const states: States = {
   expectOperand: {
     tokenTypes: {
       literal: { toState: 'expectBinOp' },
+      templateString: { toState: 'expectBinOp' },
       identifier: { toState: 'identifier' },
       unaryOp: {},
       openParen: { toState: 'subExpression' },

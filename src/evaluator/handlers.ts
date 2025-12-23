@@ -122,6 +122,28 @@ export function Literal(this: Evaluator, ast: any) {
 }
 
 /**
+ * Evaluates a TemplateLiteral by evaluating each interpolated expression
+ * and concatenating all parts into a final string.
+ * @param {{type: 'TemplateLiteral', parts: Array<{}>}} ast An expression
+ *      tree with a TemplateLiteral as the top node
+ * @returns {Promise<string>} resolves with the final interpolated string
+ * @private
+ */
+export function TemplateLiteral(this: Evaluator, ast: any) {
+  const promises = ast.parts.map((part: any) => {
+    if (part.type === 'static') {
+      return this.Promise.resolve(part.value)
+    }
+    return this.eval(part.value).then((result: any) => {
+      if (result == null) return ''
+      return String(result)
+    })
+  })
+
+  return this.Promise.all(promises).then((values: string[]) => values.join(''))
+}
+
+/**
  * Evaluates an ObjectLiteral by returning its value, with each key
  * independently run through the evaluator.
  * @param {{type: 'ObjectLiteral', value: <{}>}} ast An expression tree with an

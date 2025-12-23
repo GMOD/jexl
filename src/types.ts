@@ -51,6 +51,14 @@ export interface ObjectLiteral extends AstNode {
   }
 }
 
+export interface TemplateLiteral extends AstNode {
+  type: 'TemplateLiteral'
+  parts: Array<{
+    type: 'static' | 'expression'
+    value: string | AstNode
+  }>
+}
+
 export interface FunctionCall extends AstNode {
   type: 'FunctionCall'
   name: string
@@ -91,6 +99,7 @@ export type AstNodeUnion =
   | UnaryExpression
   | ArrayLiteral
   | ObjectLiteral
+  | TemplateLiteral
   | FunctionCall
   | FilterExpression
   | ConditionalExpression

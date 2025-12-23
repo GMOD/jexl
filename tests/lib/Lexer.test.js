@@ -192,4 +192,53 @@ describe('Lexer', () => {
       { type: 'literal', value: -3, raw: '-3' }
     ])
   })
+  describe('Template Strings', () => {
+    it('tokenizes a simple template string', () => {
+      const tokens = inst.tokenize('`hello world`')
+      expect(tokens[0].type).toBe('templateString')
+      expect(tokens[0].raw).toBe('`hello world`')
+      expect(tokens[0].value).toEqual([
+        { type: 'static', value: 'hello world' }
+      ])
+    })
+    it('tokenizes a template string with interpolation', () => {
+      const tokens = inst.tokenize('`hello ${name}`')
+      expect(tokens[0].type).toBe('templateString')
+      expect(tokens[0].value).toHaveLength(2)
+      expect(tokens[0].value[0]).toEqual({ type: 'static', value: 'hello ' })
+      expect(tokens[0].value[1]).toEqual({ type: 'interpolation', value: 'name' })
+    })
+    it('tokenizes a template string with multiple interpolations', () => {
+      const tokens = inst.tokenize('`${a} + ${b} = ${c}`')
+      expect(tokens[0].value).toHaveLength(5)
+      expect(tokens[0].value[0]).toEqual({ type: 'interpolation', value: 'a' })
+      expect(tokens[0].value[1]).toEqual({ type: 'static', value: ' + ' })
+      expect(tokens[0].value[2]).toEqual({ type: 'interpolation', value: 'b' })
+      expect(tokens[0].value[3]).toEqual({ type: 'static', value: ' = ' })
+      expect(tokens[0].value[4]).toEqual({ type: 'interpolation', value: 'c' })
+    })
+    it('handles escaped backticks', () => {
+      const tokens = inst.tokenize('`hello \\` world`')
+      expect(tokens[0].value).toEqual([
+        { type: 'static', value: 'hello \\` world' }
+      ])
+    })
+    it('handles escaped dollar signs', () => {
+      const tokens = inst.tokenize('`price: \\$100`')
+      expect(tokens[0].value).toEqual([
+        { type: 'static', value: 'price: \\$100' }
+      ])
+    })
+    it('handles nested braces in interpolations', () => {
+      const tokens = inst.tokenize('`result: ${obj.map(x => {return x})}`')
+      expect(tokens[0].value[1].value).toBe('obj.map(x => {return x})')
+    })
+    it('handles complex expressions in interpolations', () => {
+      const tokens = inst.tokenize('`total: ${price * quantity}`')
+      expect(tokens[0].value[1].value).toBe('price * quantity')
+    })
+    it('throws on unclosed interpolation', () => {
+      expect(() => inst.tokenize('`unclosed: ${1 + 2`')).toThrow(/Unclosed interpolation/)
+    })
+  })
 })

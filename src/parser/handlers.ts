@@ -5,6 +5,7 @@
 
 import type { AstNode, Token } from '../types'
 import type Parser from './Parser'
+import Lexer from '../Lexer'
 
 /**
  * Handles a subexpression that's used to define a transform argument's value.
@@ -155,6 +156,43 @@ export function literal(this: Parser, token: Token) {
   this._placeAtCursor({
     type: 'Literal',
     value: token.value
+  } as any)
+}
+
+/**
+ * Handles template string tokens by parsing their interpolation expressions
+ * and creating a TemplateLiteral AST node.
+ * @param {{type: <string>}} token A token object
+ */
+export function templateString(this: Parser, token: Token) {
+  const parts: Array<{ type: 'static' | 'expression'; value: string | AstNode }> = []
+
+  for (const part of token.value) {
+    if (part.type === 'static') {
+      parts.push({
+        type: 'static',
+        value: this._lexer._unescapeTemplateString(part.value)
+      })
+    } else {
+      const subTokens = this._lexer.tokenize(part.value)
+      const subParser = new (this.constructor as any)(this._grammar, this._lexer)
+      subParser.addTokens(subTokens)
+      const subAst = subParser.complete()
+
+      if (!subAst) {
+        throw new Error('Empty interpolation in template string')
+      }
+
+      parts.push({
+        type: 'expression',
+        value: subAst
+      })
+    }
+  }
+
+  this._placeAtCursor({
+    type: 'TemplateLiteral',
+    parts: parts
   } as any)
 }
 

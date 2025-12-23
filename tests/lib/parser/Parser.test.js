@@ -15,7 +15,7 @@ const lexer = new Lexer(grammar)
 
 describe('Parser', () => {
   beforeEach(() => {
-    inst = new Parser(grammar)
+    inst = new Parser(grammar, lexer)
   })
   it('constructs an AST for 1+2', () => {
     inst.addTokens(lexer.tokenize('1+2'))

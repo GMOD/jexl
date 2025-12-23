@@ -6,6 +6,7 @@
 import * as handlers from './handlers'
 import { states } from './states'
 import type { AstNode, Token } from '../types'
+import type Lexer from '../Lexer'
 
 interface Grammar {
   elements: {
@@ -32,6 +33,7 @@ interface Grammar {
  */
 class Parser {
   _grammar: Grammar
+  _lexer: Lexer
   _state: string
   _tree: AstNode | null
   _exprStr: string
@@ -45,8 +47,9 @@ class Parser {
   _curObjKey?: string
   _sequenceExpressions?: AstNode[]
 
-  constructor(grammar: Grammar, prefix?: string, stopMap?: { [tokenType: string]: any }) {
+  constructor(grammar: Grammar, lexer: Lexer, prefix?: string, stopMap?: { [tokenType: string]: any }) {
     this._grammar = grammar
+    this._lexer = lexer
     this._state = 'expectOperand'
     this._tree = null
     this._exprStr = prefix || ''
@@ -219,7 +222,7 @@ class Parser {
       this._parentStop = true
       endStates = this._stopMap
     }
-    this._subParser = new Parser(this._grammar, exprStr, endStates)
+    this._subParser = new Parser(this._grammar, this._lexer, exprStr, endStates)
   }
 }
 
