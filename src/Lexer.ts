@@ -34,7 +34,9 @@ const minusNegatesAfter = new Set([
   'openParen',
   'openBracket',
   'question',
-  'colon'
+  'colon',
+  'comma',
+  'semicolon'
 ])
 
 interface Grammar {
