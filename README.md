@@ -128,18 +128,6 @@ jexl.eval('max(temperature, threshold)')
 // evaluates with context
 ```
 
-### Multiple Expressions
-
-Separate multiple expressions with semicolons. The result is the value of the last expression:
-
-```javascript
-jexl.eval('5; 10; 15')
-// 15
-
-jexl.eval('1 + 1; 2 + 2; 3 + 3')
-// 6
-```
-
 ### Variable Assignment
 
 Assign values to variables using `=` (no `let`, `var`, or `const` needed). Assignments mutate the context and return the assigned value:
@@ -159,6 +147,8 @@ jexl.eval('x = 5; y = x * 2; y', context)
 // 10
 // context is now { x: 5, y: 10 }
 ```
+
+Separate multiple expressions with semicolons. The result is the value of the last expression:
 
 ## API
 
