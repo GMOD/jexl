@@ -72,6 +72,7 @@ export const states: States = {
       binaryOp: { toState: 'expectOperand' },
       pipe: { toState: 'expectTransform' },
       dot: { toState: 'traverse' },
+      openBracket: { toState: 'filter' },
       question: { toState: 'ternaryMid', handler: h.ternaryStart },
       semicolon: { handler: h.semicolon }
     },
@@ -101,7 +102,8 @@ export const states: States = {
       dot: { toState: 'traverse' },
       openBracket: { toState: 'filter' },
       pipe: { toState: 'expectTransform' },
-      question: { toState: 'ternaryMid', handler: h.ternaryStart }
+      question: { toState: 'ternaryMid', handler: h.ternaryStart },
+      semicolon: { handler: h.semicolon }
     },
     completable: true
   },
@@ -111,7 +113,8 @@ export const states: States = {
       dot: { toState: 'traverse' },
       openBracket: { toState: 'filter' },
       pipe: { toState: 'expectTransform' },
-      question: { toState: 'ternaryMid', handler: h.ternaryStart }
+      question: { toState: 'ternaryMid', handler: h.ternaryStart },
+      semicolon: { handler: h.semicolon }
     },
     completable: true
   },
@@ -122,7 +125,8 @@ export const states: States = {
       openBracket: { toState: 'filter' },
       openParen: { toState: 'argVal', handler: h.functionCall },
       pipe: { toState: 'expectTransform' },
-      question: { toState: 'ternaryMid', handler: h.ternaryStart }
+      question: { toState: 'ternaryMid', handler: h.ternaryStart },
+      semicolon: { handler: h.semicolon }
     },
     completable: true
   },

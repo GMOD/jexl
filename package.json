@@ -51,16 +51,17 @@
   },
   "homepage": "https://github.com/TomFrost/jexl",
   "devDependencies": {
-    "@types/node": "^25.0.3",
-    "@vitest/coverage-v8": "^4.0.16",
-    "eslint": "^9.39.2",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.3.3",
+    "@vitest/coverage-v8": "^4.0.18",
+    "eslint": "^10.0.2",
     "eslint-plugin-import": "^2.32.0",
-    "eslint-plugin-unicorn": "^62.0.0",
-    "prettier": "^3.7.4",
-    "rimraf": "^6.1.2",
+    "eslint-plugin-unicorn": "^63.0.0",
+    "prettier": "^3.8.1",
+    "rimraf": "^6.1.3",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.50.1",
-    "vitest": "^4.0.16"
+    "typescript-eslint": "^8.56.1",
+    "vitest": "^4.0.18"
   },
   "publishConfig": {
     "access": "public"

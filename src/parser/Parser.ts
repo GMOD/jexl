@@ -85,11 +85,16 @@ class Parser {
       const stopState = this._subParser!.addToken(token)
       if (stopState) {
         this._endSubExpression()
-        if (this._parentStop) {
+        if (stopState === '_semicolon') {
+          handlers.semicolon.call(this)
+        } else if (this._parentStop) {
           return stopState
+        } else {
+          this._state = stopState
         }
-        this._state = stopState
       }
+    } else if (token.type === 'semicolon' && this._stopMap[token.type]) {
+      return this._stopMap[token.type]
     } else if (state.tokenTypes?.[token.type]) {
       const typeOpts = state.tokenTypes[token.type]
       let handleFunc = (handlers as any)[token.type]
@@ -139,7 +144,9 @@ class Parser {
     }
 
     if (this._sequenceExpressions) {
-      this._sequenceExpressions.push(this._tree!)
+      if (this._tree) {
+        this._sequenceExpressions.push(this._tree)
+      }
       const sequence: any = {
         type: 'SequenceExpression',
         expressions: this._sequenceExpressions
@@ -227,6 +234,9 @@ class Parser {
     if (!endStates) {
       this._parentStop = true
       endStates = this._stopMap
+    }
+    if (states[this._state].completable && !endStates.semicolon) {
+      endStates = { ...endStates, semicolon: '_semicolon' }
     }
     this._subParser = new Parser(this._grammar, this._lexer, exprStr, endStates)
   }
