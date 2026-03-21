@@ -5,12 +5,12 @@
 
 import * as h from './handlers.ts'
 
-import type { AstNode } from '../types.ts'
+import type { AstNode, Token } from '../types.ts'
 import type Parser from './Parser.ts'
 
 interface TokenTypeOptions {
   toState?: string
-  handler?: (this: Parser, ...args: any[]) => void
+  handler?: (this: Parser, token: Token) => void
 }
 
 interface StateDefinition {

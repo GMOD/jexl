@@ -3,15 +3,30 @@
  * Copyright 2020 Tom Shawver
  */
 
+export interface TemplatePart {
+  type: 'static' | 'interpolation'
+  value: string
+}
+
+export type JexlValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | JexlValue[]
+  | { [key: string]: JexlValue }
+
 export interface Token {
   type: string
-  value: any
+  value: string | number | boolean | TemplatePart[]
   raw: string
 }
 
 export interface AstNode {
   type: string
   _parent?: AstNode
+  right?: AstNode
 }
 
 export interface Literal extends AstNode {
@@ -87,7 +102,6 @@ export interface AssignmentExpression extends AstNode {
   type: 'AssignmentExpression'
   operator: '='
   left: Identifier
-  right: AstNode
 }
 
 export type AstNodeUnion =

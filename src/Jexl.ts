@@ -6,10 +6,8 @@
 import Expression from './Expression.ts'
 import { getGrammar } from './grammar.ts'
 
-interface Grammar {
-  elements: Record<string, any>
-  functions: Record<string, (...args: any[]) => any>
-}
+import type { Grammar, GrammarElement } from './grammar.ts'
+import type { JexlValue } from './types.ts'
 
 /**
  * Jexl is the Javascript Expression Language, capable of parsing and
@@ -47,7 +45,7 @@ class Jexl {
   addBinaryOp(
     operator: string,
     precedence: number,
-    fn: (left: any, right: any) => any,
+    fn: (left: JexlValue, right: JexlValue) => JexlValue,
     manualEval?: boolean
   ) {
     this._addGrammarElement(operator, {
@@ -65,7 +63,7 @@ class Jexl {
    *      expression function is invoked. It will be provided with each argument
    *      supplied in the expression, in the same order.
    */
-  addFunction(name: string, fn: (...args: any[]) => any) {
+  addFunction(name: string, fn: (...args: JexlValue[]) => JexlValue) {
     this._grammar.functions[name] = fn
   }
 
@@ -75,7 +73,7 @@ class Jexl {
    * function counterpart.
    * @param {{}} map A map of expression function names to javascript functions
    */
-  addFunctions(map: Record<string, (...args: any[]) => any>) {
+  addFunctions(map: Record<string, (...args: JexlValue[]) => JexlValue>) {
     Object.assign(this._grammar.functions, map)
   }
 
@@ -87,10 +85,10 @@ class Jexl {
    *      will be called with one argument: the literal value to the right of the
    *      operator. It should return the resulting value.
    */
-  addUnaryOp(operator: string, fn: (right: any) => any) {
+  addUnaryOp(operator: string, fn: (right: JexlValue) => JexlValue) {
     this._addGrammarElement(operator, {
       type: 'unaryOp',
-      weight: Infinity,
+      precedence: Infinity,
       eval: fn
     })
   }
@@ -146,12 +144,17 @@ class Jexl {
    * @param {Array<string>} strs
    * @param  {...any} args
    */
-  expr(strs: TemplateStringsArray, ...args: any[]) {
+  expr(strs: TemplateStringsArray, ...args: JexlValue[]) {
     let exprStr = ''
     for (let idx = 0; idx < strs.length; idx++) {
       exprStr += strs[idx]
       if (idx < args.length) {
-        exprStr += args[idx]
+        const arg = args[idx]
+        if (typeof arg === 'string' || typeof arg === 'number' || typeof arg === 'boolean') {
+          exprStr += String(arg)
+        } else if (arg != null) {
+          exprStr += JSON.stringify(arg)
+        }
       }
     }
     return this.createExpression(exprStr)
@@ -163,7 +166,7 @@ class Jexl {
    */
   removeOp(operator: string) {
     const elem = this._grammar.elements[operator]
-    if (elem && (elem.type === 'binaryOp' || elem.type === 'unaryOp')) {
+    if (elem.type === 'binaryOp' || elem.type === 'unaryOp') {
       Reflect.deleteProperty(this._grammar.elements, operator)
     }
   }
@@ -175,7 +178,7 @@ class Jexl {
    *      grammar element
    * @private
    */
-  _addGrammarElement(str: string, obj: any) {
+  _addGrammarElement(str: string, obj: GrammarElement) {
     this._grammar.elements[str] = obj
   }
 }

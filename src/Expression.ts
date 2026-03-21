@@ -7,12 +7,8 @@ import Lexer from './Lexer.ts'
 import Evaluator from './evaluator/Evaluator.ts'
 import Parser from './parser/Parser.ts'
 
+import type { Grammar } from './grammar.ts'
 import type { AstNode } from './types.ts'
-
-interface Grammar {
-  elements: Record<string, any>
-  [key: string]: any
-}
 
 class Expression {
   _grammar: Grammar

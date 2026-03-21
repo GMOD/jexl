@@ -7,11 +7,8 @@ import * as handlers from './handlers.ts'
 import { states } from './states.ts'
 
 import type Lexer from '../Lexer.ts'
-import type { AstNode, Token } from '../types.ts'
-
-interface Grammar {
-  elements: Record<string, any>
-}
+import type { Grammar } from '../grammar.ts'
+import type { AstNode, SequenceExpression, Token } from '../types.ts'
 
 /**
  * The Parser is a state machine that converts tokens from the {@link Lexer}
@@ -37,7 +34,7 @@ class Parser {
   _tree: AstNode | null
   _exprStr: string
   _relative: boolean
-  _stopMap: Record<string, any>
+  _stopMap: Record<string, string>
   _cursor?: AstNode | null
   _subParser?: Parser
   _parentStop?: boolean
@@ -50,7 +47,7 @@ class Parser {
     grammar: Grammar,
     lexer: Lexer,
     prefix?: string,
-    stopMap?: Record<string, any>
+    stopMap?: Record<string, string>
   ) {
     this._grammar = grammar
     this._lexer = lexer
@@ -71,7 +68,7 @@ class Parser {
    * @returns {boolean|*} the stopState value if this parser encountered a token
    *      in the stopState mapb false if tokens can continue.
    */
-  addToken(token: Token): any {
+  addToken(token: Token): string | false {
     if (this._state === 'complete') {
       throw new Error('Cannot add a new token to a completed Parser')
     }
@@ -97,7 +94,7 @@ class Parser {
       return this._stopMap[token.type]
     } else if (state.tokenTypes?.[token.type]) {
       const typeOpts = state.tokenTypes[token.type]
-      let handleFunc = (handlers as any)[token.type]
+      let handleFunc = (handlers as Record<string, ((this: Parser, token: Token) => void) | undefined>)[token.type]
       if (typeOpts.handler) {
         handleFunc = typeOpts.handler
       }
@@ -147,7 +144,7 @@ class Parser {
       if (this._tree) {
         this._sequenceExpressions.push(this._tree)
       }
-      const sequence: any = {
+      const sequence: SequenceExpression = {
         type: 'SequenceExpression',
         expressions: this._sequenceExpressions
       }
@@ -188,7 +185,7 @@ class Parser {
     if (!this._cursor) {
       this._tree = node
     } else {
-      ;(this._cursor as any).right = node
+      this._cursor.right = node
       this._setParent(node, this._cursor)
     }
     this._cursor = node

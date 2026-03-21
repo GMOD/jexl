@@ -5,17 +5,22 @@
 
 /* eslint eqeqeq:0 */
 
+import type { JexlValue } from './types.ts'
+
 export interface BinaryOp {
   type: 'binaryOp'
   precedence: number
-  eval?: (left: any, right: any) => any
-  evalOnDemand?: (left: { eval: () => any }, right: { eval: () => any }) => any
+  eval?: (left: JexlValue, right: JexlValue) => JexlValue
+  evalOnDemand?: (
+    left: { eval: () => JexlValue },
+    right: { eval: () => JexlValue }
+  ) => JexlValue
 }
 
 export interface UnaryOp {
   type: 'unaryOp'
   precedence: number
-  eval: (right: any) => any
+  eval: (right: JexlValue) => JexlValue
 }
 
 export interface SimpleElement {
@@ -26,7 +31,8 @@ export type GrammarElement = BinaryOp | UnaryOp | SimpleElement
 
 export interface Grammar {
   elements: Record<string, GrammarElement>
-  functions: Record<string, (...args: any[]) => any>
+  functions: Record<string, (...args: JexlValue[]) => JexlValue>
+  transforms?: Record<string, (...args: JexlValue[]) => JexlValue>
 }
 
 export const getGrammar = (): Grammar => ({
@@ -50,37 +56,37 @@ export const getGrammar = (): Grammar => ({
     '+': {
       type: 'binaryOp',
       precedence: 30,
-      eval: (left, right) => left + right
+      eval: (left, right) => (left as number) + (right as number)
     },
     '-': {
       type: 'binaryOp',
       precedence: 30,
-      eval: (left, right) => left - right
+      eval: (left, right) => (left as number) - (right as number)
     },
     '*': {
       type: 'binaryOp',
       precedence: 40,
-      eval: (left, right) => left * right
+      eval: (left, right) => (left as number) * (right as number)
     },
     '/': {
       type: 'binaryOp',
       precedence: 40,
-      eval: (left, right) => left / right
+      eval: (left, right) => (left as number) / (right as number)
     },
     '//': {
       type: 'binaryOp',
       precedence: 40,
-      eval: (left, right) => Math.floor(left / right)
+      eval: (left, right) => Math.floor((left as number) / (right as number))
     },
     '%': {
       type: 'binaryOp',
       precedence: 50,
-      eval: (left, right) => left % right
+      eval: (left, right) => (left as number) % (right as number)
     },
     '^': {
       type: 'binaryOp',
       precedence: 50,
-      eval: (left, right) => Math.pow(left, right)
+      eval: (left, right) => Math.pow(left as number, right as number)
     },
     '==': {
       type: 'binaryOp',
@@ -95,22 +101,22 @@ export const getGrammar = (): Grammar => ({
     '>': {
       type: 'binaryOp',
       precedence: 20,
-      eval: (left, right) => left > right
+      eval: (left, right) => (left as number) > (right as number)
     },
     '>=': {
       type: 'binaryOp',
       precedence: 20,
-      eval: (left, right) => left >= right
+      eval: (left, right) => (left as number) >= (right as number)
     },
     '<': {
       type: 'binaryOp',
       precedence: 20,
-      eval: (left, right) => left < right
+      eval: (left, right) => (left as number) < (right as number)
     },
     '<=': {
       type: 'binaryOp',
       precedence: 20,
-      eval: (left, right) => left <= right
+      eval: (left, right) => (left as number) <= (right as number)
     },
     '&&': {
       type: 'binaryOp',
@@ -139,7 +145,13 @@ export const getGrammar = (): Grammar => ({
       precedence: 20,
       eval: (left, right) => {
         if (typeof right === 'string') {
-          return right.includes(left)
+          const leftStr =
+            typeof left === 'string' ||
+            typeof left === 'number' ||
+            typeof left === 'boolean'
+              ? String(left)
+              : ''
+          return right.includes(leftStr)
         }
         if (Array.isArray(right)) {
           return right.includes(left)

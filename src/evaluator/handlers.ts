@@ -3,7 +3,23 @@
  * Copyright 2020 Tom Shawver
  */
 
-import type { AstNode } from '../types.ts'
+import type { BinaryOp, UnaryOp } from '../grammar.ts'
+import type {
+  ArrayLiteral,
+  AssignmentExpression,
+  AstNode,
+  BinaryExpression,
+  ConditionalExpression,
+  FilterExpression,
+  FunctionCall,
+  Identifier,
+  JexlValue,
+  Literal,
+  ObjectLiteral,
+  SequenceExpression,
+  TemplateLiteral,
+  UnaryExpression,
+} from '../types.ts'
 import type Evaluator from './Evaluator.ts'
 
 const poolNames: Record<string, string> = {
@@ -18,7 +34,7 @@ const poolNames: Record<string, string> = {
  * @returns {[]} an array of evaluated values.
  * @private
  */
-export function ArrayLiteral(this: Evaluator, ast: any) {
+export function ArrayLiteral(this: Evaluator, ast: ArrayLiteral): JexlValue {
   return this.evalArray(ast.value)
 }
 
@@ -36,15 +52,21 @@ export function ArrayLiteral(this: Evaluator, ast: any) {
  * @returns {*} the value of the BinaryExpression.
  * @private
  */
-export function BinaryExpression(this: Evaluator, ast: any) {
+export function BinaryExpression(this: Evaluator, ast: BinaryExpression): JexlValue {
   const grammarOp = this._grammar.elements[ast.operator]
-  if (grammarOp.evalOnDemand) {
-    const wrap = (subAst: AstNode) => ({ eval: () => this.eval(subAst) })
-    return grammarOp.evalOnDemand(wrap(ast.left), wrap(ast.right))
+  if (grammarOp.type === 'binaryOp') {
+    const binaryOp = grammarOp as BinaryOp
+    if (binaryOp.evalOnDemand) {
+      const wrap = (subAst: AstNode) => ({ eval: () => this.eval(subAst) })
+      return binaryOp.evalOnDemand(wrap(ast.left), wrap(ast.right!))
+    }
+    const left = this.eval(ast.left)
+    const right = this.eval(ast.right!)
+    if (binaryOp.eval) {
+      return binaryOp.eval(left, right)
+    }
   }
-  const left = this.eval(ast.left)
-  const right = this.eval(ast.right)
-  return grammarOp.eval(left, right)
+  return undefined
 }
 
 /**
@@ -57,12 +79,12 @@ export function BinaryExpression(this: Evaluator, ast: any) {
  *      the top node
  * @private
  */
-export function ConditionalExpression(this: Evaluator, ast: any) {
+export function ConditionalExpression(this: Evaluator, ast: ConditionalExpression): JexlValue {
   const res = this.eval(ast.test)
   if (res) {
     return ast.consequent ? this.eval(ast.consequent) : res
   }
-  return this.eval(ast.alternate)
+  return this.eval(ast.alternate!)
 }
 
 /**
@@ -74,13 +96,19 @@ export function ConditionalExpression(this: Evaluator, ast: any) {
  * @returns {*} the value at the specified index/property.
  * @private
  */
-export function FilterExpression(this: Evaluator, ast: any) {
+export function FilterExpression(this: Evaluator, ast: FilterExpression): JexlValue {
   const subject = this.eval(ast.subject)
   if (ast.relative) {
     throw new Error('Relative filter expressions are not supported')
   }
   const index = this.eval(ast.expr)
-  return subject?.[index]
+  if (subject == null) {
+    return undefined
+  }
+  if (typeof index === 'string' || typeof index === 'number') {
+    return (subject as Record<string | number, JexlValue>)[index]
+  }
+  return undefined
 }
 
 /**
@@ -92,7 +120,7 @@ export function FilterExpression(this: Evaluator, ast: any) {
  * @returns {*} the identifier's value.
  * @private
  */
-export function Identifier(this: Evaluator, ast: any) {
+export function Identifier(this: Evaluator, ast: Identifier): JexlValue {
   if (!ast.from) {
     const contextSource = ast.relative ? this._relContext : this._context
     return contextSource[ast.value]
@@ -102,7 +130,10 @@ export function Identifier(this: Evaluator, ast: any) {
     return undefined
   }
   const ctx = Array.isArray(context) ? context[0] : context
-  return ctx?.[ast.value]
+  if (ctx == null) {
+    return undefined
+  }
+  return (ctx as Record<string, JexlValue>)[ast.value]
 }
 
 /**
@@ -112,7 +143,7 @@ export function Identifier(this: Evaluator, ast: any) {
  * @returns {string|number|boolean} The value of the Literal node
  * @private
  */
-export function Literal(this: Evaluator, ast: any) {
+export function Literal(this: Evaluator, ast: Literal): JexlValue {
   return ast.value
 }
 
@@ -124,16 +155,19 @@ export function Literal(this: Evaluator, ast: any) {
  * @returns {string} the final interpolated string
  * @private
  */
-export function TemplateLiteral(this: Evaluator, ast: any) {
-  const values = ast.parts.map((part: any) => {
+export function TemplateLiteral(this: Evaluator, ast: TemplateLiteral): JexlValue {
+  const values = ast.parts.map((part) => {
     if (part.type === 'static') {
-      return part.value
+      return part.value as string
     }
-    const result = this.eval(part.value)
+    const result = this.eval(part.value as AstNode)
     if (result == null) {
       return ''
     }
-    return String(result)
+    if (typeof result === 'string' || typeof result === 'number' || typeof result === 'boolean') {
+      return String(result)
+    }
+    return JSON.stringify(result)
   })
 
   return values.join('')
@@ -147,7 +181,7 @@ export function TemplateLiteral(this: Evaluator, ast: any) {
  * @returns {{}} a map of evaluated values.
  * @private
  */
-export function ObjectLiteral(this: Evaluator, ast: any) {
+export function ObjectLiteral(this: Evaluator, ast: ObjectLiteral): JexlValue {
   return this.evalMap(ast.value)
 }
 
@@ -159,17 +193,19 @@ export function ObjectLiteral(this: Evaluator, ast: any) {
  * @returns {*} the value of the function call.
  * @private
  */
-export function FunctionCall(this: Evaluator, ast: any) {
+export function FunctionCall(this: Evaluator, ast: FunctionCall): JexlValue {
   const poolName = poolNames[ast.pool]
   if (!poolName) {
     throw new Error(`Corrupt AST: Pool '${ast.pool}' not found`)
   }
-  const pool = (this._grammar as any)[ast.pool]
+  const pool = this._grammar[ast.pool as keyof typeof this._grammar] as
+    | Record<string, (...args: JexlValue[]) => JexlValue>
+    | undefined
   const func = pool?.[ast.name]
-  if (!func) {
+  if (func === undefined) {
     throw new Error(`${poolName} ${ast.name} is not defined.`)
   }
-  const args = this.evalArray(ast.args || [])
+  const args = this.evalArray(ast.args)
   return func(...args)
 }
 
@@ -181,17 +217,21 @@ export function FunctionCall(this: Evaluator, ast: any) {
  * @returns {*} the value of the UnaryExpression.
  * @constructor
  */
-export function UnaryExpression(this: Evaluator, ast: any) {
-  const right = this.eval(ast.right)
-  return this._grammar.elements[ast.operator].eval(right)
+export function UnaryExpression(this: Evaluator, ast: UnaryExpression): JexlValue {
+  const right = this.eval(ast.right!)
+  const elem = this._grammar.elements[ast.operator]
+  if (elem.type === 'unaryOp') {
+    return (elem as UnaryOp).eval(right)
+  }
+  return undefined
 }
 
 /**
  * Evaluates a SequenceExpression by evaluating each expression in order
  * and returning the value of the last expression.
  */
-export function SequenceExpression(this: Evaluator, ast: any) {
-  let lastValue: any
+export function SequenceExpression(this: Evaluator, ast: SequenceExpression): JexlValue {
+  let lastValue: JexlValue
 
   for (const expr of ast.expressions) {
     lastValue = this.eval(expr)
@@ -204,8 +244,8 @@ export function SequenceExpression(this: Evaluator, ast: any) {
  * Evaluates an AssignmentExpression by evaluating the right side
  * and assigning it to the variable name on the left side.
  */
-export function AssignmentExpression(this: Evaluator, ast: any) {
-  const value = this.eval(ast.right)
+export function AssignmentExpression(this: Evaluator, ast: AssignmentExpression): JexlValue {
+  const value = this.eval(ast.right!)
   const varName = ast.left.value
   this._context[varName] = value
   return value

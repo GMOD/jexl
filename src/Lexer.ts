@@ -3,6 +3,7 @@
  * Copyright 2020 Tom Shawver
  */
 
+import type { Grammar } from './grammar.ts'
 import type { Token } from './types.ts'
 
 const numericRegex = /^-?(?:(?:[0-9]*\.[0-9]+)|[0-9]+)$/
@@ -38,10 +39,6 @@ const minusNegatesAfter = new Set([
   'comma',
   'semicolon'
 ])
-
-interface Grammar {
-  elements: Record<string, any>
-}
 
 /**
  * Lexer is a collection of stateless, statically-accessed functions for the
@@ -166,7 +163,7 @@ class Lexer {
       token.value = parseFloat(element)
     } else if (element === 'true' || element === 'false') {
       token.value = element === 'true'
-    } else if (this._grammar.elements[element]) {
+    } else if (Object.hasOwn(this._grammar.elements, element)) {
       token.type = this._grammar.elements[element].type
     } else if (identRegex.exec(element)) {
       token.type = 'identifier'
