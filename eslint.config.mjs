@@ -53,7 +53,7 @@ export default defineConfig(
         }
       ],
 
-      '@typescript-eslint/ban-ts-comment': 'off',
+      '@typescript-eslint/ban-ts-comment': ['error', { 'ts-expect-error': 'allow-with-description', 'ts-ignore': true }],
       'unicorn/no-array-sort': 'off',
       'unicorn/text-encoding-identifier-case': 'off',
       'unicorn/no-new-array': 'off',
@@ -98,8 +98,7 @@ export default defineConfig(
       'unicorn/no-process-exit': 'off',
       'unicorn/prefer-at': 'off',
 
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/explicit-module-boundary-types': 'off',
+      '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
