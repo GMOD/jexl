@@ -43,6 +43,7 @@ export default defineConfig(
       ],
       'no-underscore-dangle': 'off',
       curly: 'error',
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
       '@typescript-eslint/consistent-type-imports': 'error',
       semi: ['error', 'never'],
       'spaced-comment': [
@@ -62,7 +63,6 @@ export default defineConfig(
       'unicorn/prefer-modern-math-apis': 'off',
       'unicorn/prefer-node-protocol': 'off',
       'unicorn/no-unreadable-array-destructuring': 'off',
-      'unicorn/no-abusive-eslint-disable': 'off',
       'unicorn/no-array-callback-reference': 'off',
       'unicorn/number-literal-case': 'off',
       'unicorn/prefer-add-event-listener': 'off',
@@ -72,7 +72,6 @@ export default defineConfig(
       'unicorn/no-lonely-if': 'off',
       'unicorn/consistent-destructuring': 'off',
       'unicorn/prefer-module': 'off',
-      'unicorn/prefer-optional-catch-binding': 'off',
       'unicorn/no-useless-undefined': 'off',
       'unicorn/no-null': 'off',
       'unicorn/no-nested-ternary': 'off',
@@ -98,7 +97,7 @@ export default defineConfig(
       'unicorn/no-process-exit': 'off',
       'unicorn/prefer-at': 'off',
 
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
@@ -106,9 +105,8 @@ export default defineConfig(
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/prefer-nullish-coalescing': 'off',
-      '@typescript-eslint/require-await': 'off',
-      '@typescript-eslint/restrict-template-expressions': 'off',
-      '@typescript-eslint/restrict-plus-operands': 'off',
+      '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
+      
 
       '@typescript-eslint/no-unused-vars': [
         'warn',
