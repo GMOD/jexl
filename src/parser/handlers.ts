@@ -17,7 +17,7 @@ import type {
   ObjectLiteral,
   TemplateLiteral,
   Token,
-  UnaryExpression,
+  UnaryExpression
 } from '../types.ts'
 import type Parser from './Parser.ts'
 
@@ -27,7 +27,7 @@ import type Parser from './Parser.ts'
  */
 export function argVal(this: Parser, ast: AstNode | null) {
   if (ast) {
-    (this._cursor as FunctionCall).args.push(ast)
+    ;(this._cursor as FunctionCall).args.push(ast)
   }
 }
 
@@ -49,7 +49,7 @@ export function arrayStart(this: Parser) {
  */
 export function arrayVal(this: Parser, ast: AstNode | null) {
   if (ast) {
-    (this._cursor as ArrayLiteral).value.push(ast)
+    ;(this._cursor as ArrayLiteral).value.push(ast)
   }
 }
 
@@ -76,7 +76,10 @@ export function binaryOp(this: Parser, token: Token) {
 
   const tokenValue = token.value as string
   const grammarElem = this._grammar.elements[tokenValue]
-  const precedence = (grammarElem.type === 'binaryOp' ? (grammarElem as BinaryOp).precedence : 0) || 0
+  const precedence =
+    (grammarElem.type === 'binaryOp'
+      ? (grammarElem as BinaryOp).precedence
+      : 0) || 0
   let parent = this._cursor?._parent
   while (parent) {
     const parentExpr = parent as BinaryExpression
@@ -259,7 +262,7 @@ export function objStart(this: Parser) {
  * @param {{type: <string>}} ast The subexpression tree
  */
 export function objVal(this: Parser, ast: AstNode | null) {
-  (this._cursor as ObjectLiteral).value[this._curObjKey!] = ast!
+  ;(this._cursor as ObjectLiteral).value[this._curObjKey!] = ast!
 }
 
 /**
@@ -276,7 +279,7 @@ export function subExpression(this: Parser, ast: AstNode | null) {
  * @param {{type: <string>}} ast The subexpression tree
  */
 export function ternaryEnd(this: Parser, ast: AstNode | null) {
-  (this._cursor as ConditionalExpression).alternate = ast ?? undefined
+  ;(this._cursor as ConditionalExpression).alternate = ast ?? undefined
 }
 
 /**
@@ -284,7 +287,7 @@ export function ternaryEnd(this: Parser, ast: AstNode | null) {
  * @param {{type: <string>}} ast The subexpression tree
  */
 export function ternaryMid(this: Parser, ast: AstNode | null) {
-  (this._cursor as ConditionalExpression).consequent = ast ?? undefined
+  ;(this._cursor as ConditionalExpression).consequent = ast ?? undefined
 }
 
 /**

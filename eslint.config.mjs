@@ -54,7 +54,10 @@ export default defineConfig(
         }
       ],
 
-      '@typescript-eslint/ban-ts-comment': ['error', { 'ts-expect-error': 'allow-with-description', 'ts-ignore': true }],
+      '@typescript-eslint/ban-ts-comment': [
+        'error',
+        { 'ts-expect-error': 'allow-with-description', 'ts-ignore': true }
+      ],
       'unicorn/no-array-sort': 'off',
       'unicorn/text-encoding-identifier-case': 'off',
       'unicorn/no-new-array': 'off',
@@ -105,8 +108,10 @@ export default defineConfig(
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/prefer-nullish-coalescing': 'off',
-      '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
-      
+      '@typescript-eslint/restrict-template-expressions': [
+        'error',
+        { allowNumber: true }
+      ],
 
       '@typescript-eslint/no-unused-vars': [
         'warn',

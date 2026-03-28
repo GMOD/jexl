@@ -150,7 +150,11 @@ class Jexl {
       exprStr += strs[idx]
       if (idx < args.length) {
         const arg = args[idx]
-        if (typeof arg === 'string' || typeof arg === 'number' || typeof arg === 'boolean') {
+        if (
+          typeof arg === 'string' ||
+          typeof arg === 'number' ||
+          typeof arg === 'boolean'
+        ) {
           exprStr += String(arg)
         } else if (arg != null) {
           exprStr += JSON.stringify(arg)

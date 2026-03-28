@@ -94,7 +94,12 @@ class Parser {
       return this._stopMap[token.type]
     } else if (state.tokenTypes?.[token.type]) {
       const typeOpts = state.tokenTypes[token.type]
-      let handleFunc = (handlers as Record<string, ((this: Parser, token: Token) => void) | undefined>)[token.type]
+      let handleFunc = (
+        handlers as Record<
+          string,
+          ((this: Parser, token: Token) => void) | undefined
+        >
+      )[token.type]
       if (typeOpts.handler) {
         handleFunc = typeOpts.handler
       }

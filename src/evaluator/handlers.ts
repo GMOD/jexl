@@ -18,7 +18,7 @@ import type {
   ObjectLiteral,
   SequenceExpression,
   TemplateLiteral,
-  UnaryExpression,
+  UnaryExpression
 } from '../types.ts'
 import type Evaluator from './Evaluator.ts'
 
@@ -52,7 +52,10 @@ export function ArrayLiteral(this: Evaluator, ast: ArrayLiteral): JexlValue {
  * @returns {*} the value of the BinaryExpression.
  * @private
  */
-export function BinaryExpression(this: Evaluator, ast: BinaryExpression): JexlValue {
+export function BinaryExpression(
+  this: Evaluator,
+  ast: BinaryExpression
+): JexlValue {
   const grammarOp = this._grammar.elements[ast.operator]
   if (grammarOp.type === 'binaryOp') {
     const binaryOp = grammarOp as BinaryOp
@@ -79,7 +82,10 @@ export function BinaryExpression(this: Evaluator, ast: BinaryExpression): JexlVa
  *      the top node
  * @private
  */
-export function ConditionalExpression(this: Evaluator, ast: ConditionalExpression): JexlValue {
+export function ConditionalExpression(
+  this: Evaluator,
+  ast: ConditionalExpression
+): JexlValue {
   const res = this.eval(ast.test)
   if (res) {
     return ast.consequent ? this.eval(ast.consequent) : res
@@ -96,7 +102,10 @@ export function ConditionalExpression(this: Evaluator, ast: ConditionalExpressio
  * @returns {*} the value at the specified index/property.
  * @private
  */
-export function FilterExpression(this: Evaluator, ast: FilterExpression): JexlValue {
+export function FilterExpression(
+  this: Evaluator,
+  ast: FilterExpression
+): JexlValue {
   const subject = this.eval(ast.subject)
   if (ast.relative) {
     throw new Error('Relative filter expressions are not supported')
@@ -155,7 +164,10 @@ export function Literal(this: Evaluator, ast: Literal): JexlValue {
  * @returns {string} the final interpolated string
  * @private
  */
-export function TemplateLiteral(this: Evaluator, ast: TemplateLiteral): JexlValue {
+export function TemplateLiteral(
+  this: Evaluator,
+  ast: TemplateLiteral
+): JexlValue {
   const values = ast.parts.map((part) => {
     if (part.type === 'static') {
       return part.value as string
@@ -164,7 +176,11 @@ export function TemplateLiteral(this: Evaluator, ast: TemplateLiteral): JexlValu
     if (result == null) {
       return ''
     }
-    if (typeof result === 'string' || typeof result === 'number' || typeof result === 'boolean') {
+    if (
+      typeof result === 'string' ||
+      typeof result === 'number' ||
+      typeof result === 'boolean'
+    ) {
       return String(result)
     }
     return JSON.stringify(result)
@@ -217,7 +233,10 @@ export function FunctionCall(this: Evaluator, ast: FunctionCall): JexlValue {
  * @returns {*} the value of the UnaryExpression.
  * @constructor
  */
-export function UnaryExpression(this: Evaluator, ast: UnaryExpression): JexlValue {
+export function UnaryExpression(
+  this: Evaluator,
+  ast: UnaryExpression
+): JexlValue {
   const right = this.eval(ast.right!)
   const elem = this._grammar.elements[ast.operator]
   if (elem.type === 'unaryOp') {
@@ -230,7 +249,10 @@ export function UnaryExpression(this: Evaluator, ast: UnaryExpression): JexlValu
  * Evaluates a SequenceExpression by evaluating each expression in order
  * and returning the value of the last expression.
  */
-export function SequenceExpression(this: Evaluator, ast: SequenceExpression): JexlValue {
+export function SequenceExpression(
+  this: Evaluator,
+  ast: SequenceExpression
+): JexlValue {
   let lastValue: JexlValue
 
   for (const expr of ast.expressions) {
@@ -244,7 +266,10 @@ export function SequenceExpression(this: Evaluator, ast: SequenceExpression): Je
  * Evaluates an AssignmentExpression by evaluating the right side
  * and assigning it to the variable name on the left side.
  */
-export function AssignmentExpression(this: Evaluator, ast: AssignmentExpression): JexlValue {
+export function AssignmentExpression(
+  this: Evaluator,
+  ast: AssignmentExpression
+): JexlValue {
   const value = this.eval(ast.right!)
   const varName = ast.left.value
   this._context[varName] = value
