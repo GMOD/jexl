@@ -84,18 +84,18 @@ class Lexer {
     const tokens: Token[] = []
     let negate = false
     for (let i = 0; i < elements.length; i++) {
-      if (this._isWhitespace(elements[i])) {
+      if (this._isWhitespace(elements[i]!)) {
         if (tokens.length) {
-          tokens[tokens.length - 1].raw += elements[i]
+          tokens[tokens.length - 1]!.raw += elements[i]!
         }
       } else if (elements[i] === '-' && this._isNegative(tokens)) {
         negate = true
       } else {
         if (negate) {
-          elements[i] = '-' + elements[i]
+          elements[i] = '-' + elements[i]!
           negate = false
         }
-        tokens.push(this._createToken(elements[i]))
+        tokens.push(this._createToken(elements[i]!))
       }
     }
     // Catch a - at the end of the string. Let the parser handle that issue.
@@ -164,7 +164,7 @@ class Lexer {
     } else if (element === 'true' || element === 'false') {
       token.value = element === 'true'
     } else if (Object.hasOwn(this._grammar.elements, element)) {
-      token.type = this._grammar.elements[element].type
+      token.type = this._grammar.elements[element]!.type
     } else if (identRegex.exec(element)) {
       token.type = 'identifier'
     } else {
@@ -231,7 +231,7 @@ class Lexer {
     if (!tokens.length) {
       return true
     }
-    return minusNegatesAfter.has(tokens[tokens.length - 1].type)
+    return minusNegatesAfter.has(tokens[tokens.length - 1]!.type)
   }
 
   /**
@@ -258,7 +258,7 @@ class Lexer {
    * @private
    */
   _unquote(str: string) {
-    const quote = str[0]
+    const quote = str[0]!
     let escQuoteRegex = this._escQuoteRegexCache.get(quote)
     if (!escQuoteRegex) {
       escQuoteRegex = new RegExp('\\\\' + quote, 'g')
@@ -281,7 +281,7 @@ class Lexer {
         continue
       }
 
-      if (str[current] === '$' && str[current + 1] === '{') {
+      if (str[current] === '$' && str[current + 1]! === '{') {
         if (current > staticStart) {
           parts.push({
             type: 'static',
@@ -294,14 +294,14 @@ class Lexer {
         current += 2
 
         while (current < str.length && braceDepth > 0) {
-          if (str[current] === '\\') {
+          if (str[current]! === '\\') {
             current += 2
             continue
           }
-          if (str[current] === '{') {
+          if (str[current]! === '{') {
             braceDepth++
           }
-          if (str[current] === '}') {
+          if (str[current]! === '}') {
             braceDepth--
           }
           current++

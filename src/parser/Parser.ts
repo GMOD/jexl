@@ -72,7 +72,7 @@ class Parser {
     if (this._state === 'complete') {
       throw new Error('Cannot add a new token to a completed Parser')
     }
-    const state = states[this._state]
+    const state = states[this._state]!
     const startExpr = this._exprStr
     this._exprStr += token.raw
     if (state.subHandler) {
@@ -91,9 +91,9 @@ class Parser {
         }
       }
     } else if (token.type === 'semicolon' && this._stopMap[token.type]) {
-      return this._stopMap[token.type]
+      return this._stopMap[token.type]!
     } else if (state.tokenTypes?.[token.type]) {
-      const typeOpts = state.tokenTypes[token.type]
+      const typeOpts = state.tokenTypes[token.type]!
       let handleFunc = (
         handlers as Record<
           string,
@@ -110,7 +110,7 @@ class Parser {
         this._state = typeOpts.toState
       }
     } else if (this._stopMap[token.type]) {
-      return this._stopMap[token.type]
+      return this._stopMap[token.type]!
     } else {
       throw new Error(
         `Token ${token.raw} (${token.type}) unexpected in expression: ${this._exprStr}`
@@ -138,7 +138,7 @@ class Parser {
    *      the expression, indicating that the expression is incomplete
    */
   complete() {
-    if (this._cursor && !states[this._state].completable) {
+    if (this._cursor && !states[this._state]!.completable) {
       throw new Error(`Unexpected end of expression: ${this._exprStr}`)
     }
     if (this._subParser) {
@@ -175,7 +175,7 @@ class Parser {
    * @private
    */
   _endSubExpression() {
-    states[this._state].subHandler!.call(this, this._subParser!.complete())
+    states[this._state]!.subHandler!.call(this, this._subParser!.complete())
     this._subParser = undefined
   }
 
@@ -232,12 +232,12 @@ class Parser {
    * @private
    */
   _startSubExpression(exprStr?: string) {
-    let endStates = states[this._state].endStates
+    let endStates = states[this._state]!.endStates
     if (!endStates) {
       this._parentStop = true
       endStates = this._stopMap
     }
-    if (states[this._state].completable && !endStates.semicolon) {
+    if (states[this._state]!.completable && !endStates.semicolon) {
       endStates = { ...endStates, semicolon: '_semicolon' }
     }
     this._subParser = new Parser(this._grammar, this._lexer, exprStr, endStates)

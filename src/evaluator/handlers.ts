@@ -56,7 +56,7 @@ export function BinaryExpression(
   this: Evaluator,
   ast: BinaryExpression
 ): JexlValue {
-  const grammarOp = this._grammar.elements[ast.operator]
+  const grammarOp = this._grammar.elements[ast.operator]!
   if (grammarOp.type === 'binaryOp') {
     const binaryOp = grammarOp as BinaryOp
     if (binaryOp.evalOnDemand) {
@@ -238,7 +238,7 @@ export function UnaryExpression(
   ast: UnaryExpression
 ): JexlValue {
   const right = this.eval(ast.right!)
-  const elem = this._grammar.elements[ast.operator]
+  const elem = this._grammar.elements[ast.operator]!
   if (elem.type === 'unaryOp') {
     return (elem as UnaryOp).eval(right)
   }

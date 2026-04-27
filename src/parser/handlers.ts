@@ -75,7 +75,7 @@ export function binaryOp(this: Parser, token: Token) {
   }
 
   const tokenValue = token.value as string
-  const grammarElem = this._grammar.elements[tokenValue]
+  const grammarElem = this._grammar.elements[tokenValue]!
   const precedence =
     (grammarElem.type === 'binaryOp'
       ? (grammarElem as BinaryOp).precedence
@@ -86,7 +86,7 @@ export function binaryOp(this: Parser, token: Token) {
     if (!parentExpr.operator) {
       break
     }
-    const parentElem = this._grammar.elements[parentExpr.operator]
+    const parentElem = this._grammar.elements[parentExpr.operator]!
     const parentPrecedence =
       parentElem.type === 'binaryOp' || parentElem.type === 'unaryOp'
         ? (parentElem as BinaryOp).precedence

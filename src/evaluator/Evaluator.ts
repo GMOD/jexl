@@ -46,7 +46,7 @@ class Evaluator {
   eval(ast: AstNode): JexlValue {
     type HandlerFn = (this: Evaluator, ast: AstNode) => JexlValue
     const handlerMap = handlers as unknown as Record<string, HandlerFn>
-    return handlerMap[ast.type].call(this, ast)
+    return handlerMap[ast.type]!.call(this, ast)
   }
 
   /**

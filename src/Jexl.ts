@@ -169,7 +169,7 @@ class Jexl {
    * @param {string} operator The operator string to be removed
    */
   removeOp(operator: string) {
-    const elem = this._grammar.elements[operator]
+    const elem = this._grammar.elements[operator]!
     if (elem.type === 'binaryOp' || elem.type === 'unaryOp') {
       Reflect.deleteProperty(this._grammar.elements, operator)
     }
