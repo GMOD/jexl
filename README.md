@@ -206,3 +206,11 @@ jexl.eval('~3.7') // 3
 ## License
 
 MIT License, same as TomFrost/Jexl
+
+## Publishing
+
+[Trusted publishing](https://docs.npmjs.com/about-trusted-publishing) via GitHub Actions.
+
+```bash
+npm version patch  # or minor/major
+```
