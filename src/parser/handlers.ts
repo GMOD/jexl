@@ -3,7 +3,8 @@
  * Copyright 2020 Tom Shawver
  */
 
-import type { BinaryOp } from '../grammar.ts'
+import { precedenceOf } from '../grammar.ts'
+
 import type {
   ArrayLiteral,
   AssignmentExpression,
@@ -75,23 +76,16 @@ export function binaryOp(this: Parser, token: Token) {
   }
 
   const tokenValue = token.value as string
-  const grammarElem = this._grammar.elements[tokenValue]!
-  const precedence =
-    (grammarElem.type === 'binaryOp'
-      ? (grammarElem as BinaryOp).precedence
-      : 0) || 0
+  const precedence = precedenceOf(this._grammar.elements[tokenValue])
   let parent = this._cursor?._parent
   while (parent) {
     const parentExpr = parent as BinaryExpression
     if (!parentExpr.operator) {
       break
     }
-    const parentElem = this._grammar.elements[parentExpr.operator]!
-    const parentPrecedence =
-      parentElem.type === 'binaryOp' || parentElem.type === 'unaryOp'
-        ? (parentElem as BinaryOp).precedence
-        : 0
-    if (parentPrecedence < precedence) {
+    if (
+      precedenceOf(this._grammar.elements[parentExpr.operator]) < precedence
+    ) {
       break
     }
     this._cursor = parent
@@ -200,7 +194,7 @@ export function literal(this: Parser, token: Token) {
  */
 export function templateString(this: Parser, token: Token) {
   const parts: TemplateLiteral['parts'] = []
-  const tokenParts = token.value as { type: string; value: string }[]
+  const tokenParts = Array.isArray(token.value) ? token.value : []
 
   for (const part of tokenParts) {
     if (part.type === 'static') {
@@ -231,7 +225,7 @@ export function templateString(this: Parser, token: Token) {
 
   const node: TemplateLiteral = {
     type: 'TemplateLiteral',
-    parts: parts
+    parts
   }
   this._placeAtCursor(node)
 }
@@ -302,21 +296,6 @@ export function ternaryStart(this: Parser) {
   }
   this._tree = node
   this._cursor = this._tree
-}
-
-/**
- * Handles identifier tokens when used to indicate the name of a transform to
- * be applied.
- * @param {{type: <string>}} token A token object
- */
-export function transform(this: Parser, token: Token) {
-  const node: FunctionCall = {
-    type: 'FunctionCall',
-    name: token.value as string,
-    args: [this._cursor!],
-    pool: 'transforms'
-  }
-  this._placeBeforeCursor(node)
 }
 
 /**

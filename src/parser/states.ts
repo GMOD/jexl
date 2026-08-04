@@ -70,18 +70,12 @@ export const states: States = {
   expectBinOp: {
     tokenTypes: {
       binaryOp: { toState: 'expectOperand' },
-      pipe: { toState: 'expectTransform' },
       dot: { toState: 'traverse' },
       openBracket: { toState: 'filter' },
       question: { toState: 'ternaryMid', handler: h.ternaryStart },
       semicolon: { handler: h.semicolon }
     },
     completable: true
-  },
-  expectTransform: {
-    tokenTypes: {
-      identifier: { toState: 'postTransform', handler: h.transform }
-    }
   },
   expectObjKey: {
     tokenTypes: {
@@ -95,24 +89,11 @@ export const states: States = {
       colon: { toState: 'objVal' }
     }
   },
-  postTransform: {
-    tokenTypes: {
-      openParen: { toState: 'argVal' },
-      binaryOp: { toState: 'expectOperand' },
-      dot: { toState: 'traverse' },
-      openBracket: { toState: 'filter' },
-      pipe: { toState: 'expectTransform' },
-      question: { toState: 'ternaryMid', handler: h.ternaryStart },
-      semicolon: { handler: h.semicolon }
-    },
-    completable: true
-  },
   postArgs: {
     tokenTypes: {
       binaryOp: { toState: 'expectOperand' },
       dot: { toState: 'traverse' },
       openBracket: { toState: 'filter' },
-      pipe: { toState: 'expectTransform' },
       question: { toState: 'ternaryMid', handler: h.ternaryStart },
       semicolon: { handler: h.semicolon }
     },
@@ -124,7 +105,6 @@ export const states: States = {
       dot: { toState: 'traverse' },
       openBracket: { toState: 'filter' },
       openParen: { toState: 'argVal', handler: h.functionCall },
-      pipe: { toState: 'expectTransform' },
       question: { toState: 'ternaryMid', handler: h.ternaryStart },
       semicolon: { handler: h.semicolon }
     },

@@ -6,7 +6,12 @@
 import Expression from './Expression.ts'
 import { getGrammar } from './grammar.ts'
 
-import type { Grammar, GrammarElement } from './grammar.ts'
+import type {
+  BinaryOpEval,
+  BinaryOpEvalOnDemand,
+  Grammar,
+  GrammarElement
+} from './grammar.ts'
 import type { JexlValue } from './types.ts'
 
 /**
@@ -45,14 +50,33 @@ class Jexl {
   addBinaryOp(
     operator: string,
     precedence: number,
-    fn: (left: JexlValue, right: JexlValue) => JexlValue,
+    fn: BinaryOpEval,
+    manualEval?: false
+  ): void
+  addBinaryOp(
+    operator: string,
+    precedence: number,
+    fn: BinaryOpEvalOnDemand,
+    manualEval: true
+  ): void
+  addBinaryOp(
+    operator: string,
+    precedence: number,
+    fn: BinaryOpEval | BinaryOpEvalOnDemand,
     manualEval?: boolean
   ) {
-    this._addGrammarElement(operator, {
-      type: 'binaryOp',
-      precedence: precedence,
-      [manualEval ? 'evalOnDemand' : 'eval']: fn
-    })
+    // the overloads above pair `fn` with `manualEval`; the implementation
+    // signature can't express that correlation, hence the assertions
+    this._addGrammarElement(
+      operator,
+      manualEval
+        ? {
+            type: 'binaryOp',
+            precedence,
+            evalOnDemand: fn as BinaryOpEvalOnDemand
+          }
+        : { type: 'binaryOp', precedence, eval: fn as BinaryOpEval }
+    )
   }
 
   /**
@@ -146,8 +170,8 @@ class Jexl {
    */
   expr(strs: TemplateStringsArray, ...args: JexlValue[]) {
     let exprStr = ''
-    for (let idx = 0; idx < strs.length; idx++) {
-      exprStr += strs[idx]
+    for (const [idx, str] of strs.entries()) {
+      exprStr += str
       if (idx < args.length) {
         const arg = args[idx]
         if (
@@ -169,8 +193,8 @@ class Jexl {
    * @param {string} operator The operator string to be removed
    */
   removeOp(operator: string) {
-    const elem = this._grammar.elements[operator]!
-    if (elem.type === 'binaryOp' || elem.type === 'unaryOp') {
+    const elem = this._grammar.elements[operator]
+    if (elem?.type === 'binaryOp' || elem?.type === 'unaryOp') {
       Reflect.deleteProperty(this._grammar.elements, operator)
     }
   }

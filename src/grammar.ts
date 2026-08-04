@@ -7,14 +7,18 @@
 
 import type { JexlValue } from './types.ts'
 
+export type BinaryOpEval = (left: JexlValue, right: JexlValue) => JexlValue
+
+export type BinaryOpEvalOnDemand = (
+  left: { eval: () => JexlValue },
+  right: { eval: () => JexlValue }
+) => JexlValue
+
 export interface BinaryOp {
   type: 'binaryOp'
   precedence: number
-  eval?: (left: JexlValue, right: JexlValue) => JexlValue
-  evalOnDemand?: (
-    left: { eval: () => JexlValue },
-    right: { eval: () => JexlValue }
-  ) => JexlValue
+  eval?: BinaryOpEval
+  evalOnDemand?: BinaryOpEvalOnDemand
 }
 
 export interface UnaryOp {
@@ -23,8 +27,25 @@ export interface UnaryOp {
   eval: (right: JexlValue) => JexlValue
 }
 
+/**
+ * The punctuation elements of the grammar. Unlike operators these carry no
+ * behavior of their own; the Parser's state machine gives them meaning. The
+ * type is a literal union rather than `string` so that `GrammarElement` is a
+ * discriminated union, letting operator properties be accessed without casts.
+ */
 export interface SimpleElement {
-  type: string
+  type:
+    | 'dot'
+    | 'openBracket'
+    | 'closeBracket'
+    | 'openCurl'
+    | 'closeCurl'
+    | 'colon'
+    | 'comma'
+    | 'openParen'
+    | 'closeParen'
+    | 'question'
+    | 'semicolon'
 }
 
 export type GrammarElement = BinaryOp | UnaryOp | SimpleElement
@@ -32,7 +53,16 @@ export type GrammarElement = BinaryOp | UnaryOp | SimpleElement
 export interface Grammar {
   elements: Record<string, GrammarElement>
   functions: Record<string, (...args: JexlValue[]) => JexlValue>
-  transforms?: Record<string, (...args: JexlValue[]) => JexlValue>
+}
+
+/**
+ * Returns the binding power of a grammar element, or 0 for elements that
+ * aren't operators and therefore don't participate in precedence.
+ */
+export function precedenceOf(elem: GrammarElement | undefined) {
+  return elem && (elem.type === 'binaryOp' || elem.type === 'unaryOp')
+    ? elem.precedence
+    : 0
 }
 
 export const getGrammar = (): Grammar => ({

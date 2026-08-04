@@ -1,0 +1,5 @@
+allowBuilds:
+  # eslint-plugin-import-x's native resolver; it ships prebuilt platform
+  # binaries, so its install script is not needed. This matches the state
+  # node_modules was already in (pnpm had it recorded as an ignored build).
+  unrs-resolver: false

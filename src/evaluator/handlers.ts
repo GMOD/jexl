@@ -3,7 +3,6 @@
  * Copyright 2020 Tom Shawver
  */
 
-import type { BinaryOp, UnaryOp } from '../grammar.ts'
 import type {
   ArrayLiteral,
   AssignmentExpression,
@@ -21,10 +20,6 @@ import type {
   UnaryExpression
 } from '../types.ts'
 import type Evaluator from './Evaluator.ts'
-
-const poolNames: Record<string, string> = {
-  functions: 'Jexl Function'
-}
 
 /**
  * Evaluates an ArrayLiteral by returning its value, with each element
@@ -56,17 +51,16 @@ export function BinaryExpression(
   this: Evaluator,
   ast: BinaryExpression
 ): JexlValue {
-  const grammarOp = this._grammar.elements[ast.operator]!
-  if (grammarOp.type === 'binaryOp') {
-    const binaryOp = grammarOp as BinaryOp
-    if (binaryOp.evalOnDemand) {
+  const grammarOp = this._grammar.elements[ast.operator]
+  if (grammarOp?.type === 'binaryOp') {
+    if (grammarOp.evalOnDemand) {
       const wrap = (subAst: AstNode) => ({ eval: () => this.eval(subAst) })
-      return binaryOp.evalOnDemand(wrap(ast.left), wrap(ast.right!))
+      return grammarOp.evalOnDemand(wrap(ast.left), wrap(ast.right!))
     }
     const left = this.eval(ast.left)
     const right = this.eval(ast.right!)
-    if (binaryOp.eval) {
-      return binaryOp.eval(left, right)
+    if (grammarOp.eval) {
+      return grammarOp.eval(left, right)
     }
   }
   return undefined
@@ -90,7 +84,8 @@ export function ConditionalExpression(
   if (res) {
     return ast.consequent ? this.eval(ast.consequent) : res
   }
-  return this.eval(ast.alternate!)
+  // an omitted alternate ("a ? b :") evaluates to undefined
+  return ast.alternate ? this.eval(ast.alternate) : undefined
 }
 
 /**
@@ -170,9 +165,9 @@ export function TemplateLiteral(
 ): JexlValue {
   const values = ast.parts.map((part) => {
     if (part.type === 'static') {
-      return part.value as string
+      return part.value
     }
-    const result = this.eval(part.value as AstNode)
+    const result = this.eval(part.value)
     if (result == null) {
       return ''
     }
@@ -210,17 +205,12 @@ export function ObjectLiteral(this: Evaluator, ast: ObjectLiteral): JexlValue {
  * @private
  */
 export function FunctionCall(this: Evaluator, ast: FunctionCall): JexlValue {
-  const poolName = poolNames[ast.pool]
-  if (!poolName) {
-    throw new Error(`Corrupt AST: Pool '${ast.pool}' not found`)
+  // hasOwn, so that inherited Object.prototype members such as `toString` and
+  // `constructor` aren't callable as Jexl functions
+  if (!Object.hasOwn(this._grammar.functions, ast.name)) {
+    throw new Error(`Jexl Function ${ast.name} is not defined.`)
   }
-  const pool = this._grammar[ast.pool as keyof typeof this._grammar] as
-    | Record<string, (...args: JexlValue[]) => JexlValue>
-    | undefined
-  const func = pool?.[ast.name]
-  if (func === undefined) {
-    throw new Error(`${poolName} ${ast.name} is not defined.`)
-  }
+  const func = this._grammar.functions[ast.name]!
   const args = this.evalArray(ast.args)
   return func(...args)
 }
@@ -238,9 +228,9 @@ export function UnaryExpression(
   ast: UnaryExpression
 ): JexlValue {
   const right = this.eval(ast.right!)
-  const elem = this._grammar.elements[ast.operator]!
-  if (elem.type === 'unaryOp') {
-    return (elem as UnaryOp).eval(right)
+  const elem = this._grammar.elements[ast.operator]
+  if (elem?.type === 'unaryOp') {
+    return elem.eval(right)
   }
   return undefined
 }

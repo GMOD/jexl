@@ -64,19 +64,20 @@ export interface ObjectLiteral extends AstNode {
   value: Record<string, AstNode>
 }
 
+export type TemplateLiteralPart =
+  | { type: 'static'; value: string }
+  | { type: 'expression'; value: AstNode }
+
 export interface TemplateLiteral extends AstNode {
   type: 'TemplateLiteral'
-  parts: {
-    type: 'static' | 'expression'
-    value: string | AstNode
-  }[]
+  parts: TemplateLiteralPart[]
 }
 
 export interface FunctionCall extends AstNode {
   type: 'FunctionCall'
   name: string
   args: AstNode[]
-  pool: 'functions' | 'transforms'
+  pool: 'functions'
 }
 
 export interface FilterExpression extends AstNode {

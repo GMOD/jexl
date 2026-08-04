@@ -45,8 +45,18 @@ class Evaluator {
    */
   eval(ast: AstNode): JexlValue {
     type HandlerFn = (this: Evaluator, ast: AstNode) => JexlValue
-    const handlerMap = handlers as unknown as Record<string, HandlerFn>
-    return handlerMap[ast.type]!.call(this, ast)
+    // each handler declares the specific node type it accepts, so the module
+    // can't be described as a uniform map without widening it here. Dispatch is
+    // by node type, which the Parser guarantees matches the handler's argument.
+    const handlerMap = handlers as unknown as Record<
+      string,
+      HandlerFn | undefined
+    >
+    const handler = handlerMap[ast.type]
+    if (!handler) {
+      throw new Error(`Corrupt AST: unknown node type '${ast.type}'`)
+    }
+    return handler.call(this, ast)
   }
 
   /**
@@ -68,9 +78,9 @@ class Evaluator {
    * @returns {{}} the result map.
    */
   evalMap(map: Record<string, AstNode>) {
-    const entries = Object.entries(map)
-    const vals = entries.map(([_, ast]) => this.eval(ast))
-    return Object.fromEntries(entries.map(([key], idx) => [key, vals[idx]]))
+    return Object.fromEntries(
+      Object.entries(map).map(([key, ast]) => [key, this.eval(ast)])
+    )
   }
 }
 

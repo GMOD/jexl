@@ -45,8 +45,12 @@ class Expression {
    */
   eval(context = {}) {
     const ast = this._getAst()
+    // an expression with no tokens (empty or whitespace-only) has no AST
+    if (!ast) {
+      return undefined
+    }
     const evaluator = new Evaluator(this._grammar, context)
-    return evaluator.eval(ast!)
+    return evaluator.eval(ast)
   }
 
   _getAst() {

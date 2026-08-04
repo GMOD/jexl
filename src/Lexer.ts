@@ -4,12 +4,12 @@
  */
 
 import type { Grammar } from './grammar.ts'
-import type { Token } from './types.ts'
+import type { TemplatePart, Token } from './types.ts'
 
 const numericRegex = /^-?(?:(?:[0-9]*\.[0-9]+)|[0-9]+)$/
 const identRegex =
   /^[a-zA-Zа-яА-Я_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF$][a-zA-Zа-яА-Я0-9_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF$]*$/
-const escEscRegex = /\\\\/
+const escEscRegex = /\\\\/g
 const whitespaceRegex = /^\s*$/
 const preOpRegexElems = [
   // Template strings
@@ -83,19 +83,16 @@ class Lexer {
   getTokens(elements: string[]) {
     const tokens: Token[] = []
     let negate = false
-    for (let i = 0; i < elements.length; i++) {
-      if (this._isWhitespace(elements[i]!)) {
+    for (const element of elements) {
+      if (this._isWhitespace(element)) {
         if (tokens.length) {
-          tokens[tokens.length - 1]!.raw += elements[i]!
+          tokens[tokens.length - 1]!.raw += element
         }
-      } else if (elements[i] === '-' && this._isNegative(tokens)) {
+      } else if (element === '-' && this._isNegative(tokens)) {
         negate = true
       } else {
-        if (negate) {
-          elements[i] = '-' + elements[i]!
-          negate = false
-        }
-        tokens.push(this._createToken(elements[i]!))
+        tokens.push(this._createToken(negate ? '-' + element : element))
+        negate = false
       }
     }
     // Catch a - at the end of the string. Let the parser handle that issue.
@@ -266,12 +263,12 @@ class Lexer {
     }
     return str
       .slice(1, -1)
-      .replace(escQuoteRegex, quote)
-      .replace(escEscRegex, '\\')
+      .replaceAll(escQuoteRegex, quote)
+      .replaceAll(escEscRegex, '\\')
   }
 
   _parseTemplateString(str: string) {
-    const parts: { type: 'static' | 'interpolation'; value: string }[] = []
+    const parts: TemplatePart[] = []
     let current = 1
     let staticStart = 1
 
@@ -281,7 +278,7 @@ class Lexer {
         continue
       }
 
-      if (str[current] === '$' && str[current + 1]! === '{') {
+      if (str[current] === '$' && str[current + 1] === '{') {
         if (current > staticStart) {
           parts.push({
             type: 'static',
@@ -294,14 +291,14 @@ class Lexer {
         current += 2
 
         while (current < str.length && braceDepth > 0) {
-          if (str[current]! === '\\') {
+          if (str[current] === '\\') {
             current += 2
             continue
           }
-          if (str[current]! === '{') {
+          if (str[current] === '{') {
             braceDepth++
           }
-          if (str[current]! === '}') {
+          if (str[current] === '}') {
             braceDepth--
           }
           current++
