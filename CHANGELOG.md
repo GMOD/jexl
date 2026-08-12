@@ -6,6 +6,17 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Added
 
+- **A call written against a value passes it as the first argument.** `a.b(x)`
+  compiled to `b(x)`: the receiver was parsed and then dropped. jbrowse's own
+  documented recipe `jexl:refName.split(' ')[0]` therefore evaluated
+  `' '.split(undefined)` and returned a single space instead of the first word,
+  and `feature.get('start')` threw `feature.get is not a function`. Functions
+  have no receiver — they live in one global pool — so `a.b(x)` now means
+  `b(a, x)`, which is how every function in jbrowse's pool is already written
+  (`get(feature, key)`, `split(str, sep)`). Nothing that worked before changes:
+  any expression this affects was already returning a wrong value or throwing.
+  `a[expr]()`, whose subject is a filter rather than a name, now reports that
+  functions must be called by name rather than looking up `undefined`.
 - **Unary minus on any operand.** Previously only numeric literals could be
   negated: `-1` worked, but `-x`, `-(a + b)`, `-foo.bar` and `-log10(score)`
   all threw `Invalid expression token`, because the Lexer folded the sign into
@@ -15,6 +26,22 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Fixed
 
+- **`in` against a string no longer matches every absent value.** A left
+  operand that wasn't a string, number or boolean was coerced to `''`, and
+  every string contains `''`, so `missing in "abc"` — a missing feature
+  attribute, `null`, `{}`, `[]` — was `true`. Only primitives have a substring
+  form; anything else is now `false`. Array membership is unchanged.
+- **A group left unclosed is rejected instead of evaluating as if closed.**
+  `(1` returned `1`. A group opened before anything reached the tree leaves the
+  parser's cursor null, and `complete()` tested only the cursor, so the missing
+  `)` went unnoticed. `[1, 2`, `{a: 1` and `f(1` already errored and are
+  unaffected.
+- **`__proto__` as a key keeps its value.** Storing to that key invokes the
+  prototype setter rather than creating a property, so `{"__proto__": v}`
+  evaluated to `{}` — the entry was lost in the parser's key map before the
+  Evaluator ever saw it — and `__proto__ = v` re-pointed the prototype of the
+  caller's context object. Such keys are now defined, matching what
+  `JSON.parse('{"__proto__":1}')` produces: an ordinary own property.
 - **Assignment to a member expression is rejected instead of silently writing
   elsewhere.** `a.b = 5` parsed, but the Evaluator assigns into the context by
   name, so it created a top-level `b` and left `a.b` unchanged. It now throws
