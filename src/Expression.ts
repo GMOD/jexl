@@ -15,6 +15,9 @@ import type { AstNode } from './types.ts'
 class Expression {
   _grammar: Grammar
   _exprStr: string
+  /** The parsed tree, exposed for inspection. Legitimately null for an
+   * expression with no tokens, which is why compilation is tracked by
+   * `_compiled` rather than by this being set. */
   _ast: AstNode | null
   _lexer: Lexer
   _compiled = false
@@ -69,15 +72,6 @@ class Expression {
       return undefined
     }
     return this._fn(new Evaluator(this._grammar, context))
-  }
-
-  _getAst() {
-    // tracked separately from _ast, which is legitimately null for an
-    // expression with no tokens and would otherwise recompile on every eval
-    if (!this._compiled) {
-      this.compile()
-    }
-    return this._ast
   }
 }
 

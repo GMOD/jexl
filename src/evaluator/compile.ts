@@ -4,22 +4,7 @@
  */
 
 import type { Grammar } from '../grammar.ts'
-import type {
-  ArrayLiteral,
-  AssignmentExpression,
-  AstNode,
-  BinaryExpression,
-  ConditionalExpression,
-  FilterExpression,
-  FunctionCall,
-  Identifier,
-  JexlValue,
-  Literal,
-  ObjectLiteral,
-  SequenceExpression,
-  TemplateLiteral,
-  UnaryExpression
-} from '../types.ts'
+import type { AstNode, AstNodeUnion, JexlValue } from '../types.ts'
 import type Evaluator from './Evaluator.ts'
 
 /**
@@ -90,14 +75,17 @@ function stringify(value: JexlValue) {
  * @throws {Error} if the tree contains an unrecognized node type
  */
 export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
-  switch (ast.type) {
+  // AstNode types its `type` as a plain string so the Parser can build the tree
+  // loosely; narrowing to the union once, here, lets every case below see its
+  // own node type instead of repeating the same cast in each branch
+  const node = ast as AstNodeUnion
+  switch (node.type) {
     case 'Literal': {
-      const { value } = ast as Literal
+      const { value } = node
       return () => value
     }
 
     case 'Identifier': {
-      const node = ast as Identifier
       const name = node.value
       if (!node.from) {
         return node.relative
@@ -119,7 +107,6 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     }
 
     case 'BinaryExpression': {
-      const node = ast as BinaryExpression
       const op = grammar.elements[node.operator]
       if (op?.type !== 'binaryOp') {
         // matches the tree-walking behaviour: an unknown operator yields
@@ -147,7 +134,6 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     }
 
     case 'UnaryExpression': {
-      const node = ast as UnaryExpression
       const right = compileAst(node.right!, grammar)
       const elem = grammar.elements[node.operator]
       const fn =
@@ -167,7 +153,6 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     }
 
     case 'ConditionalExpression': {
-      const node = ast as ConditionalExpression
       const test = compileAst(node.test, grammar)
       const consequent = node.consequent
         ? compileAst(node.consequent, grammar)
@@ -186,7 +171,6 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     }
 
     case 'FilterExpression': {
-      const node = ast as FilterExpression
       if (node.relative) {
         // thrown on evaluation rather than compilation, as before
         return () => {
@@ -208,9 +192,7 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     }
 
     case 'ArrayLiteral': {
-      const items = (ast as ArrayLiteral).value.map((item) =>
-        compileAst(item, grammar)
-      )
+      const items = node.value.map((item) => compileAst(item, grammar))
       const len = items.length
       return (ev) => {
         const out: JexlValue[] = new Array(len)
@@ -222,9 +204,9 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     }
 
     case 'ObjectLiteral': {
-      const entries = Object.entries((ast as ObjectLiteral).value)
+      const entries = Object.entries(node.value)
       const keys = entries.map(([key]) => key)
-      const values = entries.map(([, node]) => compileAst(node, grammar))
+      const values = entries.map(([, value]) => compileAst(value, grammar))
       const len = keys.length
       // resolved once, here, so the common case keeps its plain store
       const store = keys.includes('__proto__') ? defineOwn : assignOwn
@@ -239,16 +221,14 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
 
     case 'TemplateLiteral': {
       // every part renders to a string, so these are narrower than CompiledNode
-      const parts = (ast as TemplateLiteral).parts.map(
-        (part): ((ev: Evaluator) => string) => {
-          if (part.type === 'static') {
-            const { value } = part
-            return () => value
-          }
-          const expr = compileAst(part.value, grammar)
-          return (ev) => stringify(expr(ev))
+      const parts = node.parts.map((part): ((ev: Evaluator) => string) => {
+        if (part.type === 'static') {
+          const { value } = part
+          return () => value
         }
-      )
+        const expr = compileAst(part.value, grammar)
+        return (ev) => stringify(expr(ev))
+      })
       return (ev) => {
         let out = ''
         for (const part of parts) {
@@ -259,7 +239,6 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     }
 
     case 'FunctionCall': {
-      const node = ast as FunctionCall
       const { name } = node
       const args = node.args.map((arg) => compileAst(arg, grammar))
       // hasOwn, so that inherited Object.prototype members such as `toString`
@@ -309,9 +288,7 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     }
 
     case 'SequenceExpression': {
-      const exprs = (ast as SequenceExpression).expressions.map((expr) =>
-        compileAst(expr, grammar)
-      )
+      const exprs = node.expressions.map((expr) => compileAst(expr, grammar))
       const len = exprs.length
       return (ev) => {
         let last: JexlValue
@@ -323,7 +300,6 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     }
 
     case 'AssignmentExpression': {
-      const node = ast as AssignmentExpression
       const name = node.left.value
       const right = compileAst(node.right!, grammar)
       const store = name === '__proto__' ? defineOwn : assignOwn

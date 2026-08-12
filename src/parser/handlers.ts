@@ -4,6 +4,9 @@
  */
 
 import { precedenceOf } from '../grammar.ts'
+// circular with Parser.ts, which is fine: the binding is only read from inside
+// a handler, long after both modules have finished evaluating
+import Parser from './Parser.ts'
 
 import type {
   ArrayLiteral,
@@ -20,7 +23,6 @@ import type {
   Token,
   UnaryExpression
 } from '../types.ts'
-import type Parser from './Parser.ts'
 
 /**
  * Handles a subexpression that's used to define a transform argument's value.
@@ -209,11 +211,7 @@ export function templateString(this: Parser, token: Token) {
       })
     } else {
       const subTokens = this._lexer.tokenize(part.value)
-      const ParserClass = this.constructor as new (
-        grammar: typeof this._grammar,
-        lexer: typeof this._lexer
-      ) => Parser
-      const subParser = new ParserClass(this._grammar, this._lexer)
+      const subParser = new Parser(this._grammar, this._lexer)
       subParser.addTokens(subTokens)
       const subAst = subParser.complete()
 

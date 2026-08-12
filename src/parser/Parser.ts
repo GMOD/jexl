@@ -11,6 +11,25 @@ import type { Grammar } from '../grammar.ts'
 import type { AstNode, SequenceExpression, Token } from '../types.ts'
 
 /**
+ * The handler to run for a token type when the state it appears in doesn't
+ * name one of its own. Token types absent here — the brackets, parens and
+ * separators — carry no behavior beyond the state transition the state machine
+ * gives them.
+ */
+const tokenHandlers: Record<
+  string,
+  ((this: Parser, token: Token) => void) | undefined
+> = {
+  binaryOp: handlers.binaryOp,
+  dot: handlers.dot,
+  identifier: handlers.identifier,
+  literal: handlers.literal,
+  semicolon: handlers.semicolon,
+  templateString: handlers.templateString,
+  unaryOp: handlers.unaryOp
+}
+
+/**
  * The Parser is a state machine that converts tokens from the {@link Lexer}
  * into an Abstract Syntax Tree (AST), capable of being evaluated in any
  * context by the {@link Evaluator}.  The Parser expects that all tokens
@@ -76,10 +95,8 @@ class Parser {
     const startExpr = this._exprStr
     this._exprStr += token.raw
     if (state.subHandler) {
-      if (!this._subParser) {
-        this._startSubExpression(startExpr)
-      }
-      const stopState = this._subParser!.addToken(token)
+      const subParser = this._subParser ?? this._startSubExpression(startExpr)
+      const stopState = subParser.addToken(token)
       if (stopState) {
         this._endSubExpression()
         if (stopState === '_semicolon') {
@@ -94,18 +111,10 @@ class Parser {
       return this._stopMap[token.type]!
     } else if (state.tokenTypes?.[token.type]) {
       const typeOpts = state.tokenTypes[token.type]!
-      let handleFunc = (
-        handlers as Record<
-          string,
-          ((this: Parser, token: Token) => void) | undefined
-        >
-      )[token.type]
-      if (typeOpts.handler) {
-        handleFunc = typeOpts.handler
-      }
-      if (handleFunc) {
-        handleFunc.call(this, token)
-      }
+      // the state's own handler wins over the token type's default one, and a
+      // token type with neither only drives the transition below
+      const handleFunc = typeOpts.handler ?? tokenHandlers[token.type]
+      handleFunc?.call(this, token)
       if (typeOpts.toState) {
         this._state = typeOpts.toState
       }
@@ -238,6 +247,7 @@ class Parser {
    * Prepares the Parser to accept a subexpression by (re)instantiating the
    * subParser.
    * @param {string} [exprStr] The expression string to prefix to the new Parser
+   * @returns {Parser} the new subParser, also stored on this instance
    * @private
    */
   _startSubExpression(exprStr?: string) {
@@ -250,6 +260,7 @@ class Parser {
       endStates = { ...endStates, semicolon: '_semicolon' }
     }
     this._subParser = new Parser(this._grammar, this._lexer, exprStr, endStates)
+    return this._subParser
   }
 }
 

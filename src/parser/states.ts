@@ -23,6 +23,20 @@ interface StateDefinition {
 type States = Record<string, StateDefinition>
 
 /**
+ * The tokens that may follow a finished operand: an operator to combine it
+ * with, a dot or subscript to keep drilling into it, a question mark opening a
+ * ternary, or a semicolon ending the statement. Shared by every state that
+ * sits on a complete value, which is also why each of them is completable.
+ */
+const afterOperand: Record<string, TokenTypeOptions> = {
+  binaryOp: { toState: 'expectOperand' },
+  dot: { toState: 'traverse' },
+  openBracket: { toState: 'filter' },
+  question: { toState: 'ternaryMid', handler: h.ternaryStart },
+  semicolon: { handler: h.semicolon }
+}
+
+/**
  * A mapping of all states in the finite state machine to a set of instructions
  * for handling or transitioning into other states. Each state can be handled
  * in one of two schemes: a tokenType map, or a subHandler.
@@ -68,13 +82,7 @@ export const states: States = {
     }
   },
   expectBinOp: {
-    tokenTypes: {
-      binaryOp: { toState: 'expectOperand' },
-      dot: { toState: 'traverse' },
-      openBracket: { toState: 'filter' },
-      question: { toState: 'ternaryMid', handler: h.ternaryStart },
-      semicolon: { handler: h.semicolon }
-    },
+    tokenTypes: afterOperand,
     completable: true
   },
   expectObjKey: {
@@ -90,23 +98,15 @@ export const states: States = {
     }
   },
   postArgs: {
-    tokenTypes: {
-      binaryOp: { toState: 'expectOperand' },
-      dot: { toState: 'traverse' },
-      openBracket: { toState: 'filter' },
-      question: { toState: 'ternaryMid', handler: h.ternaryStart },
-      semicolon: { handler: h.semicolon }
-    },
+    tokenTypes: afterOperand,
     completable: true
   },
   identifier: {
     tokenTypes: {
-      binaryOp: { toState: 'expectOperand' },
-      dot: { toState: 'traverse' },
-      openBracket: { toState: 'filter' },
-      openParen: { toState: 'argVal', handler: h.functionCall },
-      question: { toState: 'ternaryMid', handler: h.ternaryStart },
-      semicolon: { handler: h.semicolon }
+      ...afterOperand,
+      // a name is the only operand that can be followed by an argument list,
+      // since a function is called by name rather than evaluated as a value
+      openParen: { toState: 'argVal', handler: h.functionCall }
     },
     completable: true
   },

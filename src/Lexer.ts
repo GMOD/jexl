@@ -10,6 +10,9 @@ const numericRegex = /^-?(?:(?:[0-9]*\.[0-9]+)|[0-9]+)$/
 const identRegex =
   /^[a-zA-Zа-яА-Я_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF$][a-zA-Zа-яА-Я0-9_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF$]*$/
 const escEscRegex = /\\\\/g
+// a string literal opens with one of exactly two quote characters, so the two
+// unescaping regexes can just be named rather than built and cached per quote
+const escQuoteRegex = { "'": /\\'/g, '"': /\\"/g }
 const whitespaceRegex = /^\s*$/
 const preOpRegexElems = [
   // Template strings
@@ -58,7 +61,6 @@ const minusNegatesAfter = new Set([
 class Lexer {
   _grammar: Grammar
   _splitRegex?: RegExp
-  _escQuoteRegexCache = new Map<string, RegExp>()
 
   constructor(grammar: Grammar) {
     this._grammar = grammar
@@ -284,15 +286,10 @@ class Lexer {
    * @private
    */
   _unquote(str: string) {
-    const quote = str[0]!
-    let escQuoteRegex = this._escQuoteRegexCache.get(quote)
-    if (!escQuoteRegex) {
-      escQuoteRegex = new RegExp('\\\\' + quote, 'g')
-      this._escQuoteRegexCache.set(quote, escQuoteRegex)
-    }
+    const quote = str.startsWith('"') ? '"' : "'"
     return str
       .slice(1, -1)
-      .replaceAll(escQuoteRegex, quote)
+      .replaceAll(escQuoteRegex[quote], quote)
       .replaceAll(escEscRegex, '\\')
   }
 
