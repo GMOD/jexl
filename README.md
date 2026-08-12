@@ -129,6 +129,21 @@ jexl.eval('max(temperature, threshold)')
 // evaluates with context
 ```
 
+Functions live in one global pool and have no receiver, so a call written
+against a value passes that value as the first argument: `a.b(x)` means
+`b(a, x)`. Since functions are conventionally written to take their subject
+first, the two spellings read differently but do the same thing:
+
+```javascript
+jexl.addFunction('split', (str, sep) => String(str ?? '').split(sep))
+
+jexl.eval("refName.split(' ')[0]", { refName: 'chr1 description' }) // "chr1"
+jexl.eval("split(refName, ' ')[0]", { refName: 'chr1 description' }) // "chr1"
+```
+
+Note that this is a naming convention, not method dispatch: `a.b(x)` calls the
+function named `b` in the pool, never a method on the value of `a`.
+
 ### Variable Assignment
 
 Assign values to variables using `=` (no `let`, `var`, or `const` needed). Assignments mutate the context and return the assigned value:

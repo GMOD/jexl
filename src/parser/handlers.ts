@@ -147,13 +147,26 @@ export function filter(this: Parser, ast: AstNode | null) {
 /**
  * Handles identifier tokens when used to indicate the name of a function to
  * be called.
- * @param {{type: <string>}} token A token object
+ *
+ * A call written against a value, `a.b(x)`, becomes `b(a, x)`: jexl functions
+ * live in one global pool and have no receiver, so the value the name was read
+ * from is passed as the first argument instead. Every function in the pool is
+ * already written that way — `get(feature, key)`, `split(str, sep)` — which is
+ * what makes the two spellings equivalent. Previously the receiver was simply
+ * dropped, so `refName.split(' ')` quietly called `split(' ')`.
  */
 export function functionCall(this: Parser) {
+  const cursor = this._cursor
+  if (cursor?.type !== 'Identifier') {
+    // reached by `a[expr]()`, whose subject is a filter rather than a name;
+    // there is nothing to look up in the function pool
+    throw new Error(`Functions must be called by name: ${this._exprStr}`)
+  }
+  const { from } = cursor as Identifier
   const node: FunctionCall = {
     type: 'FunctionCall',
-    name: (this._cursor as Identifier).value,
-    args: [],
+    name: (cursor as Identifier).value,
+    args: from ? [from] : [],
     pool: 'functions'
   }
   this._placeBeforeCursor(node)

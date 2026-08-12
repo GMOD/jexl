@@ -75,6 +75,39 @@ describe('regressions', () => {
       expect(inst.eval('missing in [1, 2]')).toBe(false)
     })
   })
+  describe('calls written against a value', () => {
+    beforeEach(() => {
+      // written receiver-first, as everything in jbrowse's pool is
+      inst.addFunction('split', (s, char) => String(s ?? '').split(char))
+      inst.addFunction('get', (feature, key) => feature.get(key))
+      inst.addFunction('nullary', () => 'no args')
+    })
+    it('passes the value the name was read from as the first argument', () => {
+      // the receiver used to be dropped, so this called split(' ') and the
+      // documented jbrowse recipe silently evaluated to a single space
+      const context = { refName: 'chr1 with a description' }
+      expect(inst.eval("refName.split(' ')[0]", context)).toBe('chr1')
+      expect(inst.eval("split(refName, ' ')[0]", context)).toBe('chr1')
+    })
+    it('works for a receiver reached through a chain', () => {
+      const context = { a: { b: 'x y' } }
+      expect(inst.eval("a.b.split(' ')[1]", context)).toBe('y')
+    })
+    it('works for a receiver carrying methods of its own', () => {
+      const feature = { get: (k) => ({ start: 42 })[k] }
+      expect(inst.eval("feature.get('start')", { feature })).toBe(42)
+      expect(inst.eval("get(feature, 'start')", { feature })).toBe(42)
+    })
+    it('leaves a plain call by name alone', () => {
+      expect(inst.eval('nullary()')).toBe('no args')
+      expect(inst.eval("split('a-b', '-')[1]", {})).toBe('b')
+    })
+    it('rejects a call whose subject is a subscript rather than a name', () => {
+      expect(() => inst.eval("a['b']()", { a: { b: 1 } })).toThrow(
+        /must be called by name/
+      )
+    })
+  })
   describe('unterminated groups', () => {
     it('rejects a group left open before anything is placed in the tree', () => {
       // "(1" left the cursor null, so testing the cursor alone let the missing
