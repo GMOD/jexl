@@ -9,6 +9,21 @@ import type { JexlValue } from './types.ts'
 
 export type BinaryOpEval = (left: JexlValue, right: JexlValue) => JexlValue
 
+/**
+ * A function or operator implementation as its author writes it, for the
+ * registration methods on {@link Jexl} to accept.
+ *
+ * Jexl cannot check what a registered callback will be handed. The arguments
+ * are whatever the expression evaluated to, drawn from a context supplied at
+ * evaluation time, and that context routinely holds values jexl has no literal
+ * for — a host object with methods, a callback, a class instance. Requiring
+ * {@link JexlValue} parameters therefore rejected every callback actually
+ * written against such a value, since parameters are contravariant. The
+ * argument types are the caller's business; jexl only promises to pass along
+ * whatever the operands evaluated to.
+ */
+export type UncheckedFn = (...args: never[]) => unknown
+
 export type BinaryOpEvalOnDemand = (
   left: { eval: () => JexlValue },
   right: { eval: () => JexlValue }
@@ -27,10 +42,12 @@ export interface BinaryOp {
   unaryEval?: (right: JexlValue) => JexlValue
 }
 
+export type UnaryOpEval = (right: JexlValue) => JexlValue
+
 export interface UnaryOp {
   type: 'unaryOp'
   precedence: number
-  eval: (right: JexlValue) => JexlValue
+  eval: UnaryOpEval
 }
 
 /**
@@ -56,9 +73,12 @@ export interface SimpleElement {
 
 export type GrammarElement = BinaryOp | UnaryOp | SimpleElement
 
+/** A registered function, as jexl calls it once the operands are evaluated. */
+export type GrammarFn = (...args: JexlValue[]) => JexlValue
+
 export interface Grammar {
   elements: Record<string, GrammarElement>
-  functions: Record<string, (...args: JexlValue[]) => JexlValue>
+  functions: Record<string, GrammarFn>
 }
 
 /**

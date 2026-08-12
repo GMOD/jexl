@@ -11,7 +11,10 @@ import type {
   BinaryOpEval,
   BinaryOpEvalOnDemand,
   Grammar,
-  GrammarElement
+  GrammarElement,
+  GrammarFn,
+  UnaryOpEval,
+  UncheckedFn
 } from './grammar.ts'
 import type { JexlValue } from './types.ts'
 
@@ -55,7 +58,7 @@ class Jexl {
   addBinaryOp(
     operator: string,
     precedence: number,
-    fn: BinaryOpEval,
+    fn: UncheckedFn,
     manualEval?: false
   ): void
   addBinaryOp(
@@ -67,7 +70,7 @@ class Jexl {
   addBinaryOp(
     operator: string,
     precedence: number,
-    fn: BinaryOpEval | BinaryOpEvalOnDemand,
+    fn: UncheckedFn | BinaryOpEvalOnDemand,
     manualEval?: boolean
   ) {
     // the overloads above pair `fn` with `manualEval`; the implementation
@@ -80,7 +83,11 @@ class Jexl {
             precedence,
             evalOnDemand: fn as BinaryOpEvalOnDemand
           }
-        : { type: 'binaryOp', precedence, eval: fn as BinaryOpEval }
+        : {
+            type: 'binaryOp',
+            precedence,
+            eval: fn as unknown as BinaryOpEval
+          }
     )
   }
 
@@ -92,8 +99,10 @@ class Jexl {
    *      expression function is invoked. It will be provided with each argument
    *      supplied in the expression, in the same order.
    */
-  addFunction(name: string, fn: (...args: JexlValue[]) => JexlValue) {
-    this._grammar.functions[name] = fn
+  addFunction(name: string, fn: UncheckedFn) {
+    // jexl hands the function whatever the operands evaluated to, which it
+    // cannot reconcile with the caller's parameter types — see UncheckedFn
+    this._grammar.functions[name] = fn as unknown as GrammarFn
   }
 
   /**
@@ -102,7 +111,7 @@ class Jexl {
    * function counterpart.
    * @param {{}} map A map of expression function names to javascript functions
    */
-  addFunctions(map: Record<string, (...args: JexlValue[]) => JexlValue>) {
+  addFunctions(map: Record<string, UncheckedFn>) {
     Object.assign(this._grammar.functions, map)
   }
 
@@ -114,11 +123,11 @@ class Jexl {
    *      will be called with one argument: the literal value to the right of the
    *      operator. It should return the resulting value.
    */
-  addUnaryOp(operator: string, fn: (right: JexlValue) => JexlValue) {
+  addUnaryOp(operator: string, fn: UncheckedFn) {
     this._addGrammarElement(operator, {
       type: 'unaryOp',
       precedence: Infinity,
-      eval: fn
+      eval: fn as unknown as UnaryOpEval
     })
   }
 

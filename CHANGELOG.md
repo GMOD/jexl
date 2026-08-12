@@ -26,6 +26,17 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Fixed
 
+- **`addFunction`, `addFunctions`, `addBinaryOp` and `addUnaryOp` accept the
+  callbacks people actually write.** They required `(...args: JexlValue[]) =>
+JexlValue`, but parameters are contravariant, so any callback annotated with
+  a narrower type — `(feature: Feature, key: string) => …`, `(s: string) => …`,
+  `Math.max` — was rejected, as was any returning something jexl has no literal
+  for. Jexl cannot check these anyway: the arguments are whatever the
+  expression evaluated to, drawn from a context supplied at evaluation time. It
+  now accepts any function and leaves the argument types to the caller, which
+  clears all 55 type errors this caused in jbrowse-components. Registrations
+  written in TypeScript are covered by `test/lib/registration-types.test.ts`,
+  which `pnpm typecheck` now checks along with the rest of `test/`.
 - **`in` against a string no longer matches every absent value.** A left
   operand that wasn't a string, number or boolean was coerced to `''`, and
   every string contains `''`, so `missing in "abc"` — a missing feature
