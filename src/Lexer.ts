@@ -65,6 +65,15 @@ class Lexer {
   }
 
   /**
+   * Discards the memoized split regex, so that it is rebuilt on the next
+   * tokenize. Must be called whenever the grammar's elements change, since the
+   * regex is derived from their keys.
+   */
+  _clearCache() {
+    this._splitRegex = undefined
+  }
+
+  /**
    * Splits a Jexl expression string into an array of expression elements.
    * @param {string} str A Jexl expression string
    * @returns {Array<string>} An array of substrings defining the functional

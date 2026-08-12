@@ -67,6 +67,40 @@ describe('regressions', () => {
       expect(elements).toEqual(['-', '5'])
     })
   })
+  describe('shared lexer cache', () => {
+    // The Lexer memoizes the regex that splits an expression into elements, and
+    // is now shared across every Expression a Jexl instance creates, so grammar
+    // changes have to invalidate it. These all use multi-character operators,
+    // whose characters are individually meaningful; a single-character operator
+    // survives a stale regex because unmatched text becomes its own element.
+    it('picks up a binaryOp added after an expression was evaluated', () => {
+      expect(inst.eval('1 + 2')).toBe(3)
+      inst.addBinaryOp('**', 40, (left, right) => left ** right)
+      // a stale regex splits this into two '*' tokens and fails to parse
+      expect(inst.eval('2 ** 3')).toBe(8)
+    })
+    it('picks up a unaryOp added after an expression was evaluated', () => {
+      expect(inst.eval('1 + 2')).toBe(3)
+      inst.addUnaryOp('!!', (right) => right * 2)
+      // a stale regex reads this as '!' applied twice, giving `true`
+      expect(inst.eval('!!5')).toBe(10)
+    })
+    it('picks up an op removed after an expression was evaluated', () => {
+      expect(inst.eval('1 + 2')).toBe(3)
+      inst.removeOp('==')
+      // with the regex rebuilt, '==' splits into two assignment operators; a
+      // stale regex would instead reject '==' as an unknown token
+      expect(() => inst.eval('1 == 2')).toThrow(
+        /Left side of assignment must be a variable name/
+      )
+    })
+    it('keeps instances isolated from each other', () => {
+      const other = new Jexl()
+      inst.addBinaryOp('**', 40, (left, right) => left ** right)
+      expect(inst.eval('2 ** 3')).toBe(8)
+      expect(() => other.eval('2 ** 3')).toThrow()
+    })
+  })
   describe('unary minus', () => {
     it('negates a value that is not a numeric literal', () => {
       expect(inst.eval('-a', { a: 5 })).toBe(-5)

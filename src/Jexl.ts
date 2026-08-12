@@ -4,6 +4,7 @@
  */
 
 import Expression from './Expression.ts'
+import Lexer from './Lexer.ts'
 import { getGrammar } from './grammar.ts'
 
 import type {
@@ -22,9 +23,13 @@ import type { JexlValue } from './types.ts'
  */
 class Jexl {
   _grammar: Grammar
+  // shared by every Expression this instance creates, so that the expensive
+  // element-splitting regex is built once rather than per compile
+  _lexer: Lexer
 
   constructor() {
     this._grammar = getGrammar()
+    this._lexer = new Lexer(this._grammar)
     this.expr = this.expr.bind(this)
   }
 
@@ -137,7 +142,7 @@ class Jexl {
    * @returns {Expression} The Expression object representing the given string
    */
   createExpression(expression: string) {
-    return new Expression(this._grammar, expression)
+    return new Expression(this._grammar, expression, this._lexer)
   }
 
   /**
@@ -196,6 +201,7 @@ class Jexl {
     const elem = this._grammar.elements[operator]
     if (elem?.type === 'binaryOp' || elem?.type === 'unaryOp') {
       Reflect.deleteProperty(this._grammar.elements, operator)
+      this._lexer._clearCache()
     }
   }
 
@@ -208,6 +214,7 @@ class Jexl {
    */
   _addGrammarElement(str: string, obj: GrammarElement) {
     this._grammar.elements[str] = obj
+    this._lexer._clearCache()
   }
 }
 

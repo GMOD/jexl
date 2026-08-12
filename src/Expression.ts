@@ -14,11 +14,22 @@ class Expression {
   _grammar: Grammar
   _exprStr: string
   _ast: AstNode | null
+  _lexer: Lexer
+  _compiled = false
 
-  constructor(grammar: Grammar, exprStr: string) {
+  /**
+   * @param {{}} grammar The grammar to compile and evaluate against
+   * @param {string} exprStr The Jexl expression string
+   * @param {Lexer} [lexer] A Lexer to reuse. Lexers memoize the regex used to
+   *      split expressions, which is expensive to build, so passing a shared
+   *      one avoids paying that cost per expression. It must be invalidated
+   *      via {@link Lexer#_clearCache} whenever the grammar's elements change.
+   */
+  constructor(grammar: Grammar, exprStr: string, lexer?: Lexer) {
     this._grammar = grammar
     this._exprStr = exprStr
     this._ast = null
+    this._lexer = lexer ?? new Lexer(grammar)
   }
 
   /**
@@ -28,11 +39,11 @@ class Expression {
    * @returns {Expression} this Expression instance, for convenience
    */
   compile() {
-    const lexer = new Lexer(this._grammar)
-    const parser = new Parser(this._grammar, lexer)
-    const tokens = lexer.tokenize(this._exprStr)
+    const parser = new Parser(this._grammar, this._lexer)
+    const tokens = this._lexer.tokenize(this._exprStr)
     parser.addTokens(tokens)
     this._ast = parser.complete()
+    this._compiled = true
     return this
   }
 
@@ -54,7 +65,9 @@ class Expression {
   }
 
   _getAst() {
-    if (!this._ast) {
+    // tracked separately from _ast, which is legitimately null for an
+    // expression with no tokens and would otherwise recompile on every eval
+    if (!this._compiled) {
       this.compile()
     }
     return this._ast
