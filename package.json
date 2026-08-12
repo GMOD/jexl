@@ -1,6 +1,6 @@
 {
   "name": "@jbrowse/jexl",
-  "version": "3.0.2",
+  "version": "3.1.0",
   "description": "A fork of the jexl lang for jbrowse",
   "type": "module",
   "main": "dist/index.js",
