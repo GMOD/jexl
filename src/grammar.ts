@@ -19,6 +19,12 @@ export interface BinaryOp {
   precedence: number
   eval?: BinaryOpEval
   evalOnDemand?: BinaryOpEvalOnDemand
+  /**
+   * Evaluator for the operator's prefix form, if it has one. The Lexer emits a
+   * unaryOp token when such an operator appears where an operand is expected,
+   * which is how `-x` is distinguished from `a - x`.
+   */
+  unaryEval?: (right: JexlValue) => JexlValue
 }
 
 export interface UnaryOp {
@@ -91,7 +97,8 @@ export const getGrammar = (): Grammar => ({
     '-': {
       type: 'binaryOp',
       precedence: 30,
-      eval: (left, right) => (left as number) - (right as number)
+      eval: (left, right) => (left as number) - (right as number),
+      unaryEval: (right) => -(right as number)
     },
     '*': {
       type: 'binaryOp',

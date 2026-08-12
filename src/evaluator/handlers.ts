@@ -232,6 +232,11 @@ export function UnaryExpression(
   if (elem?.type === 'unaryOp') {
     return elem.eval(right)
   }
+  // operators that are primarily binary, such as `-`, may also define a prefix
+  // form that the Lexer emits when they show up in operand position
+  if (elem?.type === 'binaryOp' && elem.unaryEval) {
+    return elem.unaryEval(right)
+  }
   return undefined
 }
 

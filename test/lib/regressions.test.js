@@ -67,4 +67,67 @@ describe('regressions', () => {
       expect(elements).toEqual(['-', '5'])
     })
   })
+  describe('unary minus', () => {
+    it('negates a value that is not a numeric literal', () => {
+      expect(inst.eval('-a', { a: 5 })).toBe(-5)
+      expect(inst.eval('-(1 + 2)')).toBe(-3)
+      expect(inst.eval('-x.y', { x: { y: 3 } })).toBe(-3)
+      expect(inst.eval('-arr[0]', { arr: [7] })).toBe(-7)
+    })
+    it('negates the result of a function call', () => {
+      inst.addFunction('double', (x) => x * 2)
+      expect(inst.eval('-double(4)')).toBe(-8)
+    })
+    it('applies inside collections and ternaries', () => {
+      expect(inst.eval('[-a, -1]', { a: 5 })).toEqual([-5, -1])
+      expect(inst.eval('a ? -b : -c', { a: 1, b: 2, c: 3 })).toBe(-2)
+    })
+    it('composes with binary operators at the right precedence', () => {
+      expect(inst.eval('-a + b', { a: 5, b: 2 })).toBe(-3)
+      expect(inst.eval('-a * b', { a: 5, b: 2 })).toBe(-10)
+      expect(inst.eval('1 + -a', { a: 5 })).toBe(-4)
+      expect(inst.eval('-a == -5', { a: 5 })).toBe(true)
+    })
+    it('stacks, and still folds the sign into numeric literals', () => {
+      expect(inst.eval('- -a', { a: 5 })).toBe(5)
+      expect(inst.eval('1 - -2')).toBe(3)
+      expect(inst.eval('1 - 2')).toBe(-1)
+      expect(inst.eval('-1?-2:-3')).toBe(-2)
+    })
+    it('lexes a bare prefix minus as a unary operator', () => {
+      const lexer = new Lexer(getGrammar())
+      expect(lexer.tokenize('-a')).toEqual([
+        { type: 'unaryOp', value: '-', raw: '-' },
+        { type: 'identifier', value: 'a', raw: 'a' }
+      ])
+    })
+  })
+  describe('assignment', () => {
+    it('rejects assigning to a member expression', () => {
+      // previously this silently created a top-level `b` and left `a.b` alone
+      const context = { a: { b: 0 } }
+      expect(() => inst.eval('a.b = 5', context)).toThrow(
+        /Left side of assignment must be a variable name/
+      )
+      expect(context).toEqual({ a: { b: 0 } })
+    })
+    it('still assigns to a bare variable name', () => {
+      const context = {}
+      expect(inst.eval('a = 5; a + 1', context)).toBe(6)
+      expect(context).toEqual({ a: 5 })
+    })
+  })
+  describe('template strings', () => {
+    it('ignores braces inside string literals in an interpolation', () => {
+      expect(inst.eval('`${ "}" }`')).toBe('}')
+      expect(inst.eval("`${ '}' }`")).toBe('}')
+      expect(inst.eval('`a${ b }c${ "}" }d`', { b: 1 })).toBe('a1c}d')
+    })
+    it('still balances braces for object literals', () => {
+      expect(inst.eval('`${ {a: 1}.a }`')).toBe('1')
+    })
+    it('still detects a genuinely unclosed interpolation', () => {
+      expect(() => inst.eval('`${ "}" `')).toThrow(/Unclosed interpolation/)
+    })
+  })
 })

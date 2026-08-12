@@ -61,7 +61,12 @@ export function arrayVal(this: Parser, ast: AstNode | null) {
  */
 export function binaryOp(this: Parser, token: Token) {
   if (token.value === '=') {
-    if (this._cursor?.type !== 'Identifier') {
+    // `from` marks a member access such as `a.b`; only a bare name can be
+    // assigned to, since the Evaluator writes straight into the context
+    if (
+      this._cursor?.type !== 'Identifier' ||
+      (this._cursor as Identifier).from
+    ) {
       throw new Error('Left side of assignment must be a variable name')
     }
 

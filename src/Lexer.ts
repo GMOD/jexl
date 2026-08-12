@@ -29,6 +29,11 @@ const postOpRegexElems = [
   // Numerics (without negative symbol)
   String.raw`(?:(?:[0-9]*\.[0-9]+)|[0-9]+)`
 ]
+const unaryMinusToken = (): Token => ({
+  type: 'unaryOp',
+  value: '-',
+  raw: '-'
+})
 const minusNegatesAfter = new Set([
   'binaryOp',
   'unaryOp',
@@ -85,14 +90,29 @@ class Lexer {
     let negate = false
     for (const element of elements) {
       if (this._isWhitespace(element)) {
-        if (tokens.length) {
-          tokens[tokens.length - 1]!.raw += element
+        const last = tokens.at(-1)
+        if (last) {
+          last.raw += element
         }
       } else if (element === '-' && this._isNegative(tokens)) {
+        // a second prefix minus in a row ("- -x"): emit the pending one as a
+        // unary operator so this one can negate whatever comes next
+        if (negate) {
+          tokens.push(unaryMinusToken())
+        }
         negate = true
-      } else {
-        tokens.push(this._createToken(negate ? '-' + element : element))
+      } else if (negate) {
         negate = false
+        if (numericRegex.exec(element)) {
+          // fold the sign into the number, so "-1" stays a single literal
+          tokens.push(this._createToken('-' + element))
+        } else {
+          // anything else gets a standalone prefix operator, letting "-x",
+          // "-(a + b)" and "-foo.bar" negate a computed value
+          tokens.push(unaryMinusToken(), this._createToken(element))
+        }
+      } else {
+        tokens.push(this._createToken(element))
       }
     }
     // Catch a - at the end of the string. Let the parser handle that issue.
@@ -291,14 +311,24 @@ class Lexer {
         current += 2
 
         while (current < str.length && braceDepth > 0) {
-          if (str[current] === '\\') {
+          const char = str[current]
+          if (char === '\\') {
             current += 2
             continue
           }
-          if (str[current] === '{') {
-            braceDepth++
+          // skip over string literals so that braces inside them, as in
+          // `${ f('}') }`, don't unbalance the depth count
+          if (char === '"' || char === "'") {
+            current++
+            while (current < str.length && str[current] !== char) {
+              current += str[current] === '\\' ? 2 : 1
+            }
+            current++
+            continue
           }
-          if (str[current] === '}') {
+          if (char === '{') {
+            braceDepth++
+          } else if (char === '}') {
             braceDepth--
           }
           current++
