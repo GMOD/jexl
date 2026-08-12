@@ -6,6 +6,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import Lexer from '../../src/Lexer.ts'
+import { compileAst } from '../../src/evaluator/compile.ts'
 import { getGrammar } from '../../src/grammar.ts'
 import { Jexl } from '../../src/Jexl.ts'
 
@@ -65,6 +66,76 @@ describe('regressions', () => {
         { type: 'literal', value: -5, raw: '-5' }
       ])
       expect(elements).toEqual(['-', '5'])
+    })
+  })
+  describe('compiled closures', () => {
+    // the AST is lowered to closures once at compile time; these pin the
+    // semantics that lowering has to preserve across repeated evaluation
+    it('reuses one compiled expression across many contexts', () => {
+      const expr = inst.compile('a + b')
+      expect(expr.eval({ a: 1, b: 2 })).toBe(3)
+      expect(expr.eval({ a: 10, b: 20 })).toBe(30)
+      expect(expr.eval({ a: 'x', b: 'y' })).toBe('xy')
+    })
+    it('short-circuits && and || on every evaluation, not just the first', () => {
+      let calls = 0
+      inst.addFunction('boom', () => {
+        calls++
+        return true
+      })
+      const expr = inst.compile('a && boom()')
+      expect(expr.eval({ a: false })).toBe(false)
+      expect(calls).toBe(0)
+      expect(expr.eval({ a: true })).toBe(true)
+      expect(calls).toBe(1)
+      expect(expr.eval({ a: false })).toBe(false)
+      expect(calls).toBe(1)
+    })
+    it('resolves functions registered after compilation', () => {
+      const expr = inst.compile('later(2)')
+      inst.addFunction('later', (x) => x * 3)
+      expect(expr.eval()).toBe(6)
+    })
+    it('rebuilds fresh objects and arrays per evaluation', () => {
+      const expr = inst.compile('{a: x}')
+      const first = expr.eval({ x: 1 })
+      const second = expr.eval({ x: 2 })
+      expect(first).toEqual({ a: 1 })
+      expect(second).toEqual({ a: 2 })
+      expect(first).not.toBe(second)
+
+      const arr = inst.compile('[x, x + 1]')
+      expect(arr.eval({ x: 1 })).toEqual([1, 2])
+      expect(arr.eval({ x: 5 })).toEqual([5, 6])
+    })
+    it('keeps assignment writing into the context of each evaluation', () => {
+      const expr = inst.compile('n = n + 1; n')
+      const first = { n: 0 }
+      const second = { n: 10 }
+      expect(expr.eval(first)).toBe(1)
+      expect(expr.eval(second)).toBe(11)
+      expect(first).toEqual({ n: 1 })
+      expect(second).toEqual({ n: 11 })
+    })
+    it('re-throws on every evaluation of an unsupported relative filter', () => {
+      const expr = inst.compile('a[.b > 1]')
+      expect(() => expr.eval({ a: [] })).toThrow(/not supported/)
+      expect(() => expr.eval({ a: [] })).toThrow(/not supported/)
+    })
+    it('still reports an undefined function on each evaluation', () => {
+      const expr = inst.compile('nope(1)')
+      expect(() => expr.eval()).toThrow(/is not defined/)
+      expect(() => expr.eval()).toThrow(/is not defined/)
+    })
+    it('recompiles interpolations of a template literal per evaluation', () => {
+      const expr = inst.compile('`v=${a + 1}`')
+      expect(expr.eval({ a: 1 })).toBe('v=2')
+      expect(expr.eval({ a: 9 })).toBe('v=10')
+    })
+    it('rejects a corrupt AST node type', () => {
+      expect(() => compileAst({ type: 'NotARealNode' }, getGrammar())).toThrow(
+        /unknown node type/
+      )
     })
   })
   describe('shared lexer cache', () => {

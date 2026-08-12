@@ -5,8 +5,10 @@
 
 import Lexer from './Lexer.ts'
 import Evaluator from './evaluator/Evaluator.ts'
+import { compileAst } from './evaluator/compile.ts'
 import Parser from './parser/Parser.ts'
 
+import type { CompiledNode } from './evaluator/compile.ts'
 import type { Grammar } from './grammar.ts'
 import type { AstNode } from './types.ts'
 
@@ -16,6 +18,8 @@ class Expression {
   _ast: AstNode | null
   _lexer: Lexer
   _compiled = false
+  // the AST lowered to closures, so repeated eval() calls skip node dispatch
+  _fn: CompiledNode | null = null
 
   /**
    * @param {{}} grammar The grammar to compile and evaluate against
@@ -43,6 +47,8 @@ class Expression {
     const tokens = this._lexer.tokenize(this._exprStr)
     parser.addTokens(tokens)
     this._ast = parser.complete()
+    // lower the tree to closures once, here, so that eval() is just a call
+    this._fn = this._ast ? compileAst(this._ast, this._grammar) : null
     this._compiled = true
     return this
   }
@@ -55,13 +61,14 @@ class Expression {
    * @throws {*} on error
    */
   eval(context = {}) {
-    const ast = this._getAst()
+    if (!this._compiled) {
+      this.compile()
+    }
     // an expression with no tokens (empty or whitespace-only) has no AST
-    if (!ast) {
+    if (!this._fn) {
       return undefined
     }
-    const evaluator = new Evaluator(this._grammar, context)
-    return evaluator.eval(ast)
+    return this._fn(new Evaluator(this._grammar, context))
   }
 
   _getAst() {
