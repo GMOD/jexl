@@ -4,7 +4,41 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [development]
 
-Nothing yet!
+### Added
+
+- **Unary minus on any operand.** Previously only numeric literals could be
+  negated: `-1` worked, but `-x`, `-(a + b)`, `-foo.bar` and `-log10(score)`
+  all threw `Invalid expression token`, because the Lexer folded the sign into
+  whatever element followed it. A prefix `-` in front of a non-numeric element
+  is now a unary operator. Numeric literals are still folded, so `-1` remains a
+  single Literal token.
+
+### Fixed
+
+- **Assignment to a member expression is rejected instead of silently writing
+  elsewhere.** `a.b = 5` parsed, but the Evaluator assigns into the context by
+  name, so it created a top-level `b` and left `a.b` unchanged. It now throws
+  the same error `a[0] = 5` already gave. **This is a behavior change**: an
+  expression that previously appeared to succeed will now throw.
+- **Braces inside string literals no longer end a template interpolation.**
+  `` `${ "}" }` `` terminated at the quoted brace and evaluated to `" }`. The
+  interpolation scanner now skips over quoted spans.
+
+### Performance
+
+- **Expressions are lowered to closures at compile time** rather than walked
+  node-by-node on every evaluation, with the operator implementation for each
+  node resolved once. Expressions that are compiled once and evaluated many
+  times — per-item callbacks, filters — evaluate roughly 3-7x faster.
+  Functions are still resolved per call, so registering one after compiling an
+  expression continues to work; operators are bound at compile time, so a
+  grammar change still requires the recompile that `Expression#compile`
+  already documents.
+- **A Jexl instance shares one Lexer across the expressions it creates.** The
+  regex that splits an expression into elements is derived from every grammar
+  element and was rebuilt on each compile, where it accounted for roughly
+  two-thirds of the cost of `jexl.eval()`. It is now built once and
+  invalidated when the grammar changes.
 
 ## [v3.0.0]
 
