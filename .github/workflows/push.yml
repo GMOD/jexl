@@ -49,4 +49,8 @@ jobs:
       - name: Build codebase
         run: pnpm build
       - name: Publish
-        run: npm publish --access public
+        # pnpm, not npm, so the OIDC token from id-token: write is exchanged
+        # for npm trusted publishing credentials. --no-git-checks because the
+        # tag is checked out as a detached HEAD, which pnpm otherwise rejects
+        # for not being a publish branch.
+        run: pnpm publish --access public --no-git-checks
