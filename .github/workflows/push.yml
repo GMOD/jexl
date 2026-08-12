@@ -8,18 +8,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
       - name: Use Node.js 24.x
         uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
           node-version: 24.x
-      - name: Install deps (with cache)
-        uses: bahmutov/npm-install@3e063b974f0d209807684aa23e534b3dde517fd9 # v1.11.2
+          cache: pnpm
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
       - name: Lint codebase
-        run: yarn lint
+        run: pnpm lint
       - name: Build codebase
-        run: yarn build
+        run: pnpm build
       - name: Test codebase
-        run: yarn test --coverage
+        run: pnpm test --run --coverage
       - name: Upload coverage
         run: bash <(curl -s https://codecov.io/bash)
 
@@ -33,14 +36,17 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
       - name: Use Node.js 24.x
         uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
           node-version: 24.x
+          cache: pnpm
           registry-url: 'https://registry.npmjs.org'
-      - name: Install deps (with cache)
-        uses: bahmutov/npm-install@3e063b974f0d209807684aa23e534b3dde517fd9 # v1.11.2
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
       - name: Build codebase
-        run: yarn build
+        run: pnpm build
       - name: Publish
         run: npm publish --access public

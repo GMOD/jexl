@@ -43,6 +43,7 @@
   ],
   "author": "Tom Shawver <tom@frosteddesign.com>",
   "license": "MIT",
+  "packageManager": "pnpm@11.20.0",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.6.0",
