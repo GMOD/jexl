@@ -101,10 +101,10 @@ export function FilterExpression(
   this: Evaluator,
   ast: FilterExpression
 ): JexlValue {
-  const subject = this.eval(ast.subject)
   if (ast.relative) {
     throw new Error('Relative filter expressions are not supported')
   }
+  const subject = this.eval(ast.subject)
   const index = this.eval(ast.expr)
   if (subject == null) {
     return undefined

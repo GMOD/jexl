@@ -123,7 +123,7 @@ export const getGrammar = (): Grammar => ({
     '^': {
       type: 'binaryOp',
       precedence: 50,
-      eval: (left, right) => Math.pow(left as number, right as number)
+      eval: (left, right) => (left as number) ** (right as number)
     },
     '==': {
       type: 'binaryOp',

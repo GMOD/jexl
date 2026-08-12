@@ -83,14 +83,15 @@ jexl.eval('`Price: \\$100`')
 
 ### Operators
 
-**Unary:** `!` (negate)
+**Unary:** `!` (logical negation), `-` (arithmetic negation)
 
 **Binary:**
 
 - Arithmetic: `+`, `-`, `*`, `/`, `//` (floor division), `%`, `^` (power)
 - Comparison: `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`
 - Logical: `&&`, `||`
-- Assignment: `=` (assigns value to variable)
+- Assignment: `=` (assigns a value to a bare variable name; `a.b = 1` is not
+  supported)
 
 **Ternary:** `condition ? consequent : alternate`
 

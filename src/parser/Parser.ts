@@ -126,7 +126,9 @@ class Parser {
    *      the {@link Lexer#tokenize} function.
    */
   addTokens(tokens: Token[]) {
-    tokens.forEach((token) => this.addToken(token))
+    for (const token of tokens) {
+      this.addToken(token)
+    }
   }
 
   /**

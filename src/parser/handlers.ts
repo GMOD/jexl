@@ -112,16 +112,16 @@ export function binaryOp(this: Parser, token: Token) {
  * AST.
  */
 export function dot(this: Parser) {
-  const isBinaryExprWithRight = (node: AstNode) =>
-    node.type === 'BinaryExpression' && (node as BinaryExpression).right
-
+  const cursor = this._cursor
+  // the dot continues an identifier chain unless the cursor is an operator
+  // still waiting on its right-hand side, in which case it opens a relative
+  // path instead — as in the leading dot of `list[.price > 5]`
   this._nextIdentEncapsulate =
-    !!this._cursor &&
-    this._cursor.type !== 'UnaryExpression' &&
-    (this._cursor.type !== 'BinaryExpression' ||
-      !!isBinaryExprWithRight(this._cursor))
+    !!cursor &&
+    cursor.type !== 'UnaryExpression' &&
+    (cursor.type !== 'BinaryExpression' || !!cursor.right)
 
-  this._nextIdentRelative = !this._cursor || !this._nextIdentEncapsulate
+  this._nextIdentRelative = !this._nextIdentEncapsulate
   if (this._nextIdentRelative) {
     this._relative = true
   }
