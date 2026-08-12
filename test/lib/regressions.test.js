@@ -52,6 +52,73 @@ describe('regressions', () => {
       expect(inst.eval('toString()')).toBe('ok')
     })
   })
+  describe('the in operator', () => {
+    it('is false for an absent left operand against a string', () => {
+      // every string contains '', so coercing a non-primitive left operand to
+      // '' made these all true — including a missing feature attribute
+      expect(inst.eval('missing in "abc"')).toBe(false)
+      expect(inst.eval('nothing in "abc"', { nothing: null })).toBe(false)
+    })
+    it('is false for a structured left operand against a string', () => {
+      expect(inst.eval('{} in "abc"')).toBe(false)
+      expect(inst.eval('[1] in "abc"')).toBe(false)
+    })
+    it('still matches primitives as substrings', () => {
+      expect(inst.eval('"a" in "abc"')).toBe(true)
+      expect(inst.eval('"" in "abc"')).toBe(true)
+      expect(inst.eval('2 in "123"')).toBe(true)
+      expect(inst.eval('true in "is true"')).toBe(true)
+      expect(inst.eval('"z" in "abc"')).toBe(false)
+    })
+    it('still tests membership of an array', () => {
+      expect(inst.eval('1 in [1, 2]')).toBe(true)
+      expect(inst.eval('missing in [1, 2]')).toBe(false)
+    })
+  })
+  describe('unterminated groups', () => {
+    it('rejects a group left open before anything is placed in the tree', () => {
+      // "(1" left the cursor null, so testing the cursor alone let the missing
+      // ")" through and the expression evaluated as if it were closed
+      expect(() => inst.eval('(1')).toThrow(/Unexpected end of expression/)
+      expect(() => inst.eval('((1)')).toThrow(/Unexpected end of expression/)
+      expect(() => inst.eval('(1 + 2')).toThrow(/Unexpected end of expression/)
+    })
+    it('still rejects the forms that were already caught', () => {
+      expect(() => inst.eval('[1, 2')).toThrow(/Unexpected end of expression/)
+      expect(() => inst.eval('{a: 1')).toThrow(/Unexpected end of expression/)
+      expect(() => inst.eval('1 ? 2')).toThrow(/Unexpected end of expression/)
+    })
+    it('still accepts closed groups and completable subexpressions', () => {
+      expect(inst.eval('(1)')).toBe(1)
+      expect(inst.eval('((1 + 2) * 3)')).toBe(9)
+      expect(inst.eval('()')).toBeUndefined()
+      expect(inst.eval('1 ? 2 : 3')).toBe(2)
+      expect(inst.eval('1 == 2 ? "yes" : ')).toBeUndefined()
+    })
+  })
+  describe('__proto__ as a key', () => {
+    it('makes it an own property of an object literal', () => {
+      // a plain store invokes the prototype setter, so the literal used to
+      // evaluate to {} and the value vanished
+      const res = inst.eval('{"__proto__": 1, b: 2}')
+      expect(Object.hasOwn(res, '__proto__')).toBe(true)
+      expect(Object.getPrototypeOf(res)).toBe(Object.prototype)
+      expect(res.b).toBe(2)
+    })
+    it('does not re-point the prototype of the produced object', () => {
+      const res = inst.eval('{"__proto__": {"polluted": 1}}')
+      expect(Object.getPrototypeOf(res)).toBe(Object.prototype)
+      expect({}.polluted).toBeUndefined()
+    })
+    it('makes an assignment to it an own property of the context', () => {
+      const context = {}
+      expect(
+        inst.eval('__proto__ = {"polluted": 1}; __proto__.polluted', context)
+      ).toBe(1)
+      expect(Object.getPrototypeOf(context)).toBe(Object.prototype)
+      expect({}.polluted).toBeUndefined()
+    })
+  })
   describe('removeOp', () => {
     it('is a no-op for an operator that is not in the grammar', () => {
       expect(() => inst.removeOp('@@')).not.toThrow()

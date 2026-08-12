@@ -261,7 +261,19 @@ export function objStart(this: Parser) {
  * @param {{type: <string>}} ast The subexpression tree
  */
 export function objVal(this: Parser, ast: AstNode | null) {
-  ;(this._cursor as ObjectLiteral).value[this._curObjKey!] = ast!
+  // defined rather than assigned so that the key "__proto__" becomes an
+  // ordinary entry of the node's key map instead of re-pointing its prototype,
+  // which dropped the entry before the Evaluator ever saw it
+  Object.defineProperty(
+    (this._cursor as ObjectLiteral).value,
+    this._curObjKey!,
+    {
+      value: ast!,
+      writable: true,
+      enumerable: true,
+      configurable: true
+    }
+  )
 }
 
 /**

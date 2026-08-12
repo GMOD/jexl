@@ -182,18 +182,17 @@ export const getGrammar = (): Grammar => ({
       precedence: 20,
       eval: (left, right) => {
         if (typeof right === 'string') {
-          const leftStr =
-            typeof left === 'string' ||
+          // only a primitive has a meaningful substring form. An absent or
+          // structured left operand is not "in" a string, and must not be
+          // coerced to '' — every string contains the empty string, so that
+          // made `feature.missingAttr in "someString"` true for every feature.
+          return typeof left === 'string' ||
             typeof left === 'number' ||
             typeof left === 'boolean'
-              ? String(left)
-              : ''
-          return right.includes(leftStr)
+            ? right.includes(String(left))
+            : false
         }
-        if (Array.isArray(right)) {
-          return right.includes(left)
-        }
-        return false
+        return Array.isArray(right) ? right.includes(left) : false
       }
     },
     '!': {

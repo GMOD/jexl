@@ -140,7 +140,14 @@ class Parser {
    *      the expression, indicating that the expression is incomplete
    */
   complete() {
-    if (this._cursor && !states[this._state]!.completable) {
+    // `_subParser` counts as unfinished business alongside `_cursor`: a group
+    // that opened before anything was placed in the tree, as in "(1", leaves
+    // the cursor null, and testing the cursor alone let the missing ")" pass
+    // silently and evaluate as if it were closed.
+    if (
+      (this._cursor || this._subParser) &&
+      !states[this._state]!.completable
+    ) {
       throw new Error(`Unexpected end of expression: ${this._exprStr}`)
     }
     if (this._subParser) {

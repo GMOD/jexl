@@ -28,6 +28,34 @@ import type Evaluator from './Evaluator.ts'
  */
 export type CompiledNode = (ev: Evaluator) => JexlValue
 
+/**
+ * Writes a key that a plain assignment would mishandle. Storing to
+ * "__proto__" invokes the prototype setter rather than creating a property, so
+ * an object literal or assignment using that key silently lost its value (and
+ * re-pointed the target's prototype). Defining the property instead matches
+ * what `JSON.parse('{"__proto__":1}')` produces: an ordinary own property.
+ */
+function defineOwn(
+  target: Record<string, JexlValue>,
+  key: string,
+  value: JexlValue
+) {
+  Object.defineProperty(target, key, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true
+  })
+}
+
+function assignOwn(
+  target: Record<string, JexlValue>,
+  key: string,
+  value: JexlValue
+) {
+  target[key] = value
+}
+
 /** Renders an interpolated value for a template literal. */
 function stringify(value: JexlValue) {
   if (value == null) {
@@ -198,10 +226,12 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
       const keys = entries.map(([key]) => key)
       const values = entries.map(([, node]) => compileAst(node, grammar))
       const len = keys.length
+      // resolved once, here, so the common case keeps its plain store
+      const store = keys.includes('__proto__') ? defineOwn : assignOwn
       return (ev) => {
         const out: Record<string, JexlValue> = {}
         for (let i = 0; i < len; i++) {
-          out[keys[i]!] = values[i]!(ev)
+          store(out, keys[i]!, values[i]!(ev))
         }
         return out
       }
@@ -296,9 +326,10 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
       const node = ast as AssignmentExpression
       const name = node.left.value
       const right = compileAst(node.right!, grammar)
+      const store = name === '__proto__' ? defineOwn : assignOwn
       return (ev) => {
         const value = right(ev)
-        ev._context[name] = value
+        store(ev._context, name, value)
         return value
       }
     }
