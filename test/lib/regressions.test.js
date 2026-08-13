@@ -306,8 +306,52 @@ describe('regressions', () => {
         { type: 'identifier', value: 'a', raw: 'a' }
       ])
     })
+    it('keeps the raw of a prefix minus separated from its operand', () => {
+      // the raws concatenate back to the source, which is what the parser
+      // quotes in its errors; the space used to land on the token before it
+      const lexer = new Lexer(getGrammar())
+      const src = '1 - - 2'
+      expect(
+        lexer
+          .tokenize(src)
+          .map((t) => t.raw)
+          .join('')
+      ).toBe(src)
+      expect(
+        lexer
+          .tokenize('- x')
+          .map((t) => t.raw)
+          .join('')
+      ).toBe('- x')
+    })
+  })
+  describe('unary minus precedence', () => {
+    it('binds tighter than any binary operator', () => {
+      // `-2 ^ 2` is 4, because the Lexer folds that sign into the literal.
+      // `-x ^ 2` went through the unary operator, whose precedence was read
+      // off `-`'s binary entry, and grouped as `-(x ^ 2)` for -4 instead
+      expect(inst.eval('-2 ^ 2')).toBe(4)
+      expect(inst.eval('-x ^ 2', { x: 2 })).toBe(4)
+      expect(inst.eval('2 ^ -x', { x: 2 })).toBe(0.25)
+    })
+    it('still groups the looser operators around it', () => {
+      expect(inst.eval('-x + 3', { x: 2 })).toBe(1)
+      expect(inst.eval('-x * 3', { x: 2 })).toBe(-6)
+      expect(inst.eval('-x.y', { x: { y: 4 } })).toBe(-4)
+      expect(inst.eval('- -x', { x: 3 })).toBe(3)
+      expect(inst.eval('!a == false', { a: 0 })).toBe(false)
+    })
   })
   describe('assignment', () => {
+    it('assigns a ternary rather than testing the assignment', () => {
+      // `=` binds looser than `?:`, but the conditional wrapped the whole tree
+      // so `x = true ? 1 : 2` parsed as `(x = true) ? 1 : 2` and stored true
+      const context = {}
+      expect(inst.eval('x = true ? 1 : 2', context)).toBe(1)
+      expect(context).toEqual({ x: 1 })
+      expect(inst.eval('x = false ? 1 : 2; x')).toBe(2)
+      expect(inst.eval('x = y = true ? 1 : 2; x + y')).toBe(2)
+    })
     it('rejects assigning to a member expression', () => {
       // previously this silently created a top-level `b` and left `a.b` alone
       const context = { a: { b: 0 } }

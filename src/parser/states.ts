@@ -97,10 +97,6 @@ export const states: States = {
       colon: { toState: 'objVal' }
     }
   },
-  postArgs: {
-    tokenTypes: afterOperand,
-    completable: true
-  },
   identifier: {
     tokenTypes: {
       ...afterOperand,
@@ -131,7 +127,9 @@ export const states: States = {
     subHandler: h.argVal,
     endStates: {
       comma: 'argVal',
-      closeParen: 'postArgs'
+      // a call's result is an ordinary operand: it can be operated on or
+      // drilled into, but not called again, since only a name can be called
+      closeParen: 'expectBinOp'
     }
   },
   objVal: {

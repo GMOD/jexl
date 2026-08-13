@@ -231,7 +231,7 @@ export const getGrammar = (): Grammar => ({
 
   /**
    * A map of function names to javascript functions. A Jexl function
-   * takes zero ore more arguemnts:
+   * takes zero or more arguments:
    *
    *     - {*} ...args: A variable number of arguments passed to this function.
    *       All of these are pre-evaluated to their actual values before calling

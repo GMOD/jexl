@@ -26,6 +26,20 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Fixed
 
+- **A prefix `-` binds tighter than every binary operator.** `-2 ^ 2` was 4,
+  because the Lexer folds that sign into the literal, but `-x ^ 2` was -4: the
+  unary form went through the parser, which read its precedence off `-`'s
+  binary entry — lower than `^`'s — and grouped it as `-(x ^ 2)`. The same
+  expression therefore meant two different things depending on whether its
+  operand was written out. A prefix operator now outranks any binary one, as
+  `!` always did, so both spellings agree. Only `^` changes an expression's
+  value; `-x * 3` and `-x % 3` were already equal either way.
+- **`x = a ? b : c` assigns the conditional instead of testing the
+  assignment.** `=` has the lowest precedence in the grammar, but the ternary
+  encapsulated the whole tree as its test, so this parsed as `(x = a) ? b : c`
+  and stored `a` in `x`. The conditional now becomes the assignment's value,
+  matching every language that has both. **This is a behavior change** for any
+  expression that assigned and branched in one statement.
 - **`addFunction`, `addFunctions`, `addBinaryOp` and `addUnaryOp` accept the
   callbacks people actually write.** They required `(...args: JexlValue[]) =>
 JexlValue`, but parameters are contravariant, so any callback annotated with

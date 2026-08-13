@@ -40,9 +40,9 @@ class Jexl {
    * Adds a binary operator to Jexl at the specified precedence. The higher the
    * precedence, the earlier the operator is applied in the order of operations.
    * For example, * has a higher precedence than +, because multiplication comes
-   * before division.
+   * before addition.
    *
-   * Please see grammar.js for a listing of all default operators and their
+   * Please see grammar.ts for a listing of all default operators and their
    * precedence values in order to choose the appropriate precedence for the
    * new operator.
    * @param {string} operator The operator string to be added

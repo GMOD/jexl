@@ -6,13 +6,26 @@
 import type { Grammar } from './grammar.ts'
 import type { TemplatePart, Token } from './types.ts'
 
-const numericRegex = /^-?(?:(?:[0-9]*\.[0-9]+)|[0-9]+)$/
-const identRegex =
-  /^[a-zA-Zа-яА-Я_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF$][a-zA-Zа-яА-Я0-9_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF$]*$/
+// what an identifier and a number look like, written once: the split regex
+// below carves elements out of the expression with these, and _createToken
+// then re-tests the elements it produced. Two spellings of either would
+// disagree on some input, and each disagreement is an "Invalid expression
+// token" for something the splitter was happy to produce.
+const identChars = String.raw`a-zA-Zа-яА-Я_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF$`
+const identPattern = `[${identChars}][${identChars}0-9]*`
+// unsigned: whether a leading '-' negates is decided separately, in getTokens
+const numberPattern = String.raw`(?:(?:[0-9]*\.[0-9]+)|[0-9]+)`
+
+const numericRegex = new RegExp(`^-?${numberPattern}$`)
+const identRegex = new RegExp(`^${identPattern}$`)
 const escEscRegex = /\\\\/g
 // a string literal opens with one of exactly two quote characters, so the two
 // unescaping regexes can just be named rather than built and cached per quote
 const escQuoteRegex = { "'": /\\'/g, '"': /\\"/g }
+// the escapes a template string's static text recognizes. One pass, so the
+// backslash an escaped backslash yields can't be re-read as the start of the
+// escape that follows it
+const templateEscRegex = /\\([`$\\])/g
 const whitespaceRegex = /^\s*$/
 const preOpRegexElems = [
   // Template strings
@@ -26,12 +39,7 @@ const preOpRegexElems = [
   String.raw`\btrue\b`,
   String.raw`\bfalse\b`
 ]
-const postOpRegexElems = [
-  // Identifiers
-  '[a-zA-Zа-яА-Я_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\\$][a-zA-Z0-9а-яА-Я_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF\\$]*',
-  // Numerics (without negative symbol)
-  String.raw`(?:(?:[0-9]*\.[0-9]+)|[0-9]+)`
-]
+const postOpRegexElems = [identPattern, numberPattern]
 const unaryMinusToken = (): Token => ({
   type: 'unaryOp',
   value: '-',
@@ -49,14 +57,16 @@ const minusNegatesAfter = new Set([
 ])
 
 /**
- * Lexer is a collection of stateless, statically-accessed functions for the
- * lexical parsing of a Jexl string.  Its responsibility is to identify the
- * "parts of speech" of a Jexl expression, and tokenize and label each, but
- * to do only the most minimal syntax checking; the only errors the Lexer
- * should be concerned with are if it's unable to identify the utility of
- * any of its tokens.  Errors stemming from these tokens not being in a
- * sensible configuration should be left for the Parser to handle.
- * @type {{}}
+ * Lexer handles the lexical parsing of a Jexl string. Its responsibility is to
+ * identify the "parts of speech" of a Jexl expression, and tokenize and label
+ * each, but to do only the most minimal syntax checking; the only errors the
+ * Lexer should be concerned with are if it's unable to identify the utility of
+ * any of its tokens. Errors stemming from these tokens not being in a sensible
+ * configuration should be left for the Parser to handle.
+ *
+ * An instance is bound to one grammar and memoizes the regex that splits an
+ * expression into elements, which is expensive to build; {@link #_clearCache}
+ * discards it when the grammar's elements change.
  */
 class Lexer {
   _grammar: Grammar
@@ -98,37 +108,43 @@ class Lexer {
    */
   getTokens(elements: string[]) {
     const tokens: Token[] = []
-    let negate = false
+    // a prefix minus, held back until the element it applies to is known. It
+    // carries its own raw so that whitespace arriving before that element ("-
+    // 1") accumulates on the minus rather than on the token before it, which
+    // is what lets the parser's error messages quote the expression verbatim.
+    let pendingMinus: Token | undefined
     for (const element of elements) {
       if (this._isWhitespace(element)) {
-        const last = tokens.at(-1)
+        const last = pendingMinus ?? tokens.at(-1)
         if (last) {
           last.raw += element
         }
       } else if (element === '-' && this._isNegative(tokens)) {
         // a second prefix minus in a row ("- -x"): emit the pending one as a
         // unary operator so this one can negate whatever comes next
-        if (negate) {
-          tokens.push(unaryMinusToken())
+        if (pendingMinus) {
+          tokens.push(pendingMinus)
         }
-        negate = true
-      } else if (negate) {
-        negate = false
+        pendingMinus = unaryMinusToken()
+      } else if (pendingMinus) {
         if (numericRegex.exec(element)) {
           // fold the sign into the number, so "-1" stays a single literal
-          tokens.push(this._createToken('-' + element))
+          const token = this._createToken('-' + element)
+          token.raw = pendingMinus.raw + element
+          tokens.push(token)
         } else {
           // anything else gets a standalone prefix operator, letting "-x",
           // "-(a + b)" and "-foo.bar" negate a computed value
-          tokens.push(unaryMinusToken(), this._createToken(element))
+          tokens.push(pendingMinus, this._createToken(element))
         }
+        pendingMinus = undefined
       } else {
         tokens.push(this._createToken(element))
       }
     }
     // Catch a - at the end of the string. Let the parser handle that issue.
-    if (negate) {
-      tokens.push(this._createToken('-'))
+    if (pendingMinus) {
+      tokens.push(pendingMinus)
     }
     return tokens
   }
@@ -256,10 +272,8 @@ class Lexer {
    * @private
    */
   _isNegative(tokens: Token[]) {
-    if (!tokens.length) {
-      return true
-    }
-    return minusNegatesAfter.has(tokens[tokens.length - 1]!.type)
+    const last = tokens.at(-1)
+    return !last || minusNegatesAfter.has(last.type)
   }
 
   /**
@@ -366,10 +380,7 @@ class Lexer {
   }
 
   _unescapeTemplateString(str: string) {
-    return str
-      .replaceAll('\\`', '`')
-      .replaceAll(String.raw`\$`, '$')
-      .replaceAll('\\\\', '\\')
+    return str.replaceAll(templateEscRegex, '$1')
   }
 }
 

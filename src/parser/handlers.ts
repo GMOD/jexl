@@ -90,9 +90,15 @@ export function binaryOp(this: Parser, token: Token) {
     if (!parentExpr.operator) {
       break
     }
-    if (
-      precedenceOf(this._grammar.elements[parentExpr.operator]) < precedence
-    ) {
+    // a prefix operator binds tighter than any binary one, so `-x ^ 2` groups
+    // as `(-x) ^ 2` — the same way `-2 ^ 2` already does, since the Lexer folds
+    // that sign into the literal. Looking `-` up in the grammar finds its
+    // binary precedence instead, which is lower than `^`'s and gave `-(x ^ 2)`
+    const parentPrecedence =
+      parent.type === 'UnaryExpression'
+        ? Infinity
+        : precedenceOf(this._grammar.elements[parentExpr.operator])
+    if (parentPrecedence < precedence) {
       break
     }
     this._cursor = parent
@@ -162,10 +168,10 @@ export function functionCall(this: Parser) {
     // there is nothing to look up in the function pool
     throw new Error(`Functions must be called by name: ${this._exprStr}`)
   }
-  const { from } = cursor as Identifier
+  const { from, value } = cursor as Identifier
   const node: FunctionCall = {
     type: 'FunctionCall',
-    name: (cursor as Identifier).value,
+    name: value,
     args: from ? [from] : [],
     pool: 'functions'
   }
@@ -313,17 +319,32 @@ export function ternaryMid(this: Parser, ast: AstNode | null) {
 }
 
 /**
- * Handles the start of a new ternary expression by encapsulating the entire
- * AST in a ConditionalExpression node, and using the existing tree as the
- * test element.
+ * Handles the start of a new ternary expression by encapsulating the tree so
+ * far in a ConditionalExpression node, and using it as the test element.
+ *
+ * Every operator binds tighter than the conditional and so belongs in the test
+ * — except `=`, which binds looser. `x = a ? b : c` therefore assigns the
+ * conditional rather than testing the assignment, which had stored `a` in `x`.
  */
 export function ternaryStart(this: Parser) {
+  let assignment: AstNode | undefined
+  let test = this._tree!
+  while (test.type === 'AssignmentExpression' && test.right) {
+    assignment = test
+    test = test.right
+  }
+
   const node: ConditionalExpression = {
     type: 'ConditionalExpression',
-    test: this._tree!
+    test
   }
-  this._tree = node
-  this._cursor = this._tree
+  if (assignment) {
+    assignment.right = node
+    this._setParent(node, assignment)
+  } else {
+    this._tree = node
+  }
+  this._cursor = node
 }
 
 /**
