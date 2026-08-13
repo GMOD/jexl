@@ -91,6 +91,27 @@ JexlValue`, but parameters are contravariant, so any callback annotated with
   element and was rebuilt on each compile, where it accounted for roughly
   two-thirds of the cost of `jexl.eval()`. It is now built once and
   invalidated when the grammar changes.
+- **Evaluating a compiled expression no longer allocates.** A compiled closure
+  took an `Evaluator` carrying the grammar and the context, so every `eval()`
+  built one. The grammar is already captured when the closure is built, so the
+  closure now takes the context directly and the `Evaluator` class is gone.
+  `pnpm bench` covers this path.
+
+### Internal
+
+- **Relative paths are rejected when an expression is parsed.** This fork
+  removed array filtering expressions, and they are the only construct that
+  gives a relative path a root to resolve against — but the parser still built
+  the nodes for one and left a throw in the compiled closure, so `a[.b > 1]`
+  compiled cleanly and failed at `eval()`. It is now refused at `compile()`
+  with `Relative paths are not supported`. A leading dot, `.foo`, was worse: it
+  read from a relative context that always defaulted to the plain one, making
+  it a silent and obscure spelling of `foo`. It is refused the same way.
+
+  With that gone, so are `Identifier.relative`, `FilterExpression.relative`,
+  `Parser#isRelative`, and the relative-context parameter that nothing passed.
+  Ordinary subscripts and chains — `a[0]`, `a["b"]`, `a[b]`, `a.b.c` — are not
+  relative and are unaffected.
 
 ## [v3.0.0]
 

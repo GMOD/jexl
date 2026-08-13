@@ -6,17 +6,10 @@ import tseslint from 'typescript-eslint'
 
 export default defineConfig(
   {
-    ignores: [
-      'webpack.config.js',
-      'benchmarks/*',
-      'test/*',
-      'dist/*',
-      'esm_*/*',
-      'profile-bam.js',
-      'esm/*',
-      'example/*',
-      'eslint.config.mjs'
-    ]
+    // the type-aware rules need every linted file in tsconfig.lint.json's
+    // program, and that config has no allowJs, so the plain-JS trees are out.
+    // `pnpm typecheck` still covers test/ through the config's own include.
+    ignores: ['test/*', 'bench/*', 'dist/*', 'esm/*', 'eslint.config.mjs']
   },
   {
     languageOptions: {

@@ -64,7 +64,7 @@ export function arrayVal(this: Parser, ast: AstNode | null) {
 export function binaryOp(this: Parser, token: Token) {
   if (token.value === '=') {
     // `from` marks a member access such as `a.b`; only a bare name can be
-    // assigned to, since the Evaluator writes straight into the context
+    // assigned to, since the compiled closure writes straight into the context
     if (
       this._cursor?.type !== 'Identifier' ||
       (this._cursor as Identifier).from
@@ -121,18 +121,20 @@ export function binaryOp(this: Parser, token: Token) {
  */
 export function dot(this: Parser) {
   const cursor = this._cursor
-  // the dot continues an identifier chain unless the cursor is an operator
-  // still waiting on its right-hand side, in which case it opens a relative
-  // path instead — as in the leading dot of `list[.price > 5]`
-  this._nextIdentEncapsulate =
-    !!cursor &&
-    cursor.type !== 'UnaryExpression' &&
-    (cursor.type !== 'BinaryExpression' || !!cursor.right)
-
-  this._nextIdentRelative = !this._nextIdentEncapsulate
-  if (this._nextIdentRelative) {
-    this._relative = true
+  // a dot continues an identifier chain. With nothing to continue — no cursor,
+  // or an operator still waiting on its right-hand side — it would instead open
+  // a relative path, the leading dot of `list[.price > 5]`. This fork removed
+  // array filtering expressions, which are the only construct that gives a
+  // relative path a root to resolve against, so it is rejected here rather than
+  // parsed into a tree that can only fail once it is evaluated.
+  if (
+    !cursor ||
+    cursor.type === 'UnaryExpression' ||
+    (cursor.type === 'BinaryExpression' && !cursor.right)
+  ) {
+    throw new Error(`Relative paths are not supported: ${this._exprStr}`)
   }
+  this._nextIdentEncapsulate = true
 }
 
 /**
@@ -144,7 +146,6 @@ export function filter(this: Parser, ast: AstNode | null) {
   const node: FilterExpression = {
     type: 'FilterExpression',
     expr: ast!,
-    relative: this._subParser!.isRelative(),
     subject: this._cursor!
   }
   this._placeBeforeCursor(node)
@@ -191,10 +192,6 @@ export function identifier(this: Parser, token: Token) {
     this._placeBeforeCursor(node)
     this._nextIdentEncapsulate = false
   } else {
-    if (this._nextIdentRelative) {
-      node.relative = true
-      this._nextIdentRelative = false
-    }
     this._placeAtCursor(node)
   }
 }
@@ -279,7 +276,7 @@ export function objStart(this: Parser) {
 export function objVal(this: Parser, ast: AstNode | null) {
   // defined rather than assigned so that the key "__proto__" becomes an
   // ordinary entry of the node's key map instead of re-pointing its prototype,
-  // which dropped the entry before the Evaluator ever saw it
+  // which dropped the entry before it could be compiled
   Object.defineProperty(
     (this._cursor as ObjectLiteral).value,
     this._curObjKey!,

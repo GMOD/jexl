@@ -15,6 +15,7 @@
   ],
   "scripts": {
     "test": "vitest",
+    "bench": "vitest bench --run",
     "coverage": "pnpm test --coverage",
     "clean": "rimraf dist esm",
     "format": "prettier --write .",

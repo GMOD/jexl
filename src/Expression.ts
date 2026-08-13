@@ -4,7 +4,6 @@
  */
 
 import Lexer from './Lexer.ts'
-import Evaluator from './evaluator/Evaluator.ts'
 import { compileAst } from './evaluator/compile.ts'
 import Parser from './parser/Parser.ts'
 
@@ -71,7 +70,7 @@ class Expression {
     if (!this._fn) {
       return undefined
     }
-    return this._fn(new Evaluator(this._grammar, context))
+    return this._fn(context)
   }
 }
 

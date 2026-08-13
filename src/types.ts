@@ -38,7 +38,6 @@ export interface Identifier extends AstNode {
   type: 'Identifier'
   value: string
   from?: AstNode
-  relative?: boolean
 }
 
 export interface BinaryExpression extends AstNode {
@@ -82,7 +81,6 @@ export interface FunctionCall extends AstNode {
 export interface FilterExpression extends AstNode {
   type: 'FilterExpression'
   expr: AstNode
-  relative: boolean
   subject: AstNode
 }
 

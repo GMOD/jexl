@@ -32,7 +32,7 @@ const tokenHandlers: Record<
 /**
  * The Parser is a state machine that converts tokens from the {@link Lexer}
  * into an Abstract Syntax Tree (AST), capable of being evaluated in any
- * context by the {@link Evaluator}.  The Parser expects that all tokens
+ * context by {@link compileAst}.  The Parser expects that all tokens
  * provided to it are legal and typed properly according to the grammar, but
  * accepts that the tokens may still be in an invalid order or in some other
  * unparsable configuration that requires it to throw an Error.
@@ -52,13 +52,11 @@ class Parser {
   _state: string
   _tree: AstNode | null
   _exprStr: string
-  _relative: boolean
   _stopMap: Record<string, string>
   _cursor?: AstNode | null
   _subParser?: Parser
   _parentStop?: boolean
   _nextIdentEncapsulate?: boolean
-  _nextIdentRelative?: boolean
   _curObjKey?: string
   _sequenceExpressions?: AstNode[]
 
@@ -73,7 +71,6 @@ class Parser {
     this._state = 'expectOperand'
     this._tree = null
     this._exprStr = prefix || ''
-    this._relative = false
     this._stopMap = stopMap || {}
   }
 
@@ -143,7 +140,7 @@ class Parser {
   /**
    * Marks this Parser instance as completed and retrieves the full AST.
    * @returns {{}|null} a full expression tree, ready for evaluation by the
-   *      {@link Evaluator#eval} function, or null if no tokens were passed to
+   *      {@link compileAst} function, or null if no tokens were passed to
    *      the parser before complete was called
    * @throws {Error} if the parser is not in a state where it's legal to end
    *      the expression, indicating that the expression is incomplete
@@ -177,14 +174,6 @@ class Parser {
 
     this._state = 'complete'
     return this._cursor ? this._tree : null
-  }
-
-  /**
-   * Indicates whether the expression tree contains a relative path identifier.
-   * @returns {boolean} true if a relative identifier exists false otherwise.
-   */
-  isRelative() {
-    return this._relative
   }
 
   /**

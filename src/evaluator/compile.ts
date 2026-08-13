@@ -5,13 +5,16 @@
 
 import type { Grammar } from '../grammar.ts'
 import type { AstNode, AstNodeUnion, JexlValue } from '../types.ts'
-import type Evaluator from './Evaluator.ts'
+
+/** The variables an expression is evaluated against. */
+export type Context = Record<string, JexlValue>
 
 /**
- * An AST node lowered to a closure. Calling it with an Evaluator (which carries
- * the context and grammar) produces the node's value.
+ * An AST node lowered to a closure. Calling it with a context produces the
+ * node's value. The grammar is captured when the closure is built, so it is not
+ * a parameter.
  */
-export type CompiledNode = (ev: Evaluator) => JexlValue
+export type CompiledNode = (context: Context) => JexlValue
 
 /**
  * Writes a key that a plain assignment would mishandle. Storing to
@@ -20,11 +23,7 @@ export type CompiledNode = (ev: Evaluator) => JexlValue
  * re-pointed the target's prototype). Defining the property instead matches
  * what `JSON.parse('{"__proto__":1}')` produces: an ordinary own property.
  */
-function defineOwn(
-  target: Record<string, JexlValue>,
-  key: string,
-  value: JexlValue
-) {
+function defineOwn(target: Context, key: string, value: JexlValue) {
   Object.defineProperty(target, key, {
     value,
     writable: true,
@@ -33,11 +32,7 @@ function defineOwn(
   })
 }
 
-function assignOwn(
-  target: Record<string, JexlValue>,
-  key: string,
-  value: JexlValue
-) {
+function assignOwn(target: Context, key: string, value: JexlValue) {
   target[key] = value
 }
 
@@ -88,21 +83,17 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     case 'Identifier': {
       const name = node.value
       if (!node.from) {
-        return node.relative
-          ? (ev) => ev._relContext[name]
-          : (ev) => ev._context[name]
+        return (ctx) => ctx[name]
       }
       const from = compileAst(node.from, grammar)
-      return (ev) => {
-        const context = from(ev)
-        if (context == null) {
+      return (ctx) => {
+        const subject = from(ctx)
+        if (subject == null) {
           return undefined
         }
         // an identifier chained off an array reads through its first element
-        const ctx = Array.isArray(context) ? context[0] : context
-        return ctx == null
-          ? undefined
-          : (ctx as Record<string, JexlValue>)[name]
+        const target = Array.isArray(subject) ? subject[0] : subject
+        return target == null ? undefined : (target as Context)[name]
       }
     }
 
@@ -119,18 +110,18 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
       if (evalOnDemand) {
         // operands stay unevaluated behind an `eval` thunk, so operators such
         // as && and || can short-circuit
-        return (ev) =>
-          evalOnDemand({ eval: () => left(ev) }, { eval: () => right(ev) })
+        return (ctx) =>
+          evalOnDemand({ eval: () => left(ctx) }, { eval: () => right(ctx) })
       }
       const fn = op.eval
       if (!fn) {
-        return (ev) => {
-          left(ev)
-          right(ev)
+        return (ctx) => {
+          left(ctx)
+          right(ctx)
           return undefined
         }
       }
-      return (ev) => fn(left(ev), right(ev))
+      return (ctx) => fn(left(ctx), right(ctx))
     }
 
     case 'UnaryExpression': {
@@ -144,12 +135,12 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
             : undefined
       if (!fn) {
         // the operand is still evaluated for an unknown operator, as before
-        return (ev) => {
-          right(ev)
+        return (ctx) => {
+          right(ctx)
           return undefined
         }
       }
-      return (ev) => fn(right(ev))
+      return (ctx) => fn(right(ctx))
     }
 
     case 'ConditionalExpression': {
@@ -160,28 +151,22 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
       const alternate = node.alternate
         ? compileAst(node.alternate, grammar)
         : undefined
-      return (ev) => {
-        const res = test(ev)
+      return (ctx) => {
+        const res = test(ctx)
         if (res) {
           // an omitted consequent ("a ?: b") yields the test result
-          return consequent ? consequent(ev) : res
+          return consequent ? consequent(ctx) : res
         }
-        return alternate ? alternate(ev) : undefined
+        return alternate ? alternate(ctx) : undefined
       }
     }
 
     case 'FilterExpression': {
-      if (node.relative) {
-        // thrown on evaluation rather than compilation, as before
-        return () => {
-          throw new Error('Relative filter expressions are not supported')
-        }
-      }
       const subject = compileAst(node.subject, grammar)
       const index = compileAst(node.expr, grammar)
-      return (ev) => {
-        const subjectVal = subject(ev)
-        const indexVal = index(ev)
+      return (ctx) => {
+        const subjectVal = subject(ctx)
+        const indexVal = index(ctx)
         if (subjectVal == null) {
           return undefined
         }
@@ -194,10 +179,10 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     case 'ArrayLiteral': {
       const items = node.value.map((item) => compileAst(item, grammar))
       const len = items.length
-      return (ev) => {
+      return (ctx) => {
         const out: JexlValue[] = new Array(len)
         for (let i = 0; i < len; i++) {
-          out[i] = items[i]!(ev)
+          out[i] = items[i]!(ctx)
         }
         return out
       }
@@ -210,10 +195,10 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
       const len = keys.length
       // resolved once, here, so the common case keeps its plain store
       const store = keys.includes('__proto__') ? defineOwn : assignOwn
-      return (ev) => {
+      return (ctx) => {
         const out: Record<string, JexlValue> = {}
         for (let i = 0; i < len; i++) {
-          store(out, keys[i]!, values[i]!(ev))
+          store(out, keys[i]!, values[i]!(ctx))
         }
         return out
       }
@@ -221,18 +206,18 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
 
     case 'TemplateLiteral': {
       // every part renders to a string, so these are narrower than CompiledNode
-      const parts = node.parts.map((part): ((ev: Evaluator) => string) => {
+      const parts = node.parts.map((part): ((ctx: Context) => string) => {
         if (part.type === 'static') {
           const { value } = part
           return () => value
         }
         const expr = compileAst(part.value, grammar)
-        return (ev) => stringify(expr(ev))
+        return (ctx) => stringify(expr(ctx))
       })
-      return (ev) => {
+      return (ctx) => {
         let out = ''
         for (const part of parts) {
-          out += part(ev)
+          out += part(ctx)
         }
         return out
       }
@@ -245,8 +230,8 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
       // and `constructor` aren't callable as Jexl functions. Resolved per call
       // rather than baked in, since functions are routinely registered after
       // an expression has been compiled.
-      const lookup = (ev: Evaluator) => {
-        const { functions } = ev._grammar
+      const lookup = () => {
+        const { functions } = grammar
         if (!Object.hasOwn(functions, name)) {
           throw new Error(`Jexl Function ${name} is not defined.`)
         }
@@ -256,15 +241,15 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
       // argument array and needs no spread
       switch (args.length) {
         case 0: {
-          return (ev) => lookup(ev)()
+          return () => lookup()()
         }
         case 1: {
           const [a0] = args as [CompiledNode]
-          return (ev) => lookup(ev)(a0(ev))
+          return (ctx) => lookup()(a0(ctx))
         }
         case 2: {
           const [a0, a1] = args as [CompiledNode, CompiledNode]
-          return (ev) => lookup(ev)(a0(ev), a1(ev))
+          return (ctx) => lookup()(a0(ctx), a1(ctx))
         }
         case 3: {
           const [a0, a1, a2] = args as [
@@ -272,16 +257,16 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
             CompiledNode,
             CompiledNode
           ]
-          return (ev) => lookup(ev)(a0(ev), a1(ev), a2(ev))
+          return (ctx) => lookup()(a0(ctx), a1(ctx), a2(ctx))
         }
         default: {
           const len = args.length
-          return (ev) => {
+          return (ctx) => {
             const vals: JexlValue[] = new Array(len)
             for (let i = 0; i < len; i++) {
-              vals[i] = args[i]!(ev)
+              vals[i] = args[i]!(ctx)
             }
-            return lookup(ev)(...vals)
+            return lookup()(...vals)
           }
         }
       }
@@ -290,10 +275,10 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     case 'SequenceExpression': {
       const exprs = node.expressions.map((expr) => compileAst(expr, grammar))
       const len = exprs.length
-      return (ev) => {
+      return (ctx) => {
         let last: JexlValue
         for (let i = 0; i < len; i++) {
-          last = exprs[i]!(ev)
+          last = exprs[i]!(ctx)
         }
         return last
       }
@@ -303,9 +288,9 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
       const name = node.left.value
       const right = compileAst(node.right!, grammar)
       const store = name === '__proto__' ? defineOwn : assignOwn
-      return (ev) => {
-        const value = right(ev)
-        store(ev._context, name, value)
+      return (ctx) => {
+        const value = right(ctx)
+        store(ctx, name, value)
         return value
       }
     }

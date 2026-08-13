@@ -217,11 +217,6 @@ describe('regressions', () => {
       expect(first).toEqual({ n: 1 })
       expect(second).toEqual({ n: 11 })
     })
-    it('re-throws on every evaluation of an unsupported relative filter', () => {
-      const expr = inst.compile('a[.b > 1]')
-      expect(() => expr.eval({ a: [] })).toThrow(/not supported/)
-      expect(() => expr.eval({ a: [] })).toThrow(/not supported/)
-    })
     it('still reports an undefined function on each evaluation', () => {
       const expr = inst.compile('nope(1)')
       expect(() => expr.eval()).toThrow(/is not defined/)
@@ -340,6 +335,36 @@ describe('regressions', () => {
       expect(inst.eval('-x.y', { x: { y: 4 } })).toBe(-4)
       expect(inst.eval('- -x', { x: 3 })).toBe(3)
       expect(inst.eval('!a == false', { a: 0 })).toBe(false)
+    })
+  })
+  describe('relative paths', () => {
+    // this fork removed array filtering expressions, and they are the only
+    // construct that gives a relative path a root to resolve against. The
+    // parser used to build one anyway and leave a throw in the compiled
+    // closure, so the error surfaced at eval() rather than at compile()
+    it('rejects a relative filter when the expression is parsed', () => {
+      expect(() => inst.compile('a[.b > 1]')).toThrow(
+        /Relative paths are not supported/
+      )
+      expect(() => inst.eval('a[.b > 1]', { a: [] })).toThrow(
+        /Relative paths are not supported/
+      )
+    })
+    it('rejects a leading dot, which silently meant nothing', () => {
+      // `.foo` read from the relative context, which always defaulted to the
+      // plain context, making it an obscure spelling of `foo`
+      expect(() => inst.eval('.foo', { foo: 1 })).toThrow(
+        /Relative paths are not supported/
+      )
+    })
+    it('still accepts subscripts and chains, which are not relative', () => {
+      expect(inst.eval('a[0]', { a: [7] })).toBe(7)
+      expect(inst.eval('a["b"]', { a: { b: 8 } })).toBe(8)
+      expect(inst.eval('a[b]', { a: { k: 9 }, b: 'k' })).toBe(9)
+      expect(inst.eval('a[0].b', { a: [{ b: 3 }] })).toBe(3)
+      expect(inst.eval('a.b.c', { a: { b: { c: 4 } } })).toBe(4)
+      expect(inst.eval('{a: 1}.a')).toBe(1)
+      expect(inst.eval('-a.b', { a: { b: 2 } })).toBe(-2)
     })
   })
   describe('assignment', () => {
