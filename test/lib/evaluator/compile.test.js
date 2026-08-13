@@ -64,6 +64,32 @@ describe('compileAst', () => {
     const context = { foo: { baz: { bar: 'tek' } } }
     expect(evaluate('foo["ba" + "z"].bar', context)).toBe(context.foo.baz.bar)
   })
+  // Regression: lowering the evaluator to closures narrowed the index to a
+  // string or a number and answered undefined for anything else, where the
+  // tree-walking version was a bare `subject?.[index]`. The shape that broke is
+  // a one-element array, which is what every VCF INFO field parses to — so
+  // `{Pathogenic: 'red'}[feature.INFO.CLNSIG]` silently took its `|| fallback`
+  // for every record and a whole track went one colour.
+  it('indexes by the string form of a non-string key', () => {
+    const colors = "{Pathogenic: 'red', Benign: 'blue'}"
+    expect(evaluate(`${colors}[k]`, { k: ['Pathogenic'] })).toBe('red')
+    expect(evaluate(`${colors}[k]`, { k: 'Pathogenic' })).toBe('red')
+    // a multi-valued list stringifies to 'a,b' and misses, rather than reading
+    // through to its first element and guessing which value was meant
+    expect(
+      evaluate(`${colors}[k]`, { k: ['Pathogenic', 'Benign'] })
+    ).toBeUndefined()
+    expect(evaluate(`${colors}[k] || 'gray'`, { k: ['Nope'] })).toBe('gray')
+    expect(evaluate(`{true: 'yes'}[k]`, { k: true })).toBe('yes')
+  })
+  it('answers undefined for an index with no key-worthy string form', () => {
+    // '[object Object]' is not a key anything is stored under, so these miss —
+    // as they did before, by way of a lookup that always failed
+    expect(evaluate('{a: 1}[k]', { k: { b: 2 } })).toBeUndefined()
+    expect(evaluate('{a: 1}[k]', { k: [{ b: 2 }] })).toBeUndefined()
+    expect(evaluate('{a: 1}[k]', { k: null })).toBeUndefined()
+    expect(evaluate('{a: 1}[k]', {})).toBeUndefined()
+  })
   it('applys the DivFloor operator', () => {
     expect(evaluate('7 // 2')).toBe(3)
   })

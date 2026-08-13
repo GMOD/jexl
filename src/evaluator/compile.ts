@@ -36,6 +36,36 @@ function assignOwn(target: Context, key: string, value: JexlValue) {
   target[key] = value
 }
 
+/**
+ * The key a bracket index that is neither a string nor a number reads under:
+ * its string form, when it has one worth using.
+ *
+ * A boolean and an array of primitives do — `['a']` is the key `'a'`, exactly
+ * as JS would index by it. A plain object does not, since '[object Object]' is
+ * not a key anything is stored under, so it and an array holding one answer
+ * `undefined` instead; indexing by either reached that lookup and missed
+ * anyway. null and undefined are the same case.
+ */
+function indexKey(value: JexlValue): string | undefined {
+  if (typeof value === 'boolean') {
+    return String(value)
+  }
+  return Array.isArray(value) && value.every(isKeyPart)
+    ? value.join(',')
+    : undefined
+}
+
+function isKeyPart(
+  value: JexlValue
+): value is string | number | boolean | null | undefined {
+  return (
+    value == null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  )
+}
+
 /** Renders an interpolated value for a template literal. */
 function stringify(value: JexlValue) {
   if (value == null) {
@@ -170,9 +200,31 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
         if (subjectVal == null) {
           return undefined
         }
-        return typeof indexVal === 'string' || typeof indexVal === 'number'
-          ? (subjectVal as Record<string | number, JexlValue>)[indexVal]
-          : undefined
+        if (typeof indexVal === 'string' || typeof indexVal === 'number') {
+          return (subjectVal as Record<string | number, JexlValue>)[indexVal]
+        }
+        // A value with a meaningful string form is indexed by it, which is what
+        // JS does and what this did until the evaluator was lowered to closures
+        // — the tree-walking version was a bare `subject?.[index]`. Answering
+        // `undefined` for everything else reads as a deliberate strictness and
+        // is not: nothing wanted it, and the shape it rejects is common.
+        //
+        // That shape is a one-element array. Every `@gmod/vcf` INFO value is a
+        // list — `Number=1` included, so `CLNSIG=Pathogenic` parses to
+        // `['Pathogenic']` — and the natural way to colour by one is a lookup
+        // table indexed by it. The miss is silent, because such an expression
+        // always carries a `|| fallback` for the values it has no entry for,
+        // and that fallback then answers for every record.
+        //
+        // A multi-valued list still misses — `['a','b']` is the key 'a,b' —
+        // which is the honest answer rather than a lucky one: reading through
+        // to the first element would be the index guessing which value was
+        // meant. `Identifier` above does read through a one-element array, but
+        // it is navigating rather than selecting, so it has nothing to guess.
+        const key = indexKey(indexVal)
+        return key === undefined
+          ? undefined
+          : (subjectVal as Record<string, JexlValue>)[key]
       }
     }
 

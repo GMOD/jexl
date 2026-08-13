@@ -2,6 +2,26 @@
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## Unreleased
+
+### Fixed
+
+- **`obj[key]` indexes by a non-string key's string form again**, as it did
+  before v3.1.0. Lowering the evaluator to closures narrowed the index to a
+  string or a number and answered `undefined` for everything else, where the
+  tree-walking version had been a bare `subject?.[index]`. That went out in a
+  minor and the shape it rejects is a common one: every `@gmod/vcf` INFO value
+  is a list (`Number=1` included, so `CLNSIG=Pathogenic` parses to
+  `['Pathogenic']`), and the natural way to colour by one is a lookup table
+  indexed by it. Such an expression always carries a `|| fallback` for the
+  values it has no entry for, so the miss was silent and answered for every
+  record — a whole JBrowse track went one flat colour, found by eye on a figure.
+
+  A multi-valued list still misses: `['a','b']` is the key `'a,b'`, not `'a'`.
+  A plain object, an array holding one, `null` and `undefined` answer
+  `undefined` rather than looking up `'[object Object]'`/`'null'`/`'undefined'`
+  — the same result the old lookup reached, one step sooner.
+
 ## [v4.0.0]
 
 ### BREAKING CHANGES
