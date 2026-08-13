@@ -77,7 +77,6 @@ export interface FunctionCall extends AstNode {
   type: 'FunctionCall'
   name: string
   args: AstNode[]
-  pool: 'functions'
 }
 
 export interface FilterExpression extends AstNode {

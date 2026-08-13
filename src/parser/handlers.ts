@@ -172,8 +172,7 @@ export function functionCall(this: Parser) {
   const node: FunctionCall = {
     type: 'FunctionCall',
     name: value,
-    args: from ? [from] : [],
-    pool: 'functions'
+    args: from ? [from] : []
   }
   this._placeBeforeCursor(node)
 }
