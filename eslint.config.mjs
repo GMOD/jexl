@@ -9,7 +9,16 @@ export default defineConfig(
     // the type-aware rules need every linted file in tsconfig.lint.json's
     // program, and that config has no allowJs, so the plain-JS trees are out.
     // `pnpm typecheck` still covers test/ through the config's own include.
-    ignores: ['test/*', 'bench/*', 'dist/*', 'esm/*', 'eslint.config.mjs']
+    ignores: [
+      'test/*',
+      'bench/*',
+      'dist/*',
+      'esm/*',
+      // vitest writes JS reporter assets here, so `pnpm coverage && pnpm lint`
+      // failed on them. Already ignored by git and prettier.
+      'coverage/*',
+      'eslint.config.mjs'
+    ]
   },
   {
     languageOptions: {
