@@ -2,27 +2,28 @@
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-## [development]
+## [v4.0.0]
 
-### Added
+### BREAKING CHANGES
 
-- **A call written against a value passes it as the first argument.** `a.b(x)`
-  compiled to `b(x)`: the receiver was parsed and then dropped. jbrowse's own
-  documented recipe `jexl:refName.split(' ')[0]` therefore evaluated
-  `' '.split(undefined)` and returned a single space instead of the first word,
-  and `feature.get('start')` threw `feature.get is not a function`. Functions
-  have no receiver — they live in one global pool — so `a.b(x)` now means
-  `b(a, x)`, which is how every function in jbrowse's pool is already written
-  (`get(feature, key)`, `split(str, sep)`). Nothing that worked before changes:
-  any expression this affects was already returning a wrong value or throwing.
-  `a[expr]()`, whose subject is a filter rather than a name, now reports that
-  functions must be called by name rather than looking up `undefined`.
-- **Unary minus on any operand.** Previously only numeric literals could be
-  negated: `-1` worked, but `-x`, `-(a + b)`, `-foo.bar` and `-log10(score)`
-  all threw `Invalid expression token`, because the Lexer folded the sign into
-  whatever element followed it. A prefix `-` in front of a non-numeric element
-  is now a unary operator. Numeric literals are still folded, so `-1` remains a
-  single Literal token.
+Each of these corrects something that was already wrong, but an expression or a
+type that relied on the old behavior will not survive the upgrade.
+
+- **`x = a ? b : c` assigns the conditional.** It used to store `a` in `x` and
+  then branch on it. Any expression that assigns and branches in one statement
+  changes meaning — grep config for `=` followed by `?`.
+- **`-x ^ 2` is 4, not -4.** Prefix `-` now binds tighter than every binary
+  operator. `^` is the only one whose result this changes.
+- **Relative paths are refused when an expression is parsed.** `a[.b > 1]`
+  already threw, but at `eval()` rather than `compile()`. `.foo` used to
+  evaluate as a silent alias for `foo` and now throws.
+- **Three fields are gone from the exported AST types**: `FunctionCall.pool`,
+  `Identifier.relative` and `FilterExpression.relative`. Each was written by
+  the parser and read by nothing. Code that inspects `Expression._ast` in
+  TypeScript may need updating; code that only evaluates expressions will not.
+- **The internal `Evaluator` class is gone.** It was never exported from the
+  package entry point, so this only affects a deep import of
+  `src/evaluator/Evaluator.ts`.
 
 ### Fixed
 
@@ -34,63 +35,16 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   operand was written out. A prefix operator now outranks any binary one, as
   `!` always did, so both spellings agree. Only `^` changes an expression's
   value; `-x * 3` and `-x % 3` were already equal either way.
+
 - **`x = a ? b : c` assigns the conditional instead of testing the
   assignment.** `=` has the lowest precedence in the grammar, but the ternary
   encapsulated the whole tree as its test, so this parsed as `(x = a) ? b : c`
   and stored `a` in `x`. The conditional now becomes the assignment's value,
   matching every language that has both. **This is a behavior change** for any
   expression that assigned and branched in one statement.
-- **`addFunction`, `addFunctions`, `addBinaryOp` and `addUnaryOp` accept the
-  callbacks people actually write.** They required `(...args: JexlValue[]) =>
-JexlValue`, but parameters are contravariant, so any callback annotated with
-  a narrower type — `(feature: Feature, key: string) => …`, `(s: string) => …`,
-  `Math.max` — was rejected, as was any returning something jexl has no literal
-  for. Jexl cannot check these anyway: the arguments are whatever the
-  expression evaluated to, drawn from a context supplied at evaluation time. It
-  now accepts any function and leaves the argument types to the caller, which
-  clears all 55 type errors this caused in jbrowse-components. Registrations
-  written in TypeScript are covered by `test/lib/registration-types.test.ts`,
-  which `pnpm typecheck` now checks along with the rest of `test/`.
-- **`in` against a string no longer matches every absent value.** A left
-  operand that wasn't a string, number or boolean was coerced to `''`, and
-  every string contains `''`, so `missing in "abc"` — a missing feature
-  attribute, `null`, `{}`, `[]` — was `true`. Only primitives have a substring
-  form; anything else is now `false`. Array membership is unchanged.
-- **A group left unclosed is rejected instead of evaluating as if closed.**
-  `(1` returned `1`. A group opened before anything reached the tree leaves the
-  parser's cursor null, and `complete()` tested only the cursor, so the missing
-  `)` went unnoticed. `[1, 2`, `{a: 1` and `f(1` already errored and are
-  unaffected.
-- **`__proto__` as a key keeps its value.** Storing to that key invokes the
-  prototype setter rather than creating a property, so `{"__proto__": v}`
-  evaluated to `{}` — the entry was lost in the parser's key map before the
-  Evaluator ever saw it — and `__proto__ = v` re-pointed the prototype of the
-  caller's context object. Such keys are now defined, matching what
-  `JSON.parse('{"__proto__":1}')` produces: an ordinary own property.
-- **Assignment to a member expression is rejected instead of silently writing
-  elsewhere.** `a.b = 5` parsed, but the Evaluator assigns into the context by
-  name, so it created a top-level `b` and left `a.b` unchanged. It now throws
-  the same error `a[0] = 5` already gave. **This is a behavior change**: an
-  expression that previously appeared to succeed will now throw.
-- **Braces inside string literals no longer end a template interpolation.**
-  `` `${ "}" }` `` terminated at the quoted brace and evaluated to `" }`. The
-  interpolation scanner now skips over quoted spans.
 
 ### Performance
 
-- **Expressions are lowered to closures at compile time** rather than walked
-  node-by-node on every evaluation, with the operator implementation for each
-  node resolved once. Expressions that are compiled once and evaluated many
-  times — per-item callbacks, filters — evaluate roughly 3-7x faster.
-  Functions are still resolved per call, so registering one after compiling an
-  expression continues to work; operators are bound at compile time, so a
-  grammar change still requires the recompile that `Expression#compile`
-  already documents.
-- **A Jexl instance shares one Lexer across the expressions it creates.** The
-  regex that splits an expression into elements is derived from every grammar
-  element and was rebuilt on each compile, where it accounted for roughly
-  two-thirds of the cost of `jexl.eval()`. It is now built once and
-  invalidated when the grammar changes.
 - **Evaluating a compiled expression no longer allocates.** A compiled closure
   took an `Evaluator` carrying the grammar and the context, so every `eval()`
   built one. The grammar is already captured when the closure is built, so the
@@ -112,6 +66,99 @@ JexlValue`, but parameters are contravariant, so any callback annotated with
   `Parser#isRelative`, and the relative-context parameter that nothing passed.
   Ordinary subscripts and chains — `a[0]`, `a["b"]`, `a[b]`, `a.b.c` — are not
   relative and are unaffected.
+
+## [v3.3.0]
+
+### Fixed
+
+- **`addFunction`, `addFunctions`, `addBinaryOp` and `addUnaryOp` accept the
+  callbacks people actually write.** They required `(...args: JexlValue[]) =>
+JexlValue`, but parameters are contravariant, so any callback annotated with
+  a narrower type — `(feature: Feature, key: string) => …`, `(s: string) => …`,
+  `Math.max` — was rejected, as was any returning something jexl has no literal
+  for. Jexl cannot check these anyway: the arguments are whatever the
+  expression evaluated to, drawn from a context supplied at evaluation time. It
+  now accepts any function and leaves the argument types to the caller, which
+  clears all 55 type errors this caused in jbrowse-components. Registrations
+  written in TypeScript are covered by `test/lib/registration-types.test.ts`,
+  which `pnpm typecheck` now checks along with the rest of `test/`.
+
+## [v3.2.0]
+
+### Added
+
+- **A call written against a value passes it as the first argument.** `a.b(x)`
+  compiled to `b(x)`: the receiver was parsed and then dropped. jbrowse's own
+  documented recipe `jexl:refName.split(' ')[0]` therefore evaluated
+  `' '.split(undefined)` and returned a single space instead of the first word,
+  and `feature.get('start')` threw `feature.get is not a function`. Functions
+  have no receiver — they live in one global pool — so `a.b(x)` now means
+  `b(a, x)`, which is how every function in jbrowse's pool is already written
+  (`get(feature, key)`, `split(str, sep)`). Nothing that worked before changes:
+  any expression this affects was already returning a wrong value or throwing.
+  `a[expr]()`, whose subject is a filter rather than a name, now reports that
+  functions must be called by name rather than looking up `undefined`.
+
+### Fixed
+
+- **`in` against a string no longer matches every absent value.** A left
+  operand that wasn't a string, number or boolean was coerced to `''`, and
+  every string contains `''`, so `missing in "abc"` — a missing feature
+  attribute, `null`, `{}`, `[]` — was `true`. Only primitives have a substring
+  form; anything else is now `false`. Array membership is unchanged.
+
+- **A group left unclosed is rejected instead of evaluating as if closed.**
+  `(1` returned `1`. A group opened before anything reached the tree leaves the
+  parser's cursor null, and `complete()` tested only the cursor, so the missing
+  `)` went unnoticed. `[1, 2`, `{a: 1` and `f(1` already errored and are
+  unaffected.
+
+- **`__proto__` as a key keeps its value.** Storing to that key invokes the
+  prototype setter rather than creating a property, so `{"__proto__": v}`
+  evaluated to `{}` — the entry was lost in the parser's key map before the
+  Evaluator ever saw it — and `__proto__ = v` re-pointed the prototype of the
+  caller's context object. Such keys are now defined, matching what
+  `JSON.parse('{"__proto__":1}')` produces: an ordinary own property.
+
+## [v3.1.0]
+
+### Added
+
+- **Unary minus on any operand.** Previously only numeric literals could be
+  negated: `-1` worked, but `-x`, `-(a + b)`, `-foo.bar` and `-log10(score)`
+  all threw `Invalid expression token`, because the Lexer folded the sign into
+  whatever element followed it. A prefix `-` in front of a non-numeric element
+  is now a unary operator. Numeric literals are still folded, so `-1` remains a
+  single Literal token.
+
+### Fixed
+
+- **Assignment to a member expression is rejected instead of silently writing
+  elsewhere.** `a.b = 5` parsed, but the Evaluator assigns into the context by
+  name, so it created a top-level `b` and left `a.b` unchanged. It now throws
+  the same error `a[0] = 5` already gave. **This is a behavior change**: an
+  expression that previously appeared to succeed will now throw.
+
+- **Braces inside string literals no longer end a template interpolation.**
+  `` `${ "}" }` `` terminated at the quoted brace and evaluated to `" }`. The
+  interpolation scanner now skips over quoted spans.
+
+### Performance
+
+- **Expressions are lowered to closures at compile time** rather than walked
+  node-by-node on every evaluation, with the operator implementation for each
+  node resolved once. Expressions that are compiled once and evaluated many
+  times — per-item callbacks, filters — evaluate roughly 3-7x faster.
+  Functions are still resolved per call, so registering one after compiling an
+  expression continues to work; operators are bound at compile time, so a
+  grammar change still requires the recompile that `Expression#compile`
+  already documents.
+
+- **A Jexl instance shares one Lexer across the expressions it creates.** The
+  regex that splits an expression into elements is derived from every grammar
+  element and was rebuilt on each compile, where it accounted for roughly
+  two-thirds of the cost of `jexl.eval()`. It is now built once and
+  invalidated when the grammar changes.
 
 ## [v3.0.0]
 
