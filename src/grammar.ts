@@ -6,7 +6,7 @@
 /* eslint eqeqeq:0 */
 
 import { collectionFunctions } from './collections.ts'
-import { anyValue, eachValue, isIn, matches } from './operators.ts'
+import { anyPair, isIn, isList, matches, pairwise } from './operators.ts'
 
 import type { JexlValue } from './types.ts'
 
@@ -107,7 +107,31 @@ export interface Grammar {
   variableReader?: VariableReader
 }
 
-const equals = anyValue((left, right) => left == right)
+const plus = (left: JexlValue, right: JexlValue) =>
+  (left as number) + (right as number)
+const minus = (left: JexlValue, right: JexlValue) =>
+  (left as number) - (right as number)
+const times = (left: JexlValue, right: JexlValue) =>
+  (left as number) * (right as number)
+const divide = (left: JexlValue, right: JexlValue) =>
+  (left as number) / (right as number)
+const floorDivide = (left: JexlValue, right: JexlValue) =>
+  Math.floor((left as number) / (right as number))
+const modulo = (left: JexlValue, right: JexlValue) =>
+  (left as number) % (right as number)
+const power = (left: JexlValue, right: JexlValue) =>
+  (left as number) ** (right as number)
+const loose = (left: JexlValue, right: JexlValue) => left == right
+const greater = (left: JexlValue, right: JexlValue) =>
+  (left as number) > (right as number)
+const atLeast = (left: JexlValue, right: JexlValue) =>
+  (left as number) >= (right as number)
+const less = (left: JexlValue, right: JexlValue) =>
+  (left as number) < (right as number)
+const atMost = (left: JexlValue, right: JexlValue) =>
+  (left as number) <= (right as number)
+const equals = (left: JexlValue, right: JexlValue) =>
+  isList(left, right) ? anyPair(loose, left, right) : left == right
 
 export const getGrammar = (): Grammar => ({
   /**
@@ -131,12 +155,14 @@ export const getGrammar = (): Grammar => ({
     '+': {
       type: 'binaryOp',
       precedence: 30,
-      eval: eachValue((left, right) => (left as number) + (right as number))
+      eval: (left, right) =>
+        isList(left, right) ? pairwise(plus, left, right) : plus(left, right)
     },
     '-': {
       type: 'binaryOp',
       precedence: 30,
-      eval: eachValue((left, right) => (left as number) - (right as number)),
+      eval: (left, right) =>
+        isList(left, right) ? pairwise(minus, left, right) : minus(left, right),
       unaryEval: (right) =>
         Array.isArray(right)
           ? right.map((value) => -(value as number))
@@ -145,30 +171,39 @@ export const getGrammar = (): Grammar => ({
     '*': {
       type: 'binaryOp',
       precedence: 40,
-      eval: eachValue((left, right) => (left as number) * (right as number))
+      eval: (left, right) =>
+        isList(left, right) ? pairwise(times, left, right) : times(left, right)
     },
     '/': {
       type: 'binaryOp',
       precedence: 40,
-      eval: eachValue((left, right) => (left as number) / (right as number))
+      eval: (left, right) =>
+        isList(left, right)
+          ? pairwise(divide, left, right)
+          : divide(left, right)
     },
     '//': {
       type: 'binaryOp',
       precedence: 40,
-      eval: eachValue((left, right) =>
-        Math.floor((left as number) / (right as number))
-      )
+      eval: (left, right) =>
+        isList(left, right)
+          ? pairwise(floorDivide, left, right)
+          : floorDivide(left, right)
     },
     '%': {
       type: 'binaryOp',
       precedence: 50,
-      eval: eachValue((left, right) => (left as number) % (right as number))
+      eval: (left, right) =>
+        isList(left, right)
+          ? pairwise(modulo, left, right)
+          : modulo(left, right)
     },
     '^': {
       type: 'binaryOp',
       precedence: 50,
       rightAssociative: true,
-      eval: eachValue((left, right) => (left as number) ** (right as number))
+      eval: (left, right) =>
+        isList(left, right) ? pairwise(power, left, right) : power(left, right)
     },
     '==': {
       type: 'binaryOp',
@@ -193,22 +228,30 @@ export const getGrammar = (): Grammar => ({
     '>': {
       type: 'binaryOp',
       precedence: 20,
-      eval: anyValue((left, right) => (left as number) > (right as number))
+      eval: (left, right) =>
+        isList(left, right)
+          ? anyPair(greater, left, right)
+          : greater(left, right)
     },
     '>=': {
       type: 'binaryOp',
       precedence: 20,
-      eval: anyValue((left, right) => (left as number) >= (right as number))
+      eval: (left, right) =>
+        isList(left, right)
+          ? anyPair(atLeast, left, right)
+          : atLeast(left, right)
     },
     '<': {
       type: 'binaryOp',
       precedence: 20,
-      eval: anyValue((left, right) => (left as number) < (right as number))
+      eval: (left, right) =>
+        isList(left, right) ? anyPair(less, left, right) : less(left, right)
     },
     '<=': {
       type: 'binaryOp',
       precedence: 20,
-      eval: anyValue((left, right) => (left as number) <= (right as number))
+      eval: (left, right) =>
+        isList(left, right) ? anyPair(atMost, left, right) : atMost(left, right)
     },
     '&&': {
       type: 'binaryOp',

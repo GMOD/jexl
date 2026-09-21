@@ -8,49 +8,54 @@ import type { JexlValue } from './types.ts'
 type Test = (left: JexlValue, right: JexlValue) => boolean
 type Arithmetic = (left: JexlValue, right: JexlValue) => JexlValue
 
-/**
- * A comparison that holds when it holds for any value of a list operand, as
- * bcftools compares a multi-valued tag: `AF > 0.05` is true when any allele's
- * frequency is, and `CLNSIG == 'Pathogenic'` when any significance is.
- */
-export function anyValue(test: Test): Test {
-  const any: Test = (left, right) =>
-    Array.isArray(left)
-      ? left.some((l) => any(l, right))
-      : Array.isArray(right)
-        ? right.some((r) => test(left, r))
-        : test(left, right)
-  return any
+export function isList(left: JexlValue, right: JexlValue) {
+  return Array.isArray(left) || Array.isArray(right)
 }
 
 /**
- * Arithmetic applied value by value when either operand is a list, as bcftools
- * and R do: `AC / AN` divides each count, and a list of one, or a lone value,
- * pairs with every value of the other side. Lists of two other lengths have no
- * pairing and yield undefined.
+ * A comparison over list operands: it holds when it holds for any value, as
+ * bcftools compares a multi-valued tag, so `AF > 0.05` is true when any
+ * allele's frequency is and `CLNSIG == 'Pathogenic'` when any significance is.
+ * Each operator calls this only once {@link isList} says it must, so the
+ * comparison of two single values stays a direct call V8 can inline.
  */
-export function eachValue(fn: Arithmetic): Arithmetic {
-  return (left, right) => {
-    const leftList = Array.isArray(left)
-    const rightList = Array.isArray(right)
-    if (!leftList && !rightList) {
-      return fn(left, right)
-    }
-    const ls = leftList ? left : [left]
-    const rs = rightList ? right : [right]
-    if (ls.length !== rs.length && ls.length !== 1 && rs.length !== 1) {
-      return undefined
-    }
-    const length = ls.length === 1 ? rs.length : ls.length
-    const out: JexlValue[] = new Array(length)
-    for (let i = 0; i < length; i++) {
-      out[i] = fn(
-        ls.length === 1 ? ls[0] : ls[i],
-        rs.length === 1 ? rs[0] : rs[i]
-      )
-    }
-    return out
+export function anyPair(
+  test: Test,
+  left: JexlValue,
+  right: JexlValue
+): boolean {
+  return Array.isArray(left)
+    ? left.some((l) => anyPair(test, l, right))
+    : Array.isArray(right)
+      ? right.some((r) => test(left, r))
+      : test(left, right)
+}
+
+/**
+ * Arithmetic over list operands, value by value, as bcftools and R apply it:
+ * `AC / AN` divides each count, and a list of one, or a lone value, pairs with
+ * every value of the other side. Lists of two other lengths have no pairing
+ * and yield undefined.
+ */
+export function pairwise(
+  fn: Arithmetic,
+  left: JexlValue,
+  right: JexlValue
+): JexlValue {
+  const ls = Array.isArray(left) ? left : [left]
+  const rs = Array.isArray(right) ? right : [right]
+  if (ls.length !== rs.length && ls.length !== 1 && rs.length !== 1) {
+    return undefined
   }
+  const length = ls.length === 1 ? rs.length : ls.length
+  const out: JexlValue[] = new Array(length)
+  for (let i = 0; i < length; i++) {
+    out[i] = fn(
+      ls.length === 1 ? ls[0] : ls[i],
+      rs.length === 1 ? rs[0] : rs[i]
+    )
+  }
+  return out
 }
 
 const patterns = new Map<string, RegExp>()
