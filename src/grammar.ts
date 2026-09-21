@@ -147,7 +147,7 @@ export const and: BinaryOpEvalOnDemand = (left, right) => {
 }
 export const or: BinaryOpEvalOnDemand = (left, right) => {
   const leftVal = left.eval()
-  return leftVal ? leftVal : right.eval()
+  return leftVal || right.eval()
 }
 export const nullish: BinaryOpEvalOnDemand = (left, right) =>
   left.eval() ?? right.eval()
