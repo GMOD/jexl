@@ -31,6 +31,8 @@ export interface JexlOptions {
   variableReader?: VariableReader
 }
 
+const MAX_COMPILED = 10_000
+
 /**
  * Jexl is the Javascript Expression Language, capable of parsing and
  * evaluating basic to complex expression strings, combined with advanced
@@ -42,6 +44,7 @@ class Jexl {
   // shared by every Expression this instance creates, so that the expensive
   // element-splitting regex is built once rather than per compile
   _lexer: Lexer
+  _compiled = new Map<string, Expression>()
 
   constructor({ getMember, variableReader }: JexlOptions = {}) {
     this._grammar = { ...getGrammar(), getMember, variableReader }
@@ -145,16 +148,21 @@ class Jexl {
   }
 
   /**
-   * Creates an Expression object from the given Jexl expression string, and
-   * immediately compiles it. The returned Expression object can then be
-   * evaluated multiple times with new contexts, without generating any
-   * additional string processing overhead.
-   * @param {string} expression The Jexl expression to be compiled
-   * @returns {Expression} The compiled Expression object
+   * Compiles an expression string, or returns the Expression this instance
+   * already compiled from the same string. Adding or removing an operator
+   * empties the cache, since a compiled expression binds its operators;
+   * functions are looked up per call and leave it alone.
    */
   compile(expression: string) {
-    const exprObj = this.createExpression(expression)
-    return exprObj.compile()
+    let compiled = this._compiled.get(expression)
+    if (!compiled) {
+      compiled = this.createExpression(expression).compile()
+      if (this._compiled.size >= MAX_COMPILED) {
+        this._compiled.delete(this._compiled.keys().next().value!)
+      }
+      this._compiled.set(expression, compiled)
+    }
+    return compiled
   }
 
   /**
@@ -185,8 +193,7 @@ class Jexl {
    * @throws {*} on error
    */
   eval(expression: string, context = {}) {
-    const exprObj = this.createExpression(expression)
-    return exprObj.eval(context)
+    return this.compile(expression).eval(context)
   }
 
   /**
@@ -223,7 +230,7 @@ class Jexl {
     const elem = this._grammar.elements[operator]
     if (elem?.type === 'binaryOp' || elem?.type === 'unaryOp') {
       Reflect.deleteProperty(this._grammar.elements, operator)
-      this._lexer._clearCache()
+      this._grammarChanged()
     }
   }
 
@@ -236,7 +243,12 @@ class Jexl {
    */
   _addGrammarElement(str: string, obj: GrammarElement) {
     this._grammar.elements[str] = obj
+    this._grammarChanged()
+  }
+
+  _grammarChanged() {
     this._lexer._clearCache()
+    this._compiled.clear()
   }
 }
 
