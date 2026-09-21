@@ -21,6 +21,15 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   per record, and can resolve bare names against the current record. An
   instance with neither evaluates exactly as before.
 
+- **`analyze(ast)` and `Expression#analyze()` list what an expression reads**
+  without evaluating it or needing its functions registered: the context
+  variables, each path used (`feature.INFO.DP[0]` as `feature.INFO.DP.0`), the
+  row's fields, every call with its arguments classified, and the names it
+  assigns. `accessors` declares calls that read a path, so `get(feature,'x')`
+  and `feature.get('x')` read `feature.x`; `env` supports a host that binds a
+  row's fields as variables; `bare` says whether the expression is nothing but
+  a path.
+
 ## [v4.0.1]
 
 ### Fixed

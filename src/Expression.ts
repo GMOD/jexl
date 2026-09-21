@@ -4,9 +4,11 @@
  */
 
 import Lexer from './Lexer.ts'
+import { analyze } from './analyze.ts'
 import { compileExpression } from './evaluator/compile.ts'
 import Parser from './parser/Parser.ts'
 
+import type { AnalyzeOptions } from './analyze.ts'
 import type { CompiledNode } from './evaluator/compile.ts'
 import type { Grammar } from './grammar.ts'
 import type { AstNode } from './types.ts'
@@ -71,6 +73,17 @@ class Expression {
       return undefined
     }
     return this._fn(context)
+  }
+
+  /**
+   * Lists what the expression reads from its context, without evaluating it.
+   * See {@link analyze}.
+   */
+  analyze(options?: AnalyzeOptions) {
+    if (!this._compiled) {
+      this.compile()
+    }
+    return analyze(this._ast, options)
   }
 }
 
