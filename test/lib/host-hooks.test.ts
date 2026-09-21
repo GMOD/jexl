@@ -119,4 +119,32 @@ describe('variableReader as a data mask', () => {
     expr.eval({ feature: row })
     expect(asked).toEqual(['pvalue', 'pvalue'])
   })
+
+  it('reads an assignment once it has run, and the row before', () => {
+    const expr = inst.compile('pvalue = -log10(pvalue); pvalue')
+    expect(expr.eval({ feature: row })).toBeCloseTo(3)
+    const branch = inst.compile('type == "exon" ? (type = "x") : 0; type')
+    expect(branch.eval({ feature: row })).toBe('gene')
+  })
+})
+
+describe('one context reused across rows', () => {
+  const inst = new Jexl({ getMember })
+  const colour = inst.compile(
+    "s = feature.INFO.CLNSIG; ({Benign: 'blue'})[s] || 'purple'"
+  )
+  const rows = [
+    new Feature({ INFO: { CLNSIG: ['Benign'] } }),
+    new Feature({ INFO: {} })
+  ]
+
+  it('carries nothing from one row to the next', () => {
+    const ctx: Record<string, unknown> = { feature: undefined }
+    const out = rows.map((row) => {
+      ctx.feature = row
+      return colour.eval(ctx)
+    })
+    expect(out).toEqual(['blue', 'purple'])
+    expect(Object.keys(ctx)).toEqual(['feature'])
+  })
 })

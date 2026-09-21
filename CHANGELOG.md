@@ -4,6 +4,14 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+### BREAKING CHANGES
+
+- **An assignment no longer writes into the context.** `x = 5` makes `x` a
+  variable for the rest of that evaluation and leaves the context object alone,
+  so one context can be reused across evaluations without the last one's
+  variables leaking into the next. Code that read assigned values back off the
+  context after `eval()` has to return them from the expression instead.
+
 ### Added
 
 - **`new Jexl({ getMember, variableReader })`.** `getMember(subject, key)`

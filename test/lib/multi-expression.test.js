@@ -41,10 +41,10 @@ describe('Multi-Expression Support', () => {
       expect(jexl.eval('x = 5; y = x * 2; z = y + 3; z')).toBe(13)
     })
 
-    it('assignment mutates context', () => {
+    it('assignment leaves the context alone', () => {
       const ctx = {}
       jexl.eval('x = 5; y = 10', ctx)
-      expect(ctx).toEqual({ x: 5, y: 10 })
+      expect(ctx).toEqual({})
     })
 
     it('can use external context variables', () => {
@@ -54,7 +54,7 @@ describe('Multi-Expression Support', () => {
     it('reassignment updates variable', () => {
       const ctx = { x: 1 }
       expect(jexl.eval('x = 5; x = x + 1; x', ctx)).toBe(6)
-      expect(ctx.x).toBe(6)
+      expect(ctx.x).toBe(1)
     })
   })
 

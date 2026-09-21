@@ -146,7 +146,7 @@ function named `b` in the pool, never a method on the value of `a`.
 
 ### Variable Assignment
 
-Assign values to variables using `=` (no `let`, `var`, or `const` needed). Assignments mutate the context and return the assigned value:
+Assign values to variables using `=` (no `let`, `var`, or `const` needed). An assignment returns the assigned value, and the variable lasts for the rest of that evaluation. The context is never written to, so one context object can be reused across evaluations:
 
 ```javascript
 jexl.eval('x = 5')
@@ -158,10 +158,10 @@ jexl.eval('x = 5; x * 2')
 jexl.eval('x = 5; y = 10; x + y')
 // 15
 
-const context = {}
-jexl.eval('x = 5; y = x * 2; y', context)
-// 10
-// context is now { x: 5, y: 10 }
+const context = { x: 1 }
+jexl.eval('y = x * 2; x = y + 1; x', context)
+// 3
+// context is still { x: 1 }
 ```
 
 Separate multiple expressions with semicolons. The result is the value of the last expression:
@@ -239,12 +239,14 @@ const jexl = new Jexl({
 })
 
 const expr = jexl.compile('feature.score > 10 && -log10(pvalue) > 2')
+const context = { feature: undefined }
 for (const feature of features) {
-  expr.eval({ feature })
+  context.feature = feature
+  expr.eval(context)
 }
 ```
 
-`a.b` on an array still reads its first element's `b`: `getMember` is handed that element.
+`a.b` on an array still reads its first element's `b`: `getMember` is handed that element. A name the expression assigns reads the assignment once it has run, and goes through `variableReader` before then.
 
 ## License
 

@@ -143,11 +143,12 @@ describe('regressions', () => {
       expect(Object.getPrototypeOf(res)).toBe(Object.prototype)
       expect({}.polluted).toBeUndefined()
     })
-    it('makes an assignment to it an own property of the context', () => {
+    it('keeps an assignment to it an ordinary variable', () => {
       const context = {}
       expect(
         inst.eval('__proto__ = {"polluted": 1}; __proto__.polluted', context)
       ).toBe(1)
+      expect(context).toEqual({})
       expect(Object.getPrototypeOf(context)).toBe(Object.prototype)
       expect({}.polluted).toBeUndefined()
     })
@@ -208,14 +209,27 @@ describe('regressions', () => {
       expect(arr.eval({ x: 1 })).toEqual([1, 2])
       expect(arr.eval({ x: 5 })).toEqual([5, 6])
     })
-    it('keeps assignment writing into the context of each evaluation', () => {
+    it('scopes assignment to each evaluation', () => {
       const expr = inst.compile('n = n + 1; n')
       const first = { n: 0 }
       const second = { n: 10 }
       expect(expr.eval(first)).toBe(1)
       expect(expr.eval(second)).toBe(11)
-      expect(first).toEqual({ n: 1 })
-      expect(second).toEqual({ n: 11 })
+      expect(expr.eval(first)).toBe(1)
+      expect(first).toEqual({ n: 0 })
+      expect(second).toEqual({ n: 10 })
+    })
+    it('keeps each evaluation its own locals when one re-enters another', () => {
+      const expr = inst.compile('x = n; n > 0 ? again(n - 1) : 0; x')
+      inst.addFunction('again', (n) => expr.eval({ n }))
+      expect(expr.eval({ n: 3 })).toBe(3)
+    })
+    it('lets no assignment reach the next evaluation of a reused context', () => {
+      const expr = inst.compile('flag ? (s = "set") : 0; s')
+      const context = { flag: true }
+      expect(expr.eval(context)).toBe('set')
+      context.flag = false
+      expect(expr.eval(context)).toBeUndefined()
     })
     it('still reports an undefined function on each evaluation', () => {
       const expr = inst.compile('nope(1)')
@@ -373,7 +387,7 @@ describe('regressions', () => {
       // so `x = true ? 1 : 2` parsed as `(x = true) ? 1 : 2` and stored true
       const context = {}
       expect(inst.eval('x = true ? 1 : 2', context)).toBe(1)
-      expect(context).toEqual({ x: 1 })
+      expect(context).toEqual({})
       expect(inst.eval('x = false ? 1 : 2; x')).toBe(2)
       expect(inst.eval('x = y = true ? 1 : 2; x + y')).toBe(2)
     })
@@ -388,7 +402,7 @@ describe('regressions', () => {
     it('still assigns to a bare variable name', () => {
       const context = {}
       expect(inst.eval('a = 5; a + 1', context)).toBe(6)
-      expect(context).toEqual({ a: 5 })
+      expect(context).toEqual({})
     })
   })
   describe('template strings', () => {

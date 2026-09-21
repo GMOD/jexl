@@ -252,7 +252,7 @@ describe('Challenging Test Cases', () => {
     it('chained assignments', () => {
       const context = {}
       expect(jexl.eval('a = b = c = 5; a + b + c', context)).toBe(15)
-      expect(context).toEqual({ a: 5, b: 5, c: 5 })
+      expect(context).toEqual({})
     })
 
     it('assignment with complex expression', () => {
