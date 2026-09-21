@@ -181,6 +181,11 @@ class Jexl {
     return new Expression(this._grammar, expression, this._lexer)
   }
 
+  /** Parses an expression string, or throws a JexlSyntaxError. */
+  parse(expression: string) {
+    return this.compile(expression).ast
+  }
+
   /**
    * Retrieves a previously set expression function.
    * @param {string} name The name of the expression function

@@ -74,15 +74,25 @@ class Expression {
     return this._fn(context)
   }
 
+  /** The expression text this Expression was made from. */
+  get source() {
+    return this._exprStr
+  }
+
+  /** The parsed tree, or null for an expression with no tokens. */
+  get ast() {
+    if (!this._compiled) {
+      this.compile()
+    }
+    return this._ast
+  }
+
   /**
    * Lists what the expression reads from its context, without evaluating it.
    * See {@link analyze}.
    */
   analyze(options?: AnalyzeOptions) {
-    if (!this._compiled) {
-      this.compile()
-    }
-    return analyze(this._ast, options)
+    return analyze(this.ast, options)
   }
 
   /**
@@ -90,10 +100,7 @@ class Expression {
    * evaluating it. See {@link check}.
    */
   check(options?: CheckOptions) {
-    if (!this._compiled) {
-      this.compile()
-    }
-    return check(this._ast, options)
+    return check(this.ast, options)
   }
 }
 
