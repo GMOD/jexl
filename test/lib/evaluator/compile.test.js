@@ -262,6 +262,26 @@ describe('compileAst', () => {
       ).toBe('12345')
     })
   })
+  it('refuses an operator the grammar does not define', () => {
+    const literal = { type: 'Literal', value: 1 }
+    expect(() =>
+      compileAst(
+        {
+          type: 'BinaryExpression',
+          operator: '<>',
+          left: literal,
+          right: literal
+        },
+        grammar
+      )
+    ).toThrow(/Unknown binary operator '<>'/)
+    expect(() =>
+      compileAst(
+        { type: 'UnaryExpression', operator: '~', right: literal },
+        grammar
+      )
+    ).toThrow(/Unknown unary operator '~'/)
+  })
   describe('literal lookup tables', () => {
     it('indexes a table of primitives', () => {
       const fn = compileAst(toTree('{CDS: "red", exon: "blue"}[t]'), grammar)

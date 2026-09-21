@@ -369,27 +369,18 @@ function compileNode(
 
     case 'BinaryExpression': {
       const op = grammar.elements[node.operator]
-      if (op?.type !== 'binaryOp') {
-        // matches the tree-walking behaviour: an unknown operator yields
-        // undefined without evaluating either operand
-        return () => undefined
-      }
       const left = compile(node.left)
       const right = compile(node.right!)
-      const { evalOnDemand } = op
-      if (evalOnDemand) {
+      if (op?.type === 'binaryOp' && op.evalOnDemand) {
+        const { evalOnDemand } = op
         // operands stay unevaluated behind an `eval` thunk, so operators such
         // as && and || can short-circuit
         return (ctx) =>
           evalOnDemand({ eval: () => left(ctx) }, { eval: () => right(ctx) })
       }
-      const fn = op.eval
+      const fn = op?.type === 'binaryOp' ? op.eval : undefined
       if (!fn) {
-        return (ctx) => {
-          left(ctx)
-          right(ctx)
-          return undefined
-        }
+        throw new Error(`Unknown binary operator '${node.operator}'`)
       }
       return (ctx) => fn(left(ctx), right(ctx))
     }
@@ -404,11 +395,7 @@ function compileNode(
             ? elem.unaryEval
             : undefined
       if (!fn) {
-        // the operand is still evaluated for an unknown operator, as before
-        return (ctx) => {
-          right(ctx)
-          return undefined
-        }
+        throw new Error(`Unknown unary operator '${node.operator}'`)
       }
       return (ctx) => fn(right(ctx))
     }
