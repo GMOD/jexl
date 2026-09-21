@@ -5,10 +5,12 @@
 
 import Lexer from './Lexer.ts'
 import { analyze } from './analyze.ts'
+import { check } from './check.ts'
 import { compileAst } from './evaluator/compile.ts'
 import Parser from './parser/Parser.ts'
 
 import type { AnalyzeOptions } from './analyze.ts'
+import type { CheckOptions } from './check.ts'
 import type { CompiledNode } from './evaluator/compile.ts'
 import type { Grammar } from './grammar.ts'
 import type { AstNode } from './types.ts'
@@ -84,6 +86,17 @@ class Expression {
       this.compile()
     }
     return analyze(this._ast, options)
+  }
+
+  /**
+   * Checks the expression against a host's fields and functions, without
+   * evaluating it. See {@link check}.
+   */
+  check(options?: CheckOptions) {
+    if (!this._compiled) {
+      this.compile()
+    }
+    return check(this._ast, options)
   }
 }
 
