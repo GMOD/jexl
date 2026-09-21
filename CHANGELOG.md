@@ -2,7 +2,7 @@
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-## [v5.0.0] (unreleased)
+## [v5.0.0]
 
 Jexl 5 ships alongside JBrowse 5.0. A Pratt parser replaces the state machine:
 it builds the same tree for every expression 4.0.1 parsed correctly, which
