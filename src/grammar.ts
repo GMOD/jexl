@@ -190,6 +190,11 @@ export const getGrammar = (): Grammar => ({
         return right.eval()
       }
     },
+    '??': {
+      type: 'binaryOp',
+      precedence: 10,
+      evalOnDemand: (left, right) => left.eval() ?? right.eval()
+    },
     in: {
       type: 'binaryOp',
       precedence: 20,

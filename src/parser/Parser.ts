@@ -16,6 +16,8 @@ import type {
   Token
 } from '../types.ts'
 
+const logical = new Set(['&&', '||'])
+
 const omittedAlternateBefore = new Set([
   'closeParen',
   'closeBracket',
@@ -36,6 +38,7 @@ class Parser {
   _lexer: Lexer
   _tokens: Token[] = []
   _pos = 0
+  _grouped?: WeakSet<AstNode>
 
   constructor(grammar: Grammar, lexer: Lexer) {
     this._grammar = grammar
@@ -138,14 +141,25 @@ class Parser {
       ) {
         return left
       }
-      this._pos++
-      left = {
-        type: 'BinaryExpression',
-        operator,
-        left,
-        right: this._binary(op.precedence, op.rightAssociative)
+      const at = this._pos++
+      const right = this._binary(op.precedence, op.rightAssociative)
+      if (this._mixesNullish(operator, left, right)) {
+        throw this._error('Parenthesize ?? when mixing it with && or ||', at)
       }
+      left = { type: 'BinaryExpression', operator, left, right }
     }
+  }
+
+  /** `a ?? b || c` has no grouping a reader can guess; JS refuses it too. */
+  _mixesNullish(operator: string, ...operands: AstNodeUnion[]) {
+    return operands.some(
+      (operand) =>
+        operand.type === 'BinaryExpression' &&
+        !this._grouped?.has(operand) &&
+        (operator === '??'
+          ? logical.has(operand.operator)
+          : logical.has(operator) && operand.operator === '??')
+    )
   }
 
   _unary(): AstNodeUnion {
@@ -225,6 +239,8 @@ class Parser {
       case 'openParen': {
         const node = this._sequence()
         this._expect('closeParen')
+        this._grouped ??= new WeakSet()
+        this._grouped.add(node)
         return node
       }
       case 'openBracket': {

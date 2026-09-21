@@ -413,6 +413,36 @@ describe('regressions', () => {
       expect(inst.eval('flags & 2 && flags & 4', { flags: 6 })).toBe(4)
     })
   })
+  describe('the ?? operator', () => {
+    it('falls back only for null and undefined', () => {
+      // || replaced a real 0 score with the fallback
+      expect(inst.eval('score || 1', { score: 0 })).toBe(1)
+      expect(inst.eval('score ?? 1', { score: 0 })).toBe(0)
+      expect(inst.eval('score ?? 1', { score: '' })).toBe('')
+      expect(inst.eval('score ?? 1', { score: null })).toBe(1)
+      expect(inst.eval('score ?? 1', {})).toBe(1)
+      expect(inst.eval('a ?? b ?? 3', {})).toBe(3)
+    })
+    it('evaluates its right side only when it needs it', () => {
+      let calls = 0
+      inst.addFunction('fallback', () => ++calls)
+      expect(inst.eval('score ?? fallback()', { score: 0 })).toBe(0)
+      expect(calls).toBe(0)
+      expect(inst.eval('score ?? fallback()', {})).toBe(1)
+    })
+    it('sits with || in the precedence order, below comparisons', () => {
+      expect(inst.eval('(score ?? 0) > 5', { score: 10 })).toBe(true)
+      expect(inst.eval('score ?? 0 > 5', { score: 10 })).toBe(10)
+      expect(inst.eval('a ?? 1 ? "y" : "n"', {})).toBe('y')
+    })
+    it('refuses to mix with && or || unless parenthesized, as JS does', () => {
+      for (const expr of ['a ?? b || c', 'a || b ?? c', 'a ?? b && c']) {
+        expect(() => inst.compile(expr)).toThrow(/Parenthesize \?\?/)
+      }
+      expect(inst.eval('(a || b) ?? c', { b: 2 })).toBe(2)
+      expect(inst.eval('a ?? (b && c)', { b: 2, c: 3 })).toBe(3)
+    })
+  })
   describe('malformed input', () => {
     it('rejects an empty slot with a syntax error rather than a TypeError', () => {
       for (const expr of ['a[]', '1 + ()', '()', '{a: }', '(', '1; (']) {
