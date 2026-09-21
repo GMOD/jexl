@@ -144,6 +144,20 @@ describe('Jexl', () => {
     })
   })
   describe('replacing an operator', () => {
+    it('hands a host && its operands unevaluated', () => {
+      const seen = []
+      inst.addBinaryOp(
+        '&&',
+        11,
+        (left, right) => {
+          seen.push(typeof left.eval, typeof right.eval)
+          return left.eval() && right.eval()
+        },
+        true
+      )
+      expect(inst.eval('1 && 2')).toBe(2)
+      expect(seen).toEqual(['function', 'function'])
+    })
     it('keeps the prefix form of -', () => {
       inst.addBinaryOp('-', 30, (a, b) => a - b - 1)
       expect(inst.eval('5 - 2')).toBe(2)

@@ -3,6 +3,8 @@
  * Copyright 2020 Tom Shawver
  */
 
+import { and, nullish, or } from '../grammar.ts'
+
 import type { Grammar } from '../grammar.ts'
 import type {
   AstNode,
@@ -375,8 +377,23 @@ function compileNode(
       const right = compile(node.right!)
       if (op?.type === 'binaryOp' && op.evalOnDemand) {
         const { evalOnDemand } = op
-        // operands stay unevaluated behind an `eval` thunk, so operators such
-        // as && and || can short-circuit
+        if (evalOnDemand === and) {
+          return (ctx) => {
+            const value = left(ctx)
+            return value ? right(ctx) : value
+          }
+        }
+        if (evalOnDemand === or) {
+          return (ctx) => {
+            const value = left(ctx)
+            return value || right(ctx)
+          }
+        }
+        if (evalOnDemand === nullish) {
+          return (ctx) => left(ctx) ?? right(ctx)
+        }
+        // a host's operator gets its operands unevaluated, behind `eval`
+        // thunks, so that it can short-circuit as it chooses
         return (ctx) =>
           evalOnDemand({ eval: () => left(ctx) }, { eval: () => right(ctx) })
       }

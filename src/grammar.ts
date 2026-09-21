@@ -139,6 +139,19 @@ const less = (left: JexlValue, right: JexlValue) =>
   left != null && right != null && (left as number) < (right as number)
 const atMost = (left: JexlValue, right: JexlValue) =>
   left != null && right != null && (left as number) <= (right as number)
+// named so the compiler can recognize the built-in forms and short-circuit
+// without the thunks a host's evalOnDemand operator is handed
+export const and: BinaryOpEvalOnDemand = (left, right) => {
+  const leftVal = left.eval()
+  return leftVal ? right.eval() : leftVal
+}
+export const or: BinaryOpEvalOnDemand = (left, right) => {
+  const leftVal = left.eval()
+  return leftVal ? leftVal : right.eval()
+}
+export const nullish: BinaryOpEvalOnDemand = (left, right) =>
+  left.eval() ?? right.eval()
+
 const equals = (left: JexlValue, right: JexlValue) =>
   isList(left, right) ? anyPair(loose, left, right) : left == right
 
@@ -267,29 +280,17 @@ export const getGrammar = (): Grammar => ({
     '&&': {
       type: 'binaryOp',
       precedence: 11,
-      evalOnDemand: (left, right) => {
-        const leftVal = left.eval()
-        if (!leftVal) {
-          return leftVal
-        }
-        return right.eval()
-      }
+      evalOnDemand: and
     },
     '||': {
       type: 'binaryOp',
       precedence: 10,
-      evalOnDemand: (left, right) => {
-        const leftVal = left.eval()
-        if (leftVal) {
-          return leftVal
-        }
-        return right.eval()
-      }
+      evalOnDemand: or
     },
     '??': {
       type: 'binaryOp',
       precedence: 10,
-      evalOnDemand: (left, right) => left.eval() ?? right.eval()
+      evalOnDemand: nullish
     },
     in: {
       type: 'binaryOp',

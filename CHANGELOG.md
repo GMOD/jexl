@@ -2,6 +2,17 @@
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [v5.0.1]
+
+### Performance
+
+- **`&&`, `||` and `??` evaluate without allocating.** Each wrapped both
+  operands in a thunk object and a closure on every evaluation, so a filter
+  such as `type == 'gene' && score >= 5.5 || strand == -1` ran at about 200ns
+  and now runs at about 70ns; a per-sample test inside `count()` runs about
+  1.4x faster. An operator a host registers with `manualEval` still receives
+  its operands as thunks.
+
 ## [v5.0.0]
 
 Jexl 5 ships alongside JBrowse 5.0. A Pratt parser replaces the state machine:
