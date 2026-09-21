@@ -78,6 +78,18 @@ expression what it reads.
   and `feature.get('x')` read `feature.x`; `env` supports a host that binds a
   row's fields as variables; `bare` says whether the expression is nothing but
   a path. A lambda's parameters are bound, not read.
+- **`check(ast, options)` and `Expression#check()` check an expression against
+  the fields a file header declares and the functions a host registers**,
+  without evaluating it. A schema lists each field's path, type, cardinality
+  (`one`, `perAlt`, `perAllele`, `perGenotype`, `many` or a fixed count),
+  description and categories; signatures give each function's params and
+  return. The diagnostics name unknown fields, variables and functions with
+  suggestions, wrong arity, an index into a scalar or past a per-allele list's
+  biallelic length, text compared numerically, comparisons that can never be
+  true, values outside a field's categories, and dotted or hyphenated keys that
+  need brackets. The inferred result type carries a numeric domain or the
+  finite set of values, and the field it came from, for a host's scale defaults
+  and titles. `print(ast)` renders a tree back to text for the suggestions.
 - **Lambdas**: `x => body` and `(a, b) => body`. A lambda is a plain JS
   function, so any registered function can call it; JBrowse's
   `interpolate(score, s => …)` becomes usable from config. A parameter shadows
