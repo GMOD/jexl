@@ -56,7 +56,7 @@ jexl.eval('assoc[1].first', context)
 | Booleans         | `true`, `false`                                      |
 | Strings          | `"Hello \"user\""`, `'Hey there!'`                   |
 | Template Strings | `` `Hello ${name}` ``, `` `Total: ${price * qty}` `` |
-| Numerics         | `6`, `-7.2`, `5`, `-3.14159`                         |
+| Numerics         | `6`, `-7.2`, `.5`, `1e3`, `-5e-8`                    |
 | Objects          | `{hello: "world!"}`                                  |
 | Arrays           | `['hello', 'world!']`                                |
 

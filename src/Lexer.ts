@@ -14,7 +14,7 @@ import type { TemplatePart, Token } from './types.ts'
 const identChars = String.raw`a-zA-Zа-яА-Я_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF$`
 const identPattern = `[${identChars}][${identChars}0-9]*`
 // unsigned: whether a leading '-' negates is decided separately, in getTokens
-const numberPattern = String.raw`(?:(?:[0-9]*\.[0-9]+)|[0-9]+)`
+const numberPattern = String.raw`(?:(?:[0-9]*\.[0-9]+)|[0-9]+)(?:[eE][+-]?[0-9]+)?`
 
 const numericRegex = new RegExp(`^-?${numberPattern}$`)
 const identRegex = new RegExp(`^${identPattern}$`)
@@ -37,9 +37,11 @@ const preOpRegexElems = [
   String.raw`\s+`,
   // Booleans
   String.raw`\btrue\b`,
-  String.raw`\bfalse\b`
+  String.raw`\bfalse\b`,
+  // ahead of the grammar's '.', so that '.5' is a number rather than a dot
+  numberPattern
 ]
-const postOpRegexElems = [identPattern, numberPattern]
+const postOpRegexElems = [identPattern]
 const unaryMinusToken = (): Token => ({
   type: 'unaryOp',
   value: '-',

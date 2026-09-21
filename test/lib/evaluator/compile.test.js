@@ -31,6 +31,16 @@ describe('compileAst', () => {
       'Hello8Wo"rld'
     )
   })
+  it('compares against scientific notation', () => {
+    const context = { feature: { pvalue: 1e-9 } }
+    expect(evaluate('feature.pvalue < 5e-8', context)).toBe(true)
+    expect(evaluate('feature.pvalue > -5e-8', context)).toBe(true)
+    expect(evaluate('.5e1 + .5')).toBe(5.5)
+  })
+  it('rejects an e that does not complete an exponent', () => {
+    expect(() => evaluate('2e')).toThrow(/unexpected/)
+    expect(() => evaluate('1e3e')).toThrow(/unexpected/)
+  })
   it('evaluates a true comparison expression', () => {
     expect(evaluate('2 > 1')).toBe(true)
   })
