@@ -105,6 +105,31 @@ describe('lambdas', () => {
         /Assignment is not supported in a lambda/
       )
     })
+    it('keeps the locals of the evaluation that made it', () => {
+      expect(inst.eval('y = 2; x => x * y', { y: 10 })(3)).toBe(6)
+      expect(inst.eval('y = 2; x => x * y')(3)).toBe(6)
+      let kept
+      inst.addFunction('keep', (fn) => {
+        kept = fn
+      })
+      inst.eval('t = 5; keep(x => x + t)')
+      expect(kept(1)).toBe(6)
+    })
+    it('sees a local assigned after it was made, as a closure does', () => {
+      expect(inst.eval('f = x => x + t; t = 5; map([1, 2], f)')).toEqual([6, 7])
+    })
+    it('keeps its own locals when the expression is evaluated again inside it', () => {
+      const expr = inst.compile('y = v; h(x => x + y)')
+      let saved
+      inst.addFunction('h', (fn) => {
+        if (!saved) {
+          saved = fn
+          return expr.eval({ v: 100 })
+        }
+        return saved(1)
+      })
+      expect(expr.eval({ v: 1 })).toBe(2)
+    })
     it('can itself be assigned, at the top level', () => {
       const context = { xs: [1, 2] }
       expect(

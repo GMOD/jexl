@@ -12,8 +12,7 @@ export type PathKey = string | number
  * each literal key in `path`. `dynamic` means a computed key followed, so the
  * read reaches somewhere under `path` that only evaluation can name.
  *
- * A dot and a bracket both add a key, though at runtime `a.b` on an array reads
- * `a[0].b`.
+ * A dot and a bracket both add a key.
  */
 export interface Read {
   root: string

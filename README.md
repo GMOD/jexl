@@ -12,6 +12,9 @@ Major changes include
 - Added lambdas and collection functions (`any(xs, x => x > 1)`)
 - Added host hooks for member and name resolution
 - Added `analyze()`, which reports what an expression reads without running it
+- Added `check()`, which checks an expression against a host's fields and
+  functions, and `print()`, which renders a parsed expression back to text
+- Added bcftools-style list operators, regex matching (`~`) and aggregates
 
 ## Quick Examples
 
@@ -191,14 +194,14 @@ A name chained off an array reads the array itself, so `exes.length` is 3 and
 Call functions in expressions:
 
 ```javascript
-jexl.addFunction('min', Math.min)
-jexl.addFunction('max', Math.max)
+jexl.addFunction('log10', Math.log10)
+jexl.addFunction('round', Math.round)
 
-jexl.eval('min(5, 2, 9)')
-// 2
+jexl.eval('round(log10(1234))')
+// 3
 
-jexl.eval('max(temperature, threshold)')
-// evaluates with context
+jexl.eval('-log10(pvalue) > threshold', { pvalue: 1e-9, threshold: 8 })
+// true
 ```
 
 Functions live in one global pool and have no receiver, so a call written
@@ -281,15 +284,14 @@ jexl.addFunction('lower', (str) => str.toLowerCase())
 
 // Add multiple functions
 jexl.addFunctions({
-  min: Math.min,
-  max: Math.max,
-  abs: Math.abs
+  abs: Math.abs,
+  sqrt: Math.sqrt
 })
 
 // Use in expressions
 jexl.eval('round(3.7)') // 4
 jexl.eval('lower(name)', { name: 'HELLO' }) // "hello"
-jexl.eval('max(1, 5, 3)') // 5
+jexl.eval('sqrt(abs(-16))') // 4
 ```
 
 ### Adding Custom Operators
@@ -305,9 +307,9 @@ jexl.addBinaryOp(
 jexl.eval('"Hello" ~= "hello"') // true
 
 // Add a unary operator
-jexl.addUnaryOp('~', (right) => Math.floor(right))
+jexl.addUnaryOp('#', (right) => Math.floor(right))
 
-jexl.eval('~3.7') // 3
+jexl.eval('#3.7') // 3
 ```
 
 ### Resolving Names Through the Host

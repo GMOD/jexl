@@ -27,8 +27,24 @@ export function anyPair(
   return Array.isArray(left)
     ? left.some((l) => anyPair(test, l, right))
     : Array.isArray(right)
-      ? right.some((r) => test(left, r))
+      ? right.some((r) => anyPair(test, left, r))
       : test(left, right)
+}
+
+function hasText(value: JexlValue) {
+  return (
+    typeof value === 'string' ||
+    (Array.isArray(value) && value.some((item) => typeof item === 'string'))
+  )
+}
+
+/**
+ * Whether `+` pairs its operands value by value: only when a list is involved
+ * and neither side holds text, so `REF + '>' + ALT` still joins as JavaScript
+ * joins, `'A>T,C'`, while `DP + 1` adds.
+ */
+export function addsPairwise(left: JexlValue, right: JexlValue) {
+  return isList(left, right) && !hasText(left) && !hasText(right)
 }
 
 /**
@@ -68,9 +84,13 @@ const MAX_PATTERNS = 1000
 function regex(pattern: string) {
   let re = patterns.get(pattern)
   if (!re) {
-    re = pattern.startsWith('(?i)')
-      ? new RegExp(pattern.slice(4), 'i')
-      : new RegExp(pattern)
+    try {
+      re = pattern.startsWith('(?i)')
+        ? new RegExp(pattern.slice(4), 'i')
+        : new RegExp(pattern)
+    } catch {
+      throw new Error(`Invalid regular expression: ${pattern}`)
+    }
     if (patterns.size >= MAX_PATTERNS) {
       patterns.clear()
     }
@@ -121,9 +141,11 @@ export function isIn(left: JexlValue, right: JexlValue): boolean {
   if (
     typeof right === 'object' &&
     right !== null &&
-    (typeof left === 'string' || typeof left === 'number')
+    (typeof left === 'string' ||
+      typeof left === 'number' ||
+      typeof left === 'boolean')
   ) {
-    return Object.hasOwn(right, left)
+    return Object.hasOwn(right, String(left))
   }
   return false
 }

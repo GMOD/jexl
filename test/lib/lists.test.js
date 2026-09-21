@@ -90,6 +90,9 @@ describe('list operands', () => {
       const lengths = new Map([['chr1', 248956422]])
       expect(inst.eval("'chr1' in lengths", { lengths })).toBe(true)
     })
+    it('looks up a boolean as its key text', () => {
+      expect(inst.eval('true in o', { o: { true: 1 } })).toBe(true)
+    })
     it('still finds a substring and a list member', () => {
       expect(inst.eval('"a" in "abc"')).toBe(true)
       expect(inst.eval('missing in "abc"')).toBe(false)
@@ -135,8 +138,29 @@ describe('list operands', () => {
         false
       )
     })
+    it('names a pattern that is not a regular expression', () => {
+      expect(() => inst.eval('x ~ p', { x: 'a', p: '(' })).toThrow(
+        'Invalid regular expression: ('
+      )
+    })
     it('binds like a comparison', () => {
       expect(inst.eval("a ~ 'x' && b ~ 'y'", { a: 'x', b: 'y' })).toBe(true)
+    })
+  })
+
+  describe('nested lists', () => {
+    it('compare the same from either side', () => {
+      const context = { a: [[2, 3]] }
+      expect(inst.eval('a > 1', context)).toBe(inst.eval('1 < a', context))
+      expect(inst.eval('a == 2', context)).toBe(inst.eval('2 == a', context))
+    })
+  })
+
+  describe('missing values', () => {
+    it('order against nothing, as bcftools skips them', () => {
+      expect(inst.eval('xs < 0.05', { xs: [null, 0.2] })).toBe(false)
+      expect(inst.eval('null < 1')).toBe(false)
+      expect(inst.eval('missing >= 0')).toBe(false)
     })
   })
 
@@ -158,6 +182,11 @@ describe('list operands', () => {
     })
     it('has no answer for lists of two other lengths', () => {
       expect(inst.eval('[1, 2] + [1, 2, 3]')).toBeUndefined()
+    })
+    it('joins text as JavaScript does rather than pairing it', () => {
+      const context = { REF: 'A', ALT: ['T', 'C'] }
+      expect(inst.eval("REF + '>' + ALT", context)).toBe('A>T,C')
+      expect(inst.eval("'Alleles: ' + ALT", context)).toBe('Alleles: T,C')
     })
     it('leaves arithmetic on single values as it was', () => {
       expect(inst.eval('"chr" + 1')).toBe('chr1')
@@ -187,6 +216,18 @@ describe('list operands', () => {
       expect(inst.eval('min(xs)', context)).toBe(1)
       expect(inst.eval('max(3, 9, 2)')).toBe(9)
       expect(inst.eval('max(xs, 7)', context)).toBe(7)
+    })
+    it('reads the values of an object, a Map or a Set', () => {
+      const samples = { NA1: { GQ: 99 }, NA2: { GQ: 20 } }
+      expect(inst.eval('count(samples, s => s.GQ > 90)', { samples })).toBe(1)
+      expect(inst.eval('mean(samples, s => s.GQ)', { samples })).toBe(59.5)
+      expect(inst.eval('sum(xs)', { xs: new Set([1, 2]) })).toBe(3)
+      expect(inst.eval('max(xs)', { xs: new Map([['a', 4]]) })).toBe(4)
+    })
+    it('refuses values beside a lambda', () => {
+      expect(() => inst.eval('max(1, 2, x => x)')).toThrow(
+        /a list and a lambda/
+      )
     })
     it('reads each value through a lambda', () => {
       const samples = [

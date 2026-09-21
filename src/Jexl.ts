@@ -89,6 +89,10 @@ class Jexl {
     fn: UncheckedFn | BinaryOpEvalOnDemand,
     manualEval?: boolean
   ) {
+    // replacing `-` keeps its prefix form, which is a separate operation
+    const previous = this._grammar.elements[operator]
+    const unaryEval =
+      previous?.type === 'binaryOp' ? previous.unaryEval : undefined
     // the overloads above pair `fn` with `manualEval`; the implementation
     // signature can't express that correlation, hence the assertions
     this._addGrammarElement(
@@ -97,12 +101,14 @@ class Jexl {
         ? {
             type: 'binaryOp',
             precedence,
-            evalOnDemand: fn as BinaryOpEvalOnDemand
+            evalOnDemand: fn as BinaryOpEvalOnDemand,
+            unaryEval
           }
         : {
             type: 'binaryOp',
             precedence,
-            eval: fn as unknown as BinaryOpEval
+            eval: fn as unknown as BinaryOpEval,
+            unaryEval
           }
     )
   }

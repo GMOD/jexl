@@ -3,6 +3,8 @@
  * Copyright 2020 Tom Shawver
  */
 
+import { JexlSyntaxError } from './errors.ts'
+
 import type { Grammar } from './grammar.ts'
 import type { TemplatePart, Token } from './types.ts'
 
@@ -117,6 +119,7 @@ class Lexer {
     // 1") accumulates on the minus rather than on the token before it, which
     // is what lets the parser's error messages quote the expression verbatim.
     let pendingMinus: Token | undefined
+    let offset = 0
     for (const element of elements) {
       if (this._isWhitespace(element)) {
         const last = pendingMinus ?? tokens.at(-1)
@@ -133,18 +136,19 @@ class Lexer {
       } else if (pendingMinus) {
         if (numericRegex.exec(element)) {
           // fold the sign into the number, so "-1" stays a single literal
-          const token = this._createToken('-' + element)
+          const token = this._createToken('-' + element, offset)
           token.raw = pendingMinus.raw + element
           tokens.push(token)
         } else {
           // anything else gets a standalone prefix operator, letting "-x",
           // "-(a + b)" and "-foo.bar" negate a computed value
-          tokens.push(pendingMinus, this._createToken(element))
+          tokens.push(pendingMinus, this._createToken(element, offset))
         }
         pendingMinus = undefined
       } else {
-        tokens.push(this._createToken(element))
+        tokens.push(this._createToken(element, offset))
       }
+      offset += element.length
     }
     // Catch a - at the end of the string. Let the parser handle that issue.
     if (pendingMinus) {
@@ -195,7 +199,7 @@ class Lexer {
    * @throws {Error} if the provided string is not a valid expression element.
    * @private
    */
-  _createToken(element: string): Token {
+  _createToken(element: string, offset = 0): Token {
     const token: Token = {
       type: 'literal',
       value: element,
@@ -203,7 +207,7 @@ class Lexer {
     }
     if (element.startsWith('`')) {
       token.type = 'templateString'
-      token.value = this._parseTemplateString(element)
+      token.value = this._parseTemplateString(element, offset)
       return token
     } else if (element.startsWith('"') || element.startsWith("'")) {
       token.value = this._unquote(element)
@@ -218,7 +222,7 @@ class Lexer {
     } else if (identRegex.exec(element)) {
       token.type = 'identifier'
     } else {
-      throw new Error(`Invalid expression token: ${element}`)
+      throw new JexlSyntaxError(`Invalid expression token: ${element}`, offset)
     }
     return token
   }
@@ -311,7 +315,7 @@ class Lexer {
       .replaceAll(escEscRegex, '\\')
   }
 
-  _parseTemplateString(str: string) {
+  _parseTemplateString(str: string, offset = 0) {
     const parts: TemplatePart[] = []
     let current = 1
     let staticStart = 1
@@ -359,7 +363,10 @@ class Lexer {
         }
 
         if (braceDepth !== 0) {
-          throw new Error(`Unclosed interpolation in template string: ${str}`)
+          throw new JexlSyntaxError(
+            `Unclosed interpolation in template string: ${str}`,
+            offset + interpStart - '${'.length
+          )
         }
 
         parts.push({

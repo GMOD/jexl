@@ -35,7 +35,8 @@ expression what it reads.
 - **Arithmetic pairs lists value by value.** `AC / AN` gives each allele's
   frequency, and a list of one, or a single value, pairs with every value of
   the other side, so `feature.INFO.DP + 1` is `[26]` where it was the text
-  `'251'`. Lists of two other lengths yield `undefined`.
+  `'251'`. Lists of two other lengths yield `undefined`. Text still joins as
+  JavaScript joins it, so `REF + '>' + ALT` is `'A>T,C'`.
 - **`=` only takes a bare name, and binds loosest of all.** `1 + x = 3` used to
   assign `x` and return 4; `!x = 1`, `a < b = c` and the like did the same. Each
   is now a syntax error. A host operator registered at precedence 2 or below now
@@ -59,11 +60,19 @@ expression what it reads.
   evaluated to `undefined`; `1 + ()`, `a[]` and `{a: }` threw a `TypeError`.
 - **`;` separates statements only at the top level and inside parentheses.**
   `f(a; b)`, `[a; b]` and `c ? a; b : d` are syntax errors.
-- **`=>` and `??` are tokens.** Each already failed to parse as two tokens.
+- **`=>`, `??`, `~` and `!~` are tokens.** `=>` and `??` already failed to
+  parse as two tokens. A host that registered `~` as an operator replaces the
+  regex match, and `!~x` now reads as the `!~` operator.
 - **The function pool starts with `any`, `all`, `count`, `map`, `filter`,
-  `find`, `sort` and `reduce`.** A host function of the same name replaces one.
+  `find`, `sort`, `reduce`, `sum`, `mean`, `median`, `min` and `max`.** A host
+  function of the same name replaces one: registering `Math.min` as `min`, as
+  JBrowse does, loses the list-aware version, so `min(DV / DP)` gives `NaN`.
+- **`<`, `<=`, `>` and `>=` are false against a missing value.** JavaScript
+  reads `null` as 0, so `null < 1` was true and `[null, 0.2] < 0.05` held for a
+  record whose first value was missing; as in bcftools, a missing value now
+  orders against nothing.
 - **Parse errors are `JexlSyntaxError`**, a subclass of `Error` whose `name` is
-  `'JexlSyntaxError'`. Every message keeps its wording. The assignment error now
+  `'JexlSyntaxError'`, from the lexer as well as the parser. Every message keeps its wording. The assignment error now
   quotes the expression up to the `=`, as the others already did.
 - **Types**: `JexlValue` includes `JexlFunction`, the type of a lambda's value,
   and `Literal.value` includes `null`. `AstNodeUnion` includes `Lambda`.
@@ -117,6 +126,8 @@ expression what it reads.
   entries and was false for every real record. A leading `(?i)` ignores case.
 - **`sum`, `mean`, `median`, `min` and `max` aggregate a list**, through an
   optional lambda, skipping missing values and counting a boolean as 1 or 0.
+  Every collection function reads a Set, a Map or a plain object, such as
+  samples keyed by name, as a list of its values.
   With `count` they cover bcftools' `SUM`, `AVG`, `MEDIAN`, `MIN`, `MAX`,
   `N_PASS` and `F_PASS`: `mean(samples, s => s.GQ > 90)` is `F_PASS(GQ>90)`.
   `min` and `max` also take several values, as `Math.min` does.

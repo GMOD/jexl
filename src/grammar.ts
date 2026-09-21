@@ -6,7 +6,14 @@
 /* eslint eqeqeq:0 */
 
 import { collectionFunctions } from './collections.ts'
-import { anyPair, isIn, isList, matches, pairwise } from './operators.ts'
+import {
+  addsPairwise,
+  anyPair,
+  isIn,
+  isList,
+  matches,
+  pairwise
+} from './operators.ts'
 
 import type { JexlValue } from './types.ts'
 
@@ -122,14 +129,16 @@ const modulo = (left: JexlValue, right: JexlValue) =>
 const power = (left: JexlValue, right: JexlValue) =>
   (left as number) ** (right as number)
 const loose = (left: JexlValue, right: JexlValue) => left == right
+// a missing value orders against nothing, as bcftools skips one; JavaScript
+// alone would read null as 0, making [null, 0.2] < 0.05 true
 const greater = (left: JexlValue, right: JexlValue) =>
-  (left as number) > (right as number)
+  left != null && right != null && (left as number) > (right as number)
 const atLeast = (left: JexlValue, right: JexlValue) =>
-  (left as number) >= (right as number)
+  left != null && right != null && (left as number) >= (right as number)
 const less = (left: JexlValue, right: JexlValue) =>
-  (left as number) < (right as number)
+  left != null && right != null && (left as number) < (right as number)
 const atMost = (left: JexlValue, right: JexlValue) =>
-  (left as number) <= (right as number)
+  left != null && right != null && (left as number) <= (right as number)
 const equals = (left: JexlValue, right: JexlValue) =>
   isList(left, right) ? anyPair(loose, left, right) : left == right
 
@@ -156,7 +165,9 @@ export const getGrammar = (): Grammar => ({
       type: 'binaryOp',
       precedence: 30,
       eval: (left, right) =>
-        isList(left, right) ? pairwise(plus, left, right) : plus(left, right)
+        addsPairwise(left, right)
+          ? pairwise(plus, left, right)
+          : plus(left, right)
     },
     '-': {
       type: 'binaryOp',

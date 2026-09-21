@@ -9,13 +9,29 @@ import type { JexlFunction, JexlValue } from './types.ts'
 /**
  * A list as these functions read it. A lone value is a list of one and a
  * missing one is empty, so that a field which is sometimes a scalar and
- * sometimes an array, as VCF INFO fields are, needs no special case.
+ * sometimes an array, as VCF INFO fields are, needs no special case. A Set,
+ * a Map or a plain object, such as samples keyed by name, gives its values.
  */
 function toList(value: JexlValue): JexlValue[] {
   if (value == null) {
     return []
   }
-  return Array.isArray(value) ? value : [value]
+  if (Array.isArray(value)) {
+    return value
+  }
+  const held = value as unknown
+  if (held instanceof Set || held instanceof Map) {
+    return [...(held.values() as Iterable<JexlValue>)]
+  }
+  return isPlainObject(value) ? Object.values(value) : [value]
+}
+
+function isPlainObject(value: JexlValue): value is Record<string, JexlValue> {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+  const proto = Object.getPrototypeOf(value) as unknown
+  return proto === Object.prototype || proto === null
 }
 
 const identity = (value: JexlValue) => value
@@ -57,9 +73,13 @@ function numbers(name: string, list: JexlValue, fn: JexlValue) {
  */
 function extremes(name: string, args: JexlValue[]) {
   const last = args.at(-1)
-  return typeof last === 'function'
-    ? numbers(name, args[0], last)
-    : numbers(name, args.flat(), undefined)
+  if (typeof last !== 'function') {
+    return numbers(name, args.flatMap(toList), undefined)
+  }
+  if (args.length > 2) {
+    throw new TypeError(`${name}() takes a list and a lambda, or values`)
+  }
+  return numbers(name, args[0], last)
 }
 
 function sum(values: number[]) {

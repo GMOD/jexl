@@ -120,21 +120,27 @@ interface Locals {
 
 /**
  * One call of a lambda. A name the lambda binds reads from `args`, a name bound
- * by a lambda around it from `outer`, and any other name from `context`.
+ * by a lambda around it from `outer`, a name the expression assigns from
+ * `locals` — the evaluation's own, captured when the lambda was made, so a
+ * lambda called after its evaluation ends still sees them — and any other name
+ * from `context`.
  */
 class LambdaFrame {
   args: JexlValue[]
   outer: LambdaFrame | undefined
   context: Context
+  locals: unknown[] | undefined
 
   constructor(
     args: JexlValue[],
     outer: LambdaFrame | undefined,
-    context: Context
+    context: Context,
+    locals: unknown[] | undefined
   ) {
     this.args = args
     this.outer = outer
     this.context = context
+    this.locals = locals
   }
 }
 
@@ -176,6 +182,12 @@ function compileName(
   const slot = scope.locals?.slots.get(name)
   if (slot === undefined) {
     return fromContext
+  }
+  if (scope.params) {
+    return (env) => {
+      const local = asFrame(env).locals![slot]
+      return local === unassigned ? fromContext(env) : (local as JexlValue)
+    }
   }
   const { frame } = scope.locals!
   return (env) => {
@@ -263,23 +275,30 @@ function assignedNames(ast: AstNode | undefined, names = new Set<string>()) {
 }
 
 /**
- * Compiles a whole expression. Each name it assigns gets a slot, numbered at
- * compile time, in a frame that lasts one evaluation, so an assignment never
- * touches the context and a context reused from one evaluation to the next
- * comes back unchanged. A name reads its slot once assigned, and resolves as
- * usual until then. An expression that assigns nothing gets no frame.
+ * Lowers an expression tree into a tree of closures, resolving each node's type
+ * and its operator's implementation once, at compile time, rather than
+ * re-dispatching on `node.type` for every node on every evaluation. An
+ * expression compiled once and evaluated per-item — the usual shape for
+ * per-feature config callbacks — pays the dispatch cost once instead of N
+ * times.
  *
- * The frame is not a layer over the context via `Object.create`: V8 gives
- * every object used as a prototype a map of its own, which made evaluating
- * against a context built per evaluation six times slower.
+ * Operators are bound here, so a grammar change after compilation requires
+ * recompiling. Functions are looked up per call, since they are commonly
+ * registered after an expression has been compiled.
+ *
+ * Each name the expression assigns gets a slot, numbered at compile time, in a
+ * frame that lasts one evaluation, so an assignment never touches the context
+ * and a context reused from one evaluation to the next comes back unchanged. A
+ * name reads its slot once assigned, and resolves as usual until then. An
+ * expression that assigns nothing gets no frame. The frame is not a layer over
+ * the context via `Object.create`: V8 gives every object used as a prototype a
+ * map of its own, which made evaluating against a context built per evaluation
+ * six times slower.
  */
-export function compileExpression(
-  ast: AstNode,
-  grammar: Grammar
-): CompiledNode {
+export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
   const names = [...assignedNames(ast)]
   if (names.length === 0) {
-    return compileAst(ast, grammar)
+    return compileNode(ast, grammar, {})
   }
   const slots = new Map(names.map((name, i) => [name, i]))
   const empty = names.map(() => unassigned)
@@ -311,23 +330,6 @@ function stringify(value: JexlValue) {
     return String(value)
   }
   return JSON.stringify(value)
-}
-
-/**
- * Lowers an expression tree into a tree of closures, resolving each node's type
- * and its operator's implementation once, at compile time, rather than
- * re-dispatching on `node.type` for every node on every evaluation. An
- * expression compiled once and evaluated per-item — the usual shape for
- * per-feature config callbacks — pays the dispatch cost once instead of N
- * times.
- *
- * Operators are bound here, so a grammar change after compilation requires
- * recompiling. Functions are looked up per call, since they are commonly
- * registered after an expression has been compiled. Assignments compiled here
- * write into the context; {@link compileExpression} keeps them out of it.
- */
-export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
-  return compileNode(ast, grammar, {})
 }
 
 function compileNode(
@@ -549,19 +551,10 @@ function compileNode(
       if (scope.params) {
         throw new Error('Assignment is not supported in a lambda')
       }
-      const name = node.left.value
       const right = compile(node.right!)
-      if (scope.locals) {
-        const slot = scope.locals.slots.get(name)!
-        const { frame } = scope.locals
-        return (ctx) => (frame.locals[slot] = right(ctx))
-      }
-      const store = name === '__proto__' ? defineOwn : assignOwn
-      return (ctx) => {
-        const value = right(ctx)
-        store(ctx, name, value)
-        return value
-      }
+      const { slots, frame } = scope.locals!
+      const slot = slots.get(node.left.value)!
+      return (ctx) => (frame.locals[slot] = right(ctx))
     }
 
     case 'Lambda': {
@@ -570,14 +563,19 @@ function compileNode(
         params: { names: node.params, outer: scope.params }
       })
       if (!scope.params) {
-        return (ctx): JexlFunction =>
-          (...args) =>
-            body(asContext(new LambdaFrame(args, undefined, ctx)))
+        const frame = scope.locals?.frame
+        return (ctx): JexlFunction => {
+          const locals = frame?.locals
+          return (...args) =>
+            body(asContext(new LambdaFrame(args, undefined, ctx, locals)))
+        }
       }
       return (env): JexlFunction => {
         const outer = asFrame(env)
         return (...args) =>
-          body(asContext(new LambdaFrame(args, outer, outer.context)))
+          body(
+            asContext(new LambdaFrame(args, outer, outer.context, outer.locals))
+          )
       }
     }
 

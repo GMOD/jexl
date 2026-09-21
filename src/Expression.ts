@@ -6,7 +6,7 @@
 import Lexer from './Lexer.ts'
 import { analyze } from './analyze.ts'
 import { check } from './check.ts'
-import { compileExpression } from './evaluator/compile.ts'
+import { compileAst } from './evaluator/compile.ts'
 import Parser from './parser/Parser.ts'
 
 import type { AnalyzeOptions } from './analyze.ts'
@@ -51,7 +51,7 @@ class Expression {
   compile() {
     this._ast = new Parser(this._grammar, this._lexer).parse(this._exprStr)
     // lower the tree to closures once, here, so that eval() is just a call
-    this._fn = this._ast ? compileExpression(this._ast, this._grammar) : null
+    this._fn = this._ast ? compileAst(this._ast, this._grammar) : null
     this._compiled = true
     return this
   }

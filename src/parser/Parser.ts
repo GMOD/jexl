@@ -3,6 +3,8 @@
  * Copyright 2020 Tom Shawver
  */
 
+import { JexlSyntaxError } from '../errors.ts'
+
 import type Lexer from '../Lexer.ts'
 import type { Grammar } from '../grammar.ts'
 import type {
@@ -27,16 +29,7 @@ const omittedAlternateBefore = new Set([
   'semicolon'
 ])
 
-/** A malformed expression. `offset` is where in the source the parser gave up. */
-export class JexlSyntaxError extends Error {
-  offset: number
-
-  constructor(message: string, offset: number) {
-    super(message)
-    this.name = 'JexlSyntaxError'
-    this.offset = offset
-  }
-}
+export { JexlSyntaxError } from '../errors.ts'
 
 /**
  * Converts the tokens from the {@link Lexer} into an Abstract Syntax Tree, for
@@ -65,8 +58,16 @@ class Parser {
   }
 
   parse(source: string) {
+    const start = this._offset
     this._offset += source.length - source.trimStart().length
-    this.addTokens(this._lexer.tokenize(source))
+    try {
+      this.addTokens(this._lexer.tokenize(source))
+    } catch (error) {
+      if (error instanceof JexlSyntaxError) {
+        error.offset += start
+      }
+      throw error
+    }
     return this.complete()
   }
 

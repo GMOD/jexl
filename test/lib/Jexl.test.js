@@ -143,6 +143,35 @@ describe('Jexl', () => {
       expect(inst.eval('~5.7 + 5')).toBe(10)
     })
   })
+  describe('replacing an operator', () => {
+    it('keeps the prefix form of -', () => {
+      inst.addBinaryOp('-', 30, (a, b) => a - b - 1)
+      expect(inst.eval('5 - 2')).toBe(2)
+      expect(inst.eval('-x', { x: 3 })).toBe(-3)
+    })
+  })
+  describe('syntax errors', () => {
+    it('come from the lexer with the offset of the bad token', () => {
+      let error
+      try {
+        inst.compile('a + b # c')
+      } catch (e) {
+        error = e
+      }
+      expect(error.name).toBe('JexlSyntaxError')
+      expect(error.offset).toBe(6)
+    })
+    it('point into an unclosed interpolation', () => {
+      let error
+      try {
+        inst.compile('x + `ab${c`')
+      } catch (e) {
+        error = e
+      }
+      expect(error.name).toBe('JexlSyntaxError')
+      expect(error.offset).toBe(7)
+    })
+  })
   describe('removeOp', () => {
     it('allows binaryOps to be removed', () => {
       inst.removeOp('+')
