@@ -66,8 +66,54 @@ function isKeyPart(
   )
 }
 
+/**
+ * Reads `name` off an identifier's subject. A null subject answers undefined,
+ * and an array subject is read through its first element.
+ */
+export function readMember(subject: JexlValue, name: string): JexlValue {
+  if (subject == null) {
+    return undefined
+  }
+  const target = Array.isArray(subject) ? subject[0] : subject
+  return target == null ? undefined : (target as Context)[name]
+}
+
+/**
+ * Reads a bracket index off its subject.
+ *
+ * A value with a meaningful string form is indexed by it, which is what JS
+ * does and what this did until the evaluator was lowered to closures — the
+ * tree-walking version was a bare `subject?.[index]`. Answering `undefined`
+ * for everything else reads as a deliberate strictness and is not: nothing
+ * wanted it, and the shape it rejects is common.
+ *
+ * That shape is a one-element array. Every `@gmod/vcf` INFO value is a list —
+ * `Number=1` included, so `CLNSIG=Pathogenic` parses to `['Pathogenic']` — and
+ * the natural way to colour by one is a lookup table indexed by it. The miss is
+ * silent, because such an expression always carries a `|| fallback` for the
+ * values it has no entry for, and that fallback then answers for every record.
+ *
+ * A multi-valued list still misses — `['a','b']` is the key 'a,b' — which is
+ * the honest answer rather than a lucky one: reading through to the first
+ * element would be the index guessing which value was meant.
+ * {@link readMember} does read through a one-element array, but it is
+ * navigating rather than selecting, so it has nothing to guess.
+ */
+export function readIndex(subject: JexlValue, index: JexlValue): JexlValue {
+  if (subject == null) {
+    return undefined
+  }
+  if (typeof index === 'string' || typeof index === 'number') {
+    return (subject as Record<string | number, JexlValue>)[index]
+  }
+  const key = indexKey(index)
+  return key === undefined
+    ? undefined
+    : (subject as Record<string, JexlValue>)[key]
+}
+
 /** Renders an interpolated value for a template literal. */
-function stringify(value: JexlValue) {
+export function stringify(value: JexlValue) {
   if (value == null) {
     return ''
   }
@@ -116,15 +162,7 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
         return (ctx) => ctx[name]
       }
       const from = compileAst(node.from, grammar)
-      return (ctx) => {
-        const subject = from(ctx)
-        if (subject == null) {
-          return undefined
-        }
-        // an identifier chained off an array reads through its first element
-        const target = Array.isArray(subject) ? subject[0] : subject
-        return target == null ? undefined : (target as Context)[name]
-      }
+      return (ctx) => readMember(from(ctx), name)
     }
 
     case 'BinaryExpression': {
@@ -194,38 +232,7 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     case 'FilterExpression': {
       const subject = compileAst(node.subject, grammar)
       const index = compileAst(node.expr, grammar)
-      return (ctx) => {
-        const subjectVal = subject(ctx)
-        const indexVal = index(ctx)
-        if (subjectVal == null) {
-          return undefined
-        }
-        if (typeof indexVal === 'string' || typeof indexVal === 'number') {
-          return (subjectVal as Record<string | number, JexlValue>)[indexVal]
-        }
-        // A value with a meaningful string form is indexed by it, which is what
-        // JS does and what this did until the evaluator was lowered to closures
-        // — the tree-walking version was a bare `subject?.[index]`. Answering
-        // `undefined` for everything else reads as a deliberate strictness and
-        // is not: nothing wanted it, and the shape it rejects is common.
-        //
-        // That shape is a one-element array. Every `@gmod/vcf` INFO value is a
-        // list — `Number=1` included, so `CLNSIG=Pathogenic` parses to
-        // `['Pathogenic']` — and the natural way to colour by one is a lookup
-        // table indexed by it. The miss is silent, because such an expression
-        // always carries a `|| fallback` for the values it has no entry for,
-        // and that fallback then answers for every record.
-        //
-        // A multi-valued list still misses — `['a','b']` is the key 'a,b' —
-        // which is the honest answer rather than a lucky one: reading through
-        // to the first element would be the index guessing which value was
-        // meant. `Identifier` above does read through a one-element array, but
-        // it is navigating rather than selecting, so it has nothing to guess.
-        const key = indexKey(indexVal)
-        return key === undefined
-          ? undefined
-          : (subjectVal as Record<string, JexlValue>)[key]
-      }
+      return (ctx) => readIndex(subject(ctx), index(ctx))
     }
 
     case 'ArrayLiteral': {

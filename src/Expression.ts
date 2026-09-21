@@ -4,9 +4,11 @@
  */
 
 import Lexer from './Lexer.ts'
+import { compileColumnar } from './evaluator/columnar.ts'
 import { compileAst } from './evaluator/compile.ts'
 import Parser from './parser/Parser.ts'
 
+import type { ColumnarOptions } from './evaluator/columnar.ts'
 import type { CompiledNode } from './evaluator/compile.ts'
 import type { Grammar } from './grammar.ts'
 import type { AstNode } from './types.ts'
@@ -71,6 +73,21 @@ class Expression {
       return undefined
     }
     return this._fn(context)
+  }
+
+  /**
+   * Lowers the expression to one evaluation over whole columns: a bare name
+   * reads the column of that name, `options.env` where no column carries it,
+   * and every row's answer is what {@link eval} gives for that row's values.
+   * @param {ColumnarOptions} [options] the environment behind the columns, and
+   *      the pronouns naming the row and the environment
+   * @returns {ColumnarFn} `(columns, n, out?) => values`
+   */
+  compileColumnar(options?: ColumnarOptions) {
+    if (!this._compiled) {
+      this.compile()
+    }
+    return compileColumnar(this._ast, this._grammar, options)
   }
 }
 

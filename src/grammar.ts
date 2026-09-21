@@ -91,6 +91,22 @@ export function precedenceOf(elem: GrammarElement | undefined) {
     : 0
 }
 
+/**
+ * The built-in `&&`. Exported so an evaluator can recognize it by identity
+ * and short-circuit a whole column at once; a grammar that replaces `&&` gets
+ * its replacement called per value instead.
+ */
+export const logicalAnd: BinaryOpEvalOnDemand = (left, right) => {
+  const leftVal = left.eval()
+  return leftVal ? right.eval() : leftVal
+}
+
+/** The built-in `||`, exported for the same reason as {@link logicalAnd}. */
+export const logicalOr: BinaryOpEvalOnDemand = (left, right) => {
+  const leftVal = left.eval()
+  return leftVal || right.eval()
+}
+
 export const getGrammar = (): Grammar => ({
   /**
    * A map of all expression elements to their properties. Note that changes
@@ -178,24 +194,12 @@ export const getGrammar = (): Grammar => ({
     '&&': {
       type: 'binaryOp',
       precedence: 10,
-      evalOnDemand: (left, right) => {
-        const leftVal = left.eval()
-        if (!leftVal) {
-          return leftVal
-        }
-        return right.eval()
-      }
+      evalOnDemand: logicalAnd
     },
     '||': {
       type: 'binaryOp',
       precedence: 10,
-      evalOnDemand: (left, right) => {
-        const leftVal = left.eval()
-        if (leftVal) {
-          return leftVal
-        }
-        return right.eval()
-      }
+      evalOnDemand: logicalOr
     },
     in: {
       type: 'binaryOp',
