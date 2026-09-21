@@ -124,7 +124,6 @@ describe('regressions', () => {
     it('still accepts closed groups and completable subexpressions', () => {
       expect(inst.eval('(1)')).toBe(1)
       expect(inst.eval('((1 + 2) * 3)')).toBe(9)
-      expect(inst.eval('()')).toBeUndefined()
       expect(inst.eval('1 ? 2 : 3')).toBe(2)
       expect(inst.eval('1 == 2 ? "yes" : ')).toBeUndefined()
     })
@@ -389,6 +388,56 @@ describe('regressions', () => {
       const context = {}
       expect(inst.eval('a = 5; a + 1', context)).toBe(6)
       expect(context).toEqual({ a: 5 })
+    })
+  })
+  describe('malformed input', () => {
+    it('rejects an empty slot with a syntax error rather than a TypeError', () => {
+      for (const expr of ['a[]', '1 + ()', '()', '{a: }', '(', '1; (']) {
+        expect(() => inst.compile(expr)).toThrow(/unexpected|Unexpected end/)
+      }
+    })
+    it('rejects an empty argument or element instead of dropping it', () => {
+      expect(() => inst.compile('f(1,,2)')).toThrow(/unexpected/)
+      expect(() => inst.compile('[1,,2]')).toThrow(/unexpected/)
+      expect(() => inst.compile('[,]')).toThrow(/unexpected/)
+    })
+    it('still accepts a trailing comma', () => {
+      inst.addFunction('f', (...args) => args)
+      expect(inst.eval('f(1, 2,)')).toEqual([1, 2])
+      expect(inst.eval('[1, 2,]')).toEqual([1, 2])
+      expect(inst.eval('{a: 1,}')).toEqual({ a: 1 })
+    })
+    it('rejects an assignment whose target is an operand of another operator', () => {
+      // this assigned x and returned 1 + 3
+      const context = {}
+      expect(() => inst.eval('1 + x = 3', context)).toThrow(
+        /Left side of assignment must be a variable name/
+      )
+      expect(() => inst.eval('!x = 1', context)).toThrow(
+        /Left side of assignment must be a variable name/
+      )
+      expect(context).toEqual({})
+    })
+    it('keeps a parenthesized assignment out of a following ternary', () => {
+      // the ternary reached into the group and wrapped the assigned value
+      const context = { a: 0 }
+      expect(inst.eval('(x = a) ? "yes" : "no"', context)).toBe('no')
+      expect(context.x).toBe(0)
+    })
+    it('reads a property of a parenthesized prefix expression', () => {
+      // rejected as a relative path
+      inst.addUnaryOp('~', (n) => ({ n }))
+      expect(inst.eval('(~a).n', { a: 1 })).toBe(1)
+      expect(inst.eval('(-a).b', { a: 1 })).toBeUndefined()
+    })
+    it('continues a sequence with a group or literal after a ternary', () => {
+      expect(inst.eval('a ? 1 : 2; [3]', { a: 1 })).toEqual([3])
+      expect(inst.eval('a ? 1 : 2; (3)', { a: 1 })).toBe(3)
+      expect(inst.eval('a ? 1 : 2; {b: 3}', { a: 1 })).toEqual({ b: 3 })
+    })
+    it('names the call when the callee is not a name', () => {
+      expect(() => inst.compile('(a)(1)')).toThrow(/must be called by name/)
+      expect(() => inst.compile('f(1)(2)')).toThrow(/must be called by name/)
     })
   })
   describe('template strings', () => {

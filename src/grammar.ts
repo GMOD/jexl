@@ -52,9 +52,9 @@ export interface UnaryOp {
 
 /**
  * The punctuation elements of the grammar. Unlike operators these carry no
- * behavior of their own; the Parser's state machine gives them meaning. The
- * type is a literal union rather than `string` so that `GrammarElement` is a
- * discriminated union, letting operator properties be accessed without casts.
+ * behavior of their own; the Parser gives them meaning. The type is a literal
+ * union rather than `string` so that `GrammarElement` is a discriminated union,
+ * letting operator properties be accessed without casts.
  */
 export interface SimpleElement {
   type:
@@ -79,16 +79,6 @@ export type GrammarFn = (...args: JexlValue[]) => JexlValue
 export interface Grammar {
   elements: Record<string, GrammarElement>
   functions: Record<string, GrammarFn>
-}
-
-/**
- * Returns the binding power of a grammar element, or 0 for elements that
- * aren't operators and therefore don't participate in precedence.
- */
-export function precedenceOf(elem: GrammarElement | undefined) {
-  return elem && (elem.type === 'binaryOp' || elem.type === 'unaryOp')
-    ? elem.precedence
-    : 0
 }
 
 export const getGrammar = (): Grammar => ({

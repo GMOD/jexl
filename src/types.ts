@@ -25,7 +25,6 @@ export interface Token {
 
 export interface AstNode {
   type: string
-  _parent?: AstNode
   right?: AstNode
 }
 

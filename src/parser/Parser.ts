@@ -3,253 +3,328 @@
  * Copyright 2020 Tom Shawver
  */
 
-import * as handlers from './handlers.ts'
-import { states } from './states.ts'
-
 import type Lexer from '../Lexer.ts'
 import type { Grammar } from '../grammar.ts'
-import type { AstNode, SequenceExpression, Token } from '../types.ts'
+import type {
+  AstNode,
+  AstNodeUnion,
+  ConditionalExpression,
+  Literal,
+  ObjectLiteral,
+  TemplateLiteral,
+  TemplatePart,
+  Token
+} from '../types.ts'
+
+const omittedAlternateBefore = new Set([
+  'closeParen',
+  'closeBracket',
+  'closeCurl',
+  'comma',
+  'semicolon'
+])
 
 /**
- * The handler to run for a token type when the state it appears in doesn't
- * name one of its own. Token types absent here — the brackets, parens and
- * separators — carry no behavior beyond the state transition the state machine
- * gives them.
- */
-const tokenHandlers: Record<
-  string,
-  ((this: Parser, token: Token) => void) | undefined
-> = {
-  binaryOp: handlers.binaryOp,
-  dot: handlers.dot,
-  identifier: handlers.identifier,
-  literal: handlers.literal,
-  semicolon: handlers.semicolon,
-  templateString: handlers.templateString,
-  unaryOp: handlers.unaryOp
-}
-
-/**
- * The Parser is a state machine that converts tokens from the {@link Lexer}
- * into an Abstract Syntax Tree (AST), capable of being evaluated in any
- * context by {@link compileAst}.  The Parser expects that all tokens
- * provided to it are legal and typed properly according to the grammar, but
- * accepts that the tokens may still be in an invalid order or in some other
- * unparsable configuration that requires it to throw an Error.
- * @param {{}} grammar The grammar object to use to parse Jexl strings
- * @param {string} [prefix] A string prefix to prepend to the expression string
- *      for error messaging purposes.  This is useful for when a new Parser is
- *      instantiated to parse an subexpression, as the parent Parser's
- *      expression string thus far can be passed for a more user-friendly
- *      error message.
- * @param {{}} [stopMap] A mapping of token types to any truthy value. When the
- *      token type is encountered, the parser will return the mapped value
- *      instead of boolean false.
+ * Converts the tokens from the {@link Lexer} into an Abstract Syntax Tree, for
+ * {@link compileAst} to lower to closures. A Pratt parser: each level of the
+ * grammar is a method, from `_sequence` (loosest) down to `_primary`, and
+ * binary operators are climbed by the precedence the grammar gives them, so
+ * operators a host registers slot in without the parser knowing them.
  */
 class Parser {
   _grammar: Grammar
   _lexer: Lexer
-  _state: string
-  _tree: AstNode | null
-  _exprStr: string
-  _stopMap: Record<string, string>
-  _cursor?: AstNode | null
-  _subParser?: Parser
-  _parentStop?: boolean
-  _nextIdentEncapsulate?: boolean
-  _curObjKey?: string
-  _sequenceExpressions?: AstNode[]
+  _tokens: Token[] = []
+  _pos = 0
 
-  constructor(
-    grammar: Grammar,
-    lexer: Lexer,
-    prefix?: string,
-    stopMap?: Record<string, string>
-  ) {
+  constructor(grammar: Grammar, lexer: Lexer) {
     this._grammar = grammar
     this._lexer = lexer
-    this._state = 'expectOperand'
-    this._tree = null
-    this._exprStr = prefix || ''
-    this._stopMap = stopMap || {}
+  }
+
+  parse(source: string) {
+    this.addTokens(this._lexer.tokenize(source))
+    return this.complete()
+  }
+
+  addTokens(tokens: Token[]) {
+    this._tokens = this._tokens.concat(tokens)
   }
 
   /**
-   * Processes a new token into the AST and manages the transitions of the state
-   * machine.
-   * @param {{type: <string>}} token A token object, as provided by the
-   *      {@link Lexer#tokenize} function.
-   * @throws {Error} if a token is added when the Parser has been marked as
-   *      complete by {@link #complete}, or if an unexpected token type is added.
-   * @returns {boolean|*} the stopState value if this parser encountered a token
-   *      in the stopState mapb false if tokens can continue.
+   * @returns the expression tree, or null for an expression with no tokens
+   * @throws {Error} if the tokens do not form exactly one expression
    */
-  addToken(token: Token): string | false {
-    if (this._state === 'complete') {
-      throw new Error('Cannot add a new token to a completed Parser')
+  complete(): AstNodeUnion | null {
+    if (this._tokens.length === 0) {
+      return null
     }
-    const state = states[this._state]!
-    const startExpr = this._exprStr
-    this._exprStr += token.raw
-    if (state.subHandler) {
-      const subParser = this._subParser ?? this._startSubExpression(startExpr)
-      const stopState = subParser.addToken(token)
-      if (stopState) {
-        this._endSubExpression()
-        if (stopState === '_semicolon') {
-          handlers.semicolon.call(this)
-        } else if (this._parentStop) {
-          return stopState
-        } else {
-          this._state = stopState
+    const ast = this._sequence()
+    if (this._pos < this._tokens.length) {
+      throw this._unexpected(this._pos)
+    }
+    return ast
+  }
+
+  _sequence(): AstNodeUnion {
+    const first = this._assignment()
+    if (this._peek()?.type !== 'semicolon') {
+      return first
+    }
+    const expressions: AstNode[] = [first]
+    while (this._eat('semicolon')) {
+      const next = this._peek()
+      if (!next || next.type === 'closeParen') {
+        break
+      }
+      expressions.push(this._assignment())
+    }
+    return { type: 'SequenceExpression', expressions }
+  }
+
+  _assignment(): AstNodeUnion {
+    const left = this._ternary()
+    const token = this._peek()
+    if (token?.type !== 'binaryOp' || token.value !== '=') {
+      return left
+    }
+    if (left.type !== 'Identifier' || left.from) {
+      throw new Error('Left side of assignment must be a variable name')
+    }
+    this._pos++
+    return {
+      type: 'AssignmentExpression',
+      operator: '=',
+      left,
+      right: this._assignment()
+    }
+  }
+
+  _ternary(): AstNodeUnion {
+    const test = this._binary(-Infinity)
+    if (!this._eat('question')) {
+      return test
+    }
+    const node: ConditionalExpression = { type: 'ConditionalExpression', test }
+    if (!this._eat('colon')) {
+      node.consequent = this._assignment()
+      this._expect('colon')
+    }
+    const next = this._peek()
+    if (next && !omittedAlternateBefore.has(next.type)) {
+      node.alternate = this._assignment()
+    }
+    return node
+  }
+
+  _binary(minPrecedence: number): AstNodeUnion {
+    let left = this._unary()
+    for (;;) {
+      const token = this._peek()
+      if (token?.type !== 'binaryOp' || token.value === '=') {
+        return left
+      }
+      const operator = token.value as string
+      const op = this._grammar.elements[operator]!
+      if (op.type !== 'binaryOp' || op.precedence <= minPrecedence) {
+        return left
+      }
+      this._pos++
+      left = {
+        type: 'BinaryExpression',
+        operator,
+        left,
+        right: this._binary(op.precedence)
+      }
+    }
+  }
+
+  _unary(): AstNodeUnion {
+    const token = this._peek()
+    if (token?.type !== 'unaryOp') {
+      return this._postfix(this._primary())
+    }
+    this._pos++
+    const operator = token.value as string
+    const op = this._grammar.elements[operator]
+    return {
+      type: 'UnaryExpression',
+      operator,
+      right: this._binary(op?.type === 'unaryOp' ? op.precedence : Infinity)
+    }
+  }
+
+  _postfix(subject: AstNodeUnion): AstNodeUnion {
+    let node = subject
+    for (;;) {
+      switch (this._peek()?.type) {
+        case 'dot': {
+          this._pos++
+          node = {
+            type: 'Identifier',
+            value: this._expect('identifier').value as string,
+            from: node
+          }
+          break
+        }
+        case 'openBracket': {
+          this._pos++
+          const expr = this._assignment()
+          this._expect('closeBracket')
+          node = { type: 'FilterExpression', expr, subject: node }
+          break
+        }
+        case 'openParen': {
+          if (
+            node.type !== 'Identifier' ||
+            this._tokens[this._pos - 1]!.type !== 'identifier'
+          ) {
+            throw this._error('Functions must be called by name', this._pos)
+          }
+          this._pos++
+          const { from, value } = node
+          const args = this._list('closeParen')
+          node = {
+            type: 'FunctionCall',
+            name: value,
+            args: from ? [from, ...args] : args
+          }
+          break
+        }
+        default: {
+          return node
         }
       }
-    } else if (token.type === 'semicolon' && this._stopMap[token.type]) {
-      return this._stopMap[token.type]!
-    } else if (state.tokenTypes?.[token.type]) {
-      const typeOpts = state.tokenTypes[token.type]!
-      // the state's own handler wins over the token type's default one, and a
-      // token type with neither only drives the transition below
-      const handleFunc = typeOpts.handler ?? tokenHandlers[token.type]
-      handleFunc?.call(this, token)
-      if (typeOpts.toState) {
-        this._state = typeOpts.toState
+    }
+  }
+
+  _primary(): AstNodeUnion {
+    const token = this._next()
+    switch (token.type) {
+      case 'literal': {
+        return {
+          type: 'Literal',
+          value: token.value as string | number | boolean
+        }
       }
-    } else if (this._stopMap[token.type]) {
-      return this._stopMap[token.type]!
-    } else {
-      throw new Error(
-        `Token ${token.raw} (${token.type}) unexpected in expression: ${this._exprStr}`
-      )
-    }
-    return false
-  }
-
-  /**
-   * Processes an array of tokens iteratively through the {@link #addToken}
-   * function.
-   * @param {Array<{type: <string>}>} tokens An array of tokens, as provided by
-   *      the {@link Lexer#tokenize} function.
-   */
-  addTokens(tokens: Token[]) {
-    for (const token of tokens) {
-      this.addToken(token)
-    }
-  }
-
-  /**
-   * Marks this Parser instance as completed and retrieves the full AST.
-   * @returns {{}|null} a full expression tree, ready for evaluation by the
-   *      {@link compileAst} function, or null if no tokens were passed to
-   *      the parser before complete was called
-   * @throws {Error} if the parser is not in a state where it's legal to end
-   *      the expression, indicating that the expression is incomplete
-   */
-  complete() {
-    // `_subParser` counts as unfinished business alongside `_cursor`: a group
-    // that opened before anything was placed in the tree, as in "(1", leaves
-    // the cursor null, and testing the cursor alone let the missing ")" pass
-    // silently and evaluate as if it were closed.
-    if (
-      (this._cursor || this._subParser) &&
-      !states[this._state]!.completable
-    ) {
-      throw new Error(`Unexpected end of expression: ${this._exprStr}`)
-    }
-    if (this._subParser) {
-      this._endSubExpression()
-    }
-
-    if (this._sequenceExpressions) {
-      if (this._tree) {
-        this._sequenceExpressions.push(this._tree)
+      case 'identifier': {
+        return { type: 'Identifier', value: token.value as string }
       }
-      const sequence: SequenceExpression = {
-        type: 'SequenceExpression',
-        expressions: this._sequenceExpressions
+      case 'templateString': {
+        return this._template(token.value as TemplatePart[])
       }
-      this._state = 'complete'
-      return sequence
+      case 'openParen': {
+        const node = this._sequence()
+        this._expect('closeParen')
+        return node
+      }
+      case 'openBracket': {
+        return { type: 'ArrayLiteral', value: this._list('closeBracket') }
+      }
+      case 'openCurl': {
+        return this._object()
+      }
+      case 'dot': {
+        throw this._error('Relative paths are not supported', this._pos - 1)
+      }
+      default: {
+        throw this._unexpected(this._pos - 1)
+      }
     }
-
-    this._state = 'complete'
-    return this._cursor ? this._tree : null
   }
 
-  /**
-   * Ends a subexpression by completing the subParser and passing its result
-   * to the subHandler configured in the current state.
-   * @private
-   */
-  _endSubExpression() {
-    states[this._state]!.subHandler!.call(this, this._subParser!.complete())
-    this._subParser = undefined
-  }
-
-  /**
-   * Places a new tree node at the current position of the cursor (to the 'right'
-   * property) and then advances the cursor to the new node. This function also
-   * handles setting the parent of the new node.
-   * @param {{type: <string>}} node A node to be added to the AST
-   * @private
-   */
-  _placeAtCursor(node: AstNode) {
-    if (!this._cursor) {
-      this._tree = node
-    } else {
-      this._cursor.right = node
-      this._setParent(node, this._cursor)
+  _list(close: string): AstNode[] {
+    const items: AstNode[] = []
+    while (!this._eat(close)) {
+      items.push(this._assignment())
+      if (!this._eat('comma')) {
+        this._expect(close)
+        break
+      }
     }
-    this._cursor = node
+    return items
   }
 
-  /**
-   * Places a tree node before the current position of the cursor, replacing
-   * the node that the cursor currently points to. This should only be called in
-   * cases where the cursor is known to exist, and the provided node already
-   * contains a pointer to what's at the cursor currently.
-   * @param {{type: <string>}} node A node to be added to the AST
-   * @private
-   */
-  _placeBeforeCursor(node: AstNode) {
-    this._cursor = this._cursor?._parent
-    this._placeAtCursor(node)
+  _object(): ObjectLiteral {
+    const node: ObjectLiteral = { type: 'ObjectLiteral', value: {} }
+    while (!this._eat('closeCurl')) {
+      const key = this._next()
+      if (key.type !== 'identifier' && key.type !== 'literal') {
+        throw this._unexpected(this._pos - 1)
+      }
+      this._expect('colon')
+      // defined rather than assigned, so that "__proto__" is an ordinary key
+      Object.defineProperty(node.value, String(key.value as Literal['value']), {
+        value: this._assignment(),
+        writable: true,
+        enumerable: true,
+        configurable: true
+      })
+      if (!this._eat('comma')) {
+        this._expect('closeCurl')
+        break
+      }
+    }
+    return node
   }
 
-  /**
-   * Sets the parent of a node by creating a non-enumerable _parent property
-   * that points to the supplied parent argument.
-   * @param {{type: <string>}} node A node of the AST on which to set a new
-   *      parent
-   * @param {{type: <string>}} parent An existing node of the AST to serve as the
-   *      parent of the new node
-   * @private
-   */
-  _setParent(node: AstNode, parent: AstNode) {
-    Object.defineProperty(node, '_parent', {
-      value: parent,
-      writable: true
+  _template(tokenParts: TemplatePart[]): TemplateLiteral {
+    const parts: TemplateLiteral['parts'] = tokenParts.map((part) => {
+      if (part.type === 'static') {
+        return {
+          type: 'static',
+          value: this._lexer._unescapeTemplateString(part.value)
+        }
+      }
+      const value = new Parser(this._grammar, this._lexer).parse(part.value)
+      if (!value) {
+        throw new Error('Empty interpolation in template string')
+      }
+      return { type: 'expression', value }
     })
+    return { type: 'TemplateLiteral', parts }
   }
 
-  /**
-   * Prepares the Parser to accept a subexpression by (re)instantiating the
-   * subParser.
-   * @param {string} [exprStr] The expression string to prefix to the new Parser
-   * @returns {Parser} the new subParser, also stored on this instance
-   * @private
-   */
-  _startSubExpression(exprStr?: string) {
-    let endStates = states[this._state]!.endStates
-    if (!endStates) {
-      this._parentStop = true
-      endStates = this._stopMap
+  _peek(): Token | undefined {
+    return this._tokens[this._pos]
+  }
+
+  _next(): Token {
+    const token = this._tokens[this._pos]
+    if (!token) {
+      throw this._error('Unexpected end of expression', this._pos)
     }
-    if (states[this._state]!.completable && !endStates.semicolon) {
-      endStates = { ...endStates, semicolon: '_semicolon' }
+    this._pos++
+    return token
+  }
+
+  _eat(type: string) {
+    if (this._tokens[this._pos]?.type !== type) {
+      return false
     }
-    this._subParser = new Parser(this._grammar, this._lexer, exprStr, endStates)
-    return this._subParser
+    this._pos++
+    return true
+  }
+
+  _expect(type: string): Token {
+    const token = this._next()
+    if (token.type !== type) {
+      throw this._unexpected(this._pos - 1)
+    }
+    return token
+  }
+
+  _unexpected(index: number) {
+    const { raw, type } = this._tokens[index]!
+    return this._error(`Token ${raw} (${type}) unexpected in expression`, index)
+  }
+
+  _error(message: string, index: number) {
+    const source = this._tokens
+      .slice(0, index + 1)
+      .map((token) => token.raw)
+      .join('')
+    return new Error(`${message}: ${source}`)
   }
 }
 
