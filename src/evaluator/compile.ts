@@ -8,6 +8,7 @@ import type {
   AssignmentExpression,
   AstNode,
   AstNodeUnion,
+  JexlFunction,
   JexlValue,
   Literal
 } from '../types.ts'
@@ -113,9 +114,85 @@ const unassigned = Symbol('unassigned')
  * The slot each name an expression assigns is kept in, and the frame holding
  * those slots for the evaluation in progress.
  */
-interface Scope {
+interface Locals {
   slots: ReadonlyMap<string, number>
   frame: { locals: unknown[] }
+}
+
+/**
+ * One call of a lambda. A name the lambda binds reads from `args`, a name bound
+ * by a lambda around it from `outer`, and any other name from `context`.
+ */
+class LambdaFrame {
+  args: JexlValue[]
+  outer: LambdaFrame | undefined
+  context: Context
+
+  constructor(
+    args: JexlValue[],
+    outer: LambdaFrame | undefined,
+    context: Context
+  ) {
+    this.args = args
+    this.outer = outer
+    this.context = context
+  }
+}
+
+/** The parameters of the lambdas around a node, innermost first. */
+interface Params {
+  names: string[]
+  outer: Params | undefined
+}
+
+interface Scope {
+  locals?: Locals
+  params?: Params
+}
+
+// the closures compiled inside a lambda are handed its LambdaFrame in place of
+// the context, and only the ones that read a name, below, look inside it
+const asFrame = (env: Context) => env as unknown as LambdaFrame
+const asContext = (frame: LambdaFrame) => frame as unknown as Context
+
+function compileName(
+  name: string,
+  grammar: Grammar,
+  scope: Scope
+): CompiledNode {
+  let hops = 0
+  for (let p = scope.params; p; p = p.outer) {
+    const index = p.names.indexOf(name)
+    if (index !== -1) {
+      return hops === 0 ? (env) => asFrame(env).args[index] : climb(hops, index)
+    }
+    hops++
+  }
+  const read =
+    (grammar.variableReader?.(name) as CompiledNode | undefined) ??
+    ((ctx) => ctx[name])
+  const fromContext: CompiledNode = scope.params
+    ? (env) => read(asFrame(env).context)
+    : read
+  const slot = scope.locals?.slots.get(name)
+  if (slot === undefined) {
+    return fromContext
+  }
+  const { frame } = scope.locals!
+  return (env) => {
+    const local = frame.locals[slot]
+    return local === unassigned ? fromContext(env) : (local as JexlValue)
+  }
+}
+
+function climb(hops: number, index: number): CompiledNode {
+  return (env) => {
+    let frame = asFrame(env)
+    for (let i = 0; i < hops; i++) {
+      frame = frame.outer!
+    }
+    return frame.args[index]
+  }
 }
 
 function assignedNames(node: unknown, names = new Set<string>()) {
@@ -123,10 +200,8 @@ function assignedNames(node: unknown, names = new Set<string>()) {
     if ((node as AstNode).type === 'AssignmentExpression') {
       names.add((node as AssignmentExpression).left.value)
     }
-    for (const [key, child] of Object.entries(node)) {
-      if (key !== '_parent') {
-        assignedNames(child, names)
-      }
+    for (const child of Object.values(node)) {
+      assignedNames(child, names)
     }
   }
   return names
@@ -154,7 +229,7 @@ export function compileExpression(
   const slots = new Map(names.map((name, i) => [name, i]))
   const empty = names.map(() => unassigned)
   const frame = { locals: empty }
-  const fn = compileAst(ast, grammar, { slots, frame })
+  const fn = compileNode(ast, grammar, { locals: { slots, frame } })
   // saved and restored, so a function that evaluates this same expression
   // again from inside it leaves the outer evaluation's locals intact
   return (ctx) => {
@@ -192,22 +267,20 @@ function stringify(value: JexlValue) {
  * times.
  *
  * Operators are bound here, so a grammar change after compilation requires
- * recompiling, which is what {@link Expression#compile} already documents.
- * Functions are looked up per call, since they are commonly registered after
- * an expression has been compiled.
- *
- * @param {{}} ast An expression tree, as produced by the Parser
- * @param {{}} grammar The grammar to resolve operators against
- * @param {Scope} [scope] Where the enclosing expression's assignments go;
- *      without one they write into the context
- * @returns {function} a closure returning the expression's value
- * @throws {Error} if the tree contains an unrecognized node type
+ * recompiling. Functions are looked up per call, since they are commonly
+ * registered after an expression has been compiled. Assignments compiled here
+ * write into the context; {@link compileExpression} keeps them out of it.
  */
-export function compileAst(
+export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
+  return compileNode(ast, grammar, {})
+}
+
+function compileNode(
   ast: AstNode,
   grammar: Grammar,
-  scope?: Scope
+  scope: Scope
 ): CompiledNode {
+  const compile = (child: AstNode) => compileNode(child, grammar, scope)
   // AstNode types its `type` as a plain string so the Parser can build the tree
   // loosely; narrowing to the union once, here, lets every case below see its
   // own node type instead of repeating the same cast in each branch
@@ -221,20 +294,9 @@ export function compileAst(
     case 'Identifier': {
       const name = node.value
       if (!node.from) {
-        const read =
-          (grammar.variableReader?.(name) as CompiledNode | undefined) ??
-          ((ctx) => ctx[name])
-        const slot = scope?.slots.get(name)
-        if (!scope || slot === undefined) {
-          return read
-        }
-        const { frame } = scope
-        return (ctx) => {
-          const local = frame.locals[slot]
-          return local === unassigned ? read(ctx) : (local as JexlValue)
-        }
+        return compileName(name, grammar, scope)
       }
-      const from = compileAst(node.from, grammar, scope)
+      const from = compile(node.from)
       const { getMember } = grammar
       if (getMember) {
         return (ctx) => {
@@ -257,8 +319,8 @@ export function compileAst(
         // undefined without evaluating either operand
         return () => undefined
       }
-      const left = compileAst(node.left, grammar, scope)
-      const right = compileAst(node.right!, grammar, scope)
+      const left = compile(node.left)
+      const right = compile(node.right!)
       const { evalOnDemand } = op
       if (evalOnDemand) {
         // operands stay unevaluated behind an `eval` thunk, so operators such
@@ -278,7 +340,7 @@ export function compileAst(
     }
 
     case 'UnaryExpression': {
-      const right = compileAst(node.right!, grammar, scope)
+      const right = compile(node.right!)
       const elem = grammar.elements[node.operator]
       const fn =
         elem?.type === 'unaryOp'
@@ -297,13 +359,9 @@ export function compileAst(
     }
 
     case 'ConditionalExpression': {
-      const test = compileAst(node.test, grammar, scope)
-      const consequent = node.consequent
-        ? compileAst(node.consequent, grammar, scope)
-        : undefined
-      const alternate = node.alternate
-        ? compileAst(node.alternate, grammar, scope)
-        : undefined
+      const test = compile(node.test)
+      const consequent = node.consequent ? compile(node.consequent) : undefined
+      const alternate = node.alternate ? compile(node.alternate) : undefined
       return (ctx) => {
         const res = test(ctx)
         if (res) {
@@ -316,10 +374,8 @@ export function compileAst(
 
     case 'FilterExpression': {
       const table = literalTable(node.subject)
-      const subject = table
-        ? () => table
-        : compileAst(node.subject, grammar, scope)
-      const index = compileAst(node.expr, grammar, scope)
+      const subject = table ? () => table : compile(node.subject)
+      const index = compile(node.expr)
       const { getMember } = grammar
       if (getMember) {
         return (ctx) => {
@@ -340,7 +396,7 @@ export function compileAst(
     }
 
     case 'ArrayLiteral': {
-      const items = node.value.map((item) => compileAst(item, grammar, scope))
+      const items = node.value.map(compile)
       const len = items.length
       return (ctx) => {
         const out: JexlValue[] = new Array(len)
@@ -354,9 +410,7 @@ export function compileAst(
     case 'ObjectLiteral': {
       const entries = Object.entries(node.value)
       const keys = entries.map(([key]) => key)
-      const values = entries.map(([, value]) =>
-        compileAst(value, grammar, scope)
-      )
+      const values = entries.map(([, value]) => compile(value))
       const len = keys.length
       // resolved once, here, so the common case keeps its plain store
       const store = keys.includes('__proto__') ? defineOwn : assignOwn
@@ -376,7 +430,7 @@ export function compileAst(
           const { value } = part
           return () => value
         }
-        const expr = compileAst(part.value, grammar, scope)
+        const expr = compile(part.value)
         return (ctx) => stringify(expr(ctx))
       })
       return (ctx) => {
@@ -390,7 +444,7 @@ export function compileAst(
 
     case 'FunctionCall': {
       const { name } = node
-      const args = node.args.map((arg) => compileAst(arg, grammar, scope))
+      const args = node.args.map(compile)
       // hasOwn, so that inherited Object.prototype members such as `toString`
       // and `constructor` aren't callable as Jexl functions. Resolved per call
       // rather than baked in, since functions are routinely registered after
@@ -438,9 +492,7 @@ export function compileAst(
     }
 
     case 'SequenceExpression': {
-      const exprs = node.expressions.map((expr) =>
-        compileAst(expr, grammar, scope)
-      )
+      const exprs = node.expressions.map(compile)
       const len = exprs.length
       return (ctx) => {
         let last: JexlValue
@@ -452,11 +504,14 @@ export function compileAst(
     }
 
     case 'AssignmentExpression': {
+      if (scope.params) {
+        throw new Error('Assignment is not supported in a lambda')
+      }
       const name = node.left.value
-      const right = compileAst(node.right!, grammar, scope)
-      if (scope) {
-        const slot = scope.slots.get(name)!
-        const { frame } = scope
+      const right = compile(node.right!)
+      if (scope.locals) {
+        const slot = scope.locals.slots.get(name)!
+        const { frame } = scope.locals
         return (ctx) => (frame.locals[slot] = right(ctx))
       }
       const store = name === '__proto__' ? defineOwn : assignOwn
@@ -464,6 +519,23 @@ export function compileAst(
         const value = right(ctx)
         store(ctx, name, value)
         return value
+      }
+    }
+
+    case 'Lambda': {
+      const body = compileNode(node.body, grammar, {
+        ...scope,
+        params: { names: node.params, outer: scope.params }
+      })
+      if (!scope.params) {
+        return (ctx): JexlFunction =>
+          (...args) =>
+            body(asContext(new LambdaFrame(args, undefined, ctx)))
+      }
+      return (env): JexlFunction => {
+        const outer = asFrame(env)
+        return (...args) =>
+          body(asContext(new LambdaFrame(args, outer, outer.context)))
       }
     }
 

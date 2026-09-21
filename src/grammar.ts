@@ -5,6 +5,8 @@
 
 /* eslint eqeqeq:0 */
 
+import { collectionFunctions } from './collections.ts'
+
 import type { JexlValue } from './types.ts'
 
 export type BinaryOpEval = (left: JexlValue, right: JexlValue) => JexlValue
@@ -40,6 +42,8 @@ export interface BinaryOp {
    * which is how `-x` is distinguished from `a - x`.
    */
   unaryEval?: (right: JexlValue) => JexlValue
+  /** Groups a chain from the right, so `a ^ b ^ c` is `a ^ (b ^ c)`. */
+  rightAssociative?: boolean
 }
 
 export type UnaryOpEval = (right: JexlValue) => JexlValue
@@ -52,9 +56,9 @@ export interface UnaryOp {
 
 /**
  * The punctuation elements of the grammar. Unlike operators these carry no
- * behavior of their own; the Parser's state machine gives them meaning. The
- * type is a literal union rather than `string` so that `GrammarElement` is a
- * discriminated union, letting operator properties be accessed without casts.
+ * behavior of their own; the Parser gives them meaning. The type is a literal
+ * union rather than `string` so that `GrammarElement` is a discriminated union,
+ * letting operator properties be accessed without casts.
  */
 export interface SimpleElement {
   type:
@@ -69,6 +73,7 @@ export interface SimpleElement {
     | 'closeParen'
     | 'question'
     | 'semicolon'
+    | 'arrow'
 }
 
 export type GrammarElement = BinaryOp | UnaryOp | SimpleElement
@@ -101,16 +106,6 @@ export interface Grammar {
   variableReader?: VariableReader
 }
 
-/**
- * Returns the binding power of a grammar element, or 0 for elements that
- * aren't operators and therefore don't participate in precedence.
- */
-export function precedenceOf(elem: GrammarElement | undefined) {
-  return elem && (elem.type === 'binaryOp' || elem.type === 'unaryOp')
-    ? elem.precedence
-    : 0
-}
-
 export const getGrammar = (): Grammar => ({
   /**
    * A map of all expression elements to their properties. Note that changes
@@ -129,6 +124,7 @@ export const getGrammar = (): Grammar => ({
     ')': { type: 'closeParen' },
     '?': { type: 'question' },
     ';': { type: 'semicolon' },
+    '=>': { type: 'arrow' },
     '+': {
       type: 'binaryOp',
       precedence: 30,
@@ -163,6 +159,7 @@ export const getGrammar = (): Grammar => ({
     '^': {
       type: 'binaryOp',
       precedence: 50,
+      rightAssociative: true,
       eval: (left, right) => (left as number) ** (right as number)
     },
     '==': {
@@ -197,7 +194,7 @@ export const getGrammar = (): Grammar => ({
     },
     '&&': {
       type: 'binaryOp',
-      precedence: 10,
+      precedence: 11,
       evalOnDemand: (left, right) => {
         const leftVal = left.eval()
         if (!leftVal) {
@@ -268,5 +265,5 @@ export const getGrammar = (): Grammar => ({
    * than throw. An error is only appropriate when the function would normally
    * return a value, but cannot due to some other failure.
    */
-  functions: {}
+  functions: { ...collectionFunctions }
 })

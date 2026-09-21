@@ -16,6 +16,10 @@ export type JexlValue =
   | undefined
   | JexlValue[]
   | { [key: string]: JexlValue }
+  | JexlFunction
+
+/** What a lambda evaluates to, for a registered function to call. */
+export type JexlFunction = (...args: JexlValue[]) => JexlValue
 
 export interface Token {
   type: string
@@ -25,7 +29,6 @@ export interface Token {
 
 export interface AstNode {
   type: string
-  _parent?: AstNode
   right?: AstNode
 }
 
@@ -102,6 +105,12 @@ export interface AssignmentExpression extends AstNode {
   left: Identifier
 }
 
+export interface Lambda extends AstNode {
+  type: 'Lambda'
+  params: string[]
+  body: AstNode
+}
+
 export type AstNodeUnion =
   | Literal
   | Identifier
@@ -115,6 +124,7 @@ export type AstNodeUnion =
   | ConditionalExpression
   | SequenceExpression
   | AssignmentExpression
+  | Lambda
 
 export type NodeByType<T extends AstNodeUnion['type']> = Extract<
   AstNodeUnion,

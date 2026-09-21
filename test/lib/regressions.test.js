@@ -9,6 +9,7 @@ import Lexer from '../../src/Lexer.ts'
 import { compileAst } from '../../src/evaluator/compile.ts'
 import { getGrammar } from '../../src/grammar.ts'
 import { Jexl } from '../../src/Jexl.ts'
+import { JexlSyntaxError } from '../../src/index.ts'
 
 let inst
 
@@ -124,7 +125,6 @@ describe('regressions', () => {
     it('still accepts closed groups and completable subexpressions', () => {
       expect(inst.eval('(1)')).toBe(1)
       expect(inst.eval('((1 + 2) * 3)')).toBe(9)
-      expect(inst.eval('()')).toBeUndefined()
       expect(inst.eval('1 ? 2 : 3')).toBe(2)
       expect(inst.eval('1 == 2 ? "yes" : ')).toBeUndefined()
     })
@@ -403,6 +403,134 @@ describe('regressions', () => {
       const context = {}
       expect(inst.eval('a = 5; a + 1', context)).toBe(6)
       expect(context).toEqual({})
+    })
+  })
+  describe('operator precedence', () => {
+    it('binds && tighter than ||, as JS and SQL do', () => {
+      // both sat at 10 and grouped left to right, so this was (1 || 0) && 0
+      expect(inst.eval('1 || 0 && 0')).toBe(1)
+      const filter = "type == 'gene' || type == 'mRNA' && score > 5"
+      expect(inst.eval(filter, { type: 'gene', score: 1 })).toBe(true)
+      expect(inst.eval(filter, { type: 'mRNA', score: 1 })).toBe(false)
+      expect(inst.eval('0 && 1 || 1')).toBe(1)
+    })
+    it('groups a chain of ^ from the right', () => {
+      expect(inst.eval('2 ^ 3 ^ 2')).toBe(512)
+      expect(inst.eval('(2 ^ 3) ^ 2')).toBe(64)
+      expect(inst.eval('-x ^ 2 ^ 1', { x: 2 })).toBe(4)
+    })
+    it('still groups ^ and % left to right, as they share a precedence', () => {
+      expect(inst.eval('2 % 3 ^ 2')).toBe(4)
+      expect(inst.eval('2 ^ 3 % 3')).toBe(2)
+    })
+    it('still binds a host operator at 15 tighter than both', () => {
+      inst.addBinaryOp('&', 15, (a, b) => a & b)
+      expect(inst.eval('flags & 2 && flags & 4', { flags: 6 })).toBe(4)
+    })
+  })
+  describe('the ?? operator', () => {
+    it('falls back only for null and undefined', () => {
+      // || replaced a real 0 score with the fallback
+      expect(inst.eval('score || 1', { score: 0 })).toBe(1)
+      expect(inst.eval('score ?? 1', { score: 0 })).toBe(0)
+      expect(inst.eval('score ?? 1', { score: '' })).toBe('')
+      expect(inst.eval('score ?? 1', { score: null })).toBe(1)
+      expect(inst.eval('score ?? 1', {})).toBe(1)
+      expect(inst.eval('a ?? b ?? 3', {})).toBe(3)
+    })
+    it('evaluates its right side only when it needs it', () => {
+      let calls = 0
+      inst.addFunction('fallback', () => ++calls)
+      expect(inst.eval('score ?? fallback()', { score: 0 })).toBe(0)
+      expect(calls).toBe(0)
+      expect(inst.eval('score ?? fallback()', {})).toBe(1)
+    })
+    it('sits with || in the precedence order, below comparisons', () => {
+      expect(inst.eval('(score ?? 0) > 5', { score: 10 })).toBe(true)
+      expect(inst.eval('score ?? 0 > 5', { score: 10 })).toBe(10)
+      expect(inst.eval('a ?? 1 ? "y" : "n"', {})).toBe('y')
+    })
+    it('refuses to mix with && or || unless parenthesized, as JS does', () => {
+      for (const expr of ['a ?? b || c', 'a || b ?? c', 'a ?? b && c']) {
+        expect(() => inst.compile(expr)).toThrow(/Parenthesize \?\?/)
+      }
+      expect(inst.eval('(a || b) ?? c', { b: 2 })).toBe(2)
+      expect(inst.eval('a ?? (b && c)', { b: 2, c: 3 })).toBe(3)
+    })
+  })
+  describe('malformed input', () => {
+    it('rejects an empty slot with a syntax error rather than a TypeError', () => {
+      for (const expr of ['a[]', '1 + ()', '()', '{a: }', '(', '1; (']) {
+        expect(() => inst.compile(expr)).toThrow(/unexpected|Unexpected end/)
+      }
+    })
+    it('rejects an empty argument or element instead of dropping it', () => {
+      expect(() => inst.compile('f(1,,2)')).toThrow(/unexpected/)
+      expect(() => inst.compile('[1,,2]')).toThrow(/unexpected/)
+      expect(() => inst.compile('[,]')).toThrow(/unexpected/)
+    })
+    it('still accepts a trailing comma', () => {
+      inst.addFunction('f', (...args) => args)
+      expect(inst.eval('f(1, 2,)')).toEqual([1, 2])
+      expect(inst.eval('[1, 2,]')).toEqual([1, 2])
+      expect(inst.eval('{a: 1,}')).toEqual({ a: 1 })
+    })
+    it('rejects an assignment whose target is an operand of another operator', () => {
+      // this assigned x and returned 1 + 3
+      const context = {}
+      expect(() => inst.eval('1 + x = 3', context)).toThrow(
+        /Left side of assignment must be a variable name/
+      )
+      expect(() => inst.eval('!x = 1', context)).toThrow(
+        /Left side of assignment must be a variable name/
+      )
+      expect(context).toEqual({})
+    })
+    it('keeps a parenthesized assignment out of a following ternary', () => {
+      // the ternary reached into the group and wrapped the assigned value
+      const context = { a: 0 }
+      expect(inst.eval('(x = a) ? "yes" : "no"', context)).toBe('no')
+      expect(inst.eval('(x = a) ? "yes" : "no"; x', context)).toBe(0)
+    })
+    it('reads a property of a parenthesized prefix expression', () => {
+      // rejected as a relative path
+      inst.addUnaryOp('~', (n) => ({ n }))
+      expect(inst.eval('(~a).n', { a: 1 })).toBe(1)
+      expect(inst.eval('(-a).b', { a: 1 })).toBeUndefined()
+    })
+    it('continues a sequence with a group or literal after a ternary', () => {
+      expect(inst.eval('a ? 1 : 2; [3]', { a: 1 })).toEqual([3])
+      expect(inst.eval('a ? 1 : 2; (3)', { a: 1 })).toBe(3)
+      expect(inst.eval('a ? 1 : 2; {b: 3}', { a: 1 })).toEqual({ b: 3 })
+    })
+    it('names the call when the callee is not a name', () => {
+      expect(() => inst.compile('(a)(1)')).toThrow(/must be called by name/)
+      expect(() => inst.compile('f(1)(2)')).toThrow(/must be called by name/)
+    })
+  })
+  describe('syntax error positions', () => {
+    const offsetOf = (expr) => {
+      try {
+        inst.compile(expr)
+      } catch (err) {
+        expect(err).toBeInstanceOf(JexlSyntaxError)
+        return err.offset
+      }
+      throw new Error(`${expr} compiled`)
+    }
+    it('points at the offending token', () => {
+      expect(offsetOf('f(1,,2)')).toBe(4)
+      expect(offsetOf('  1 + )')).toBe(6)
+      expect(offsetOf('1 + x = 3')).toBe(6)
+      expect(offsetOf('.foo')).toBe(0)
+    })
+    it('points past the end when the expression stops short', () => {
+      expect(offsetOf('a ? b')).toBe(5)
+    })
+    it('points into a template interpolation', () => {
+      expect(offsetOf('`ab ${1 + } c`')).toBe(10)
+      expect(offsetOf('`x${}`')).toBe(4)
+      expect(offsetOf('`\\${1}${ ) }`')).toBe(9)
     })
   })
   describe('template strings', () => {

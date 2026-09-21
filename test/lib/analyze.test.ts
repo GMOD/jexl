@@ -532,6 +532,33 @@ describe('analyze', () => {
     })
   })
 
+  describe('lambdas', () => {
+    it('binds a parameter rather than reading the context', () => {
+      expect(summary('any(feature.INFO.AF, af => af > 0.05)')).toEqual({
+        variables: ['feature'],
+        reads: ['feature.INFO.AF'],
+        fields: ['INFO.AF'],
+        calls: ['any(feature.INFO.AF, ?)']
+      })
+    })
+    it('reads the free names of its body from the context', () => {
+      expect(summary('map(xs, x => x.y + t)')).toEqual({
+        variables: ['xs', 't'],
+        reads: ['xs', 't'],
+        calls: ['map(xs, ?)']
+      })
+    })
+    it('lets a parameter shadow a local of the same name', () => {
+      expect(summary('x = feature.score; map(xs, x => x * 2)')).toEqual({
+        variables: ['xs', 'feature'],
+        reads: ['xs', 'feature.score'],
+        fields: ['score'],
+        calls: ['map(xs, ?)'],
+        assigned: ['x']
+      })
+    })
+  })
+
   it('reports nothing for an empty expression', () => {
     expect(analyze(null)).toEqual({
       variables: [],

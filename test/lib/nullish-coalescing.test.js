@@ -86,7 +86,7 @@ describe('?? nullish coalescing', () => {
         'a ?? b == c || d',
         'a ?? (b) || c'
       ]) {
-        expect(() => inst.compile(expr), expr).toThrow(/Cannot mix/)
+        expect(() => inst.compile(expr), expr).toThrow(/Parenthesize \?\?/)
       }
     })
     it('accepts either grouping once it is written out', () => {

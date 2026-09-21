@@ -340,6 +340,15 @@ export function analyze(
         return value
       }
 
+      case 'Lambda': {
+        const inner: Scope = new Map(scope)
+        for (const param of node.params) {
+          inner.set(param, { value: [], used: true })
+        }
+        use(node.body, inner)
+        return []
+      }
+
       default: {
         throw new Error(`Corrupt AST: unknown node type '${ast.type}'`)
       }

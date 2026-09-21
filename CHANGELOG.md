@@ -2,28 +2,65 @@
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased]
+## [v5.0.0] (unreleased)
+
+Jexl 5 ships alongside JBrowse 5.0. A Pratt parser replaces the state machine:
+it builds the same tree for every expression 4.0.1 parsed correctly, which
+differential testing against 4.0.1 over about two million generated expressions
+confirmed, and parses about three times as fast. A host can now resolve members
+and bare names itself, reuse one context across evaluations, and ask an
+expression what it reads.
 
 ### BREAKING CHANGES
 
+- **`&&` binds tighter than `||`**, as in JS and SQL. Both sat at precedence 10
+  and grouped left to right, so `type == 'gene' || type == 'mRNA' && score > 5`
+  meant `(… || …) && score > 5`. `&&` is now 11. A mix that is already
+  parenthesized reads the same.
+- **`^` groups from the right**: `2 ^ 3 ^ 2` is 512, not 64. `%` and `^` still
+  share a precedence and group left to right with each other.
 - **An assignment no longer writes into the context.** `x = 5` makes `x` a
   variable for the rest of that evaluation and leaves the context object alone,
   so one context can be reused across evaluations without the last one's
   variables leaking into the next. Code that read assigned values back off the
   context after `eval()` has to return them from the expression instead.
+- **`=` only takes a bare name, and binds loosest of all.** `1 + x = 3` used to
+  assign `x` and return 4; `!x = 1`, `a < b = c` and the like did the same. Each
+  is now a syntax error. A host operator registered at precedence 2 or below now
+  binds tighter than `=`, so `x = a OP b` assigns the whole of `a OP b`.
 - **`a.b` on an array reads the array, not its first element.** The rule dated
   from filter expressions, which returned a list and were removed in 3.0; what
   it left behind was `['DEL'].length` answering 3, the length of `'DEL'`, and
-  jbrowse's `nAlt()` existing because `feature.ALT.length` could not be
+  JBrowse's `nAlt()` existing because `feature.ALT.length` could not be
   written. `list.length` is now the list's length, and a name read off a list,
   `feature.ALT.type`, is `undefined` rather than the first element's field;
-  write `feature.ALT[0].type`.
+  write `feature.ALT[0].type`, or `map(feature.ALT, a => a.type)`.
 - **`null` is a literal.** It was a name that read `context.null`, normally
   `undefined`, so `x == null` only worked because `==` is loose, and
   `ok ? 1 : null` returned `undefined`. It now differs from `undefined` in a
   returned value and in `{a: null}` once serialized, and `a.null` is a parse
   error as `a.true` already was. `undefined` stays a name, as in JS, so
-  jbrowse's `{phase: undefined}` idiom is unaffected.
+  JBrowse's `{phase: undefined}` idiom is unaffected.
+- **An empty slot is a syntax error.** `f(1,,2)`, `[1,,2]`, `[,]` and `f(,)`
+  dropped the hole. A trailing comma is still allowed.
+- **An empty or unclosed group is a syntax error.** `()`, `(` and `1; (`
+  evaluated to `undefined`; `1 + ()`, `a[]` and `{a: }` threw a `TypeError`.
+- **`;` separates statements only at the top level and inside parentheses.**
+  `f(a; b)`, `[a; b]` and `c ? a; b : d` are syntax errors.
+- **`=>` and `??` are tokens.** Each already failed to parse as two tokens.
+- **The function pool starts with `any`, `all`, `count`, `map`, `filter`,
+  `find`, `sort` and `reduce`.** A host function of the same name replaces one.
+- **Parse errors are `JexlSyntaxError`**, a subclass of `Error` whose `name` is
+  `'JexlSyntaxError'`. Every message keeps its wording. The assignment error now
+  quotes the expression up to the `=`, as the others already did.
+- **Types**: `JexlValue` includes `JexlFunction`, the type of a lambda's value,
+  and `Literal.value` includes `null`. `AstNodeUnion` includes `Lambda`.
+  `AstNode` loses `_parent`, which the old parser set on every node as a
+  non-enumerable property. `BinaryOp` gains `rightAssociative`.
+- **Internals**: `src/parser/states.ts` and `src/parser/handlers.ts` are gone,
+  and `precedenceOf` with them. `Parser` keeps `addTokens()` and `complete()`
+  and adds `parse(source)`; it loses `addToken()` and the constructor's prefix
+  and stop-map arguments. The package entry point never exported any of these.
 
 ### Added
 
@@ -40,39 +77,59 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   assigns. `accessors` declares calls that read a path, so `get(feature,'x')`
   and `feature.get('x')` read `feature.x`; `env` supports a host that binds a
   row's fields as variables; `bare` says whether the expression is nothing but
-  a path.
-- **`Jexl#compile` and `Jexl#eval` cache what they compile.** The same string
-  returns the same Expression, so a host no longer wraps `compile` in a memo of
-  its own. Adding or removing an operator empties the cache.
+  a path. A lambda's parameters are bound, not read.
+- **Lambdas**: `x => body` and `(a, b) => body`. A lambda is a plain JS
+  function, so any registered function can call it; JBrowse's
+  `interpolate(score, s => …)` becomes usable from config. A parameter shadows
+  the variable of its name, any other name resolves as it would outside, and a
+  lambda body cannot assign.
+- **Collection functions** taking a list and a lambda. A lone value reads as a
+  list of one and a missing value as empty, so
+  `any(feature.INFO.AF, af => af > 0.05)` works whether `AF` holds one value or
+  several.
 - **`??` falls back only on `null` and `undefined`.** A real score of 0 loses
   to the fallback in `get(feature, 'score') || 1` and survives in
-  `get(feature, 'score') ?? 1`. As in JS, `??` refuses to share an expression
-  with `&&` or `||` unless parentheses say which goes first, so `a ?? b || c`
-  fails to compile rather than picking a grouping nobody would guess. It binds
-  looser than comparison and tighter than `?:`, so `a ?? b ? c : d` tests
-  `a ?? b`.
+  `get(feature, 'score') ?? 1`. It shares `||`'s precedence and, as in JS,
+  refuses to mix with `&&` or `||` without parentheses.
 - **Numbers can use scientific notation or start with a dot.**
   `feature.pvalue < 5e-8` threw, because `5e` lexed as `5` followed by the name
   `e`; `1e3`, `1.5e-3`, `.5e3` and `-5e-8` now read as numbers. `.5` threw
   `Relative paths are not supported`, because the lexer tried the grammar's `.`
-  before the number pattern. Every spelling this changes was an error before.
+  before the number pattern.
+- **`Jexl#compile` and `Jexl#eval` cache what they compile.** The same string
+  returns the same Expression, so a host no longer wraps `compile` in a memo of
+  its own. Adding or removing an operator empties the cache.
+- **`JexlSyntaxError.offset`**, the character offset in the source where
+  parsing failed, including inside a template interpolation.
 
 ### Fixed
 
+- **`(x = a) ? b : c` tests the assignment.** The ternary reached into the group
+  and parsed it as `x = (a ? b : c)`.
+- **`(-x).y` and `(!x).y` read the property.** Both were refused as relative
+  paths.
+- **A sequence continues past a ternary into a group or literal.**
+  `a ? 1 : 2; [3]` failed with "Unexpected end of expression".
+- **Calling something other than a name says so.** `(a)(1)` and `f(1)(2)` now
+  fail with "Functions must be called by name".
 - **`in` ends at the end of a name in any script.** The lexer bounded word
   operators with `\b`, which only knows ASCII, so `in$`, `inà` and `inя` split
   into the operator and a stray name instead of lexing as one identifier. A
   host operator starting with `$` lost its bounds entirely and matched inside
-  longer names. `true` and `false` had the same bug and turn out to need no
-  pattern of their own. `a in$b`, which read as `a in $b`, now needs the space,
-  as in JS.
+  longer names. `a in$b`, which read as `a in $b`, now needs the space, as in
+  JS.
 
 ### Performance
 
+- **Parsing is about three times as fast**, and compiling from a string about
+  one and a half times.
 - **A literal lookup table is built once.** `{CDS: 'red', exon: 'blue'}[type]`
   rebuilt its object on every evaluation. A table of primitives can only yield
   a primitive, so one frozen copy now serves every evaluation: 290ns to 96ns
   per eval.
+- **A host that resolves members through `getMember` needs no Proxy per
+  record.** Against JBrowse's feature Proxy, the same expressions evaluate
+  1.7–3.4x faster.
 
 ## [v4.0.1]
 

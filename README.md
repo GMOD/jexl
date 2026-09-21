@@ -9,6 +9,9 @@ Major changes include
 - Remove array filtering expressions
 - Added template strings
 - Added multiple expression evaluation
+- Added lambdas and collection functions (`any(xs, x => x > 1)`)
+- Added host hooks for member and name resolution
+- Added `analyze()`, which reports what an expression reads without running it
 
 ## Quick Examples
 
@@ -90,16 +93,33 @@ jexl.eval('`Price: \\$100`')
 
 - Arithmetic: `+`, `-`, `*`, `/`, `//` (floor division), `%`, `^` (power)
 - Comparison: `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`
-- Logical: `&&`, `||`
-- Nullish coalescing: `??` (`a ?? b` is `b` only when `a` is `null` or
-  `undefined`, so `score ?? 0` keeps a real 0; as in JS, it needs parentheses
-  to share an expression with `&&` or `||`)
+- Logical: `&&`, `||`, `??` (`a ?? b` is `b` only when `a` is `null` or
+  `undefined`, so `score ?? 0` keeps a real 0)
 - Assignment: `=` (assigns a value to a bare variable name; `a.b = 1` is not
   supported)
 
 **Ternary:** `condition ? consequent : alternate`
 
 **Sequence:** `;` (separates multiple expressions)
+
+From loosest to tightest:
+
+| Operators                              | Groups             |
+| -------------------------------------- | ------------------ |
+| `;`                                    |                    |
+| `=`, lambdas                           | right to left      |
+| `? :`                                  | right to left      |
+| `\|\|`, `??`                           | left to right      |
+| `&&`                                   | left to right      |
+| `==`, `!=`, `>`, `>=`, `<`, `<=`, `in` | left to right      |
+| `+`, `-`                               | left to right      |
+| `*`, `/`, `//`                         | left to right      |
+| `%`, `^`                               | `^` from the right |
+| prefix `!`, `-`                        |                    |
+| `.`, `[]`, calls                       | left to right      |
+
+As in JavaScript, `??` does not mix with `&&` or `||` without parentheses:
+`a ?? b || c` is a syntax error, `(a ?? b) || c` is not.
 
 ### Identifiers
 
@@ -152,6 +172,24 @@ jexl.eval("split(refName, ' ')[0]", { refName: 'chr1 description' }) // "chr1"
 Note that this is a naming convention, not method dispatch: `a.b(x)` calls the
 function named `b` in the pool, never a method on the value of `a`.
 
+### Lambdas
+
+`x => body` and `(a, b) => body` are functions a registered function can call.
+A parameter shadows the context variable of the same name; any other name reads
+the context. A lambda body cannot assign.
+
+Jexl registers `any`, `all`, `count`, `map`, `filter`, `find`, `sort` and
+`reduce`, each taking a list and a lambda. A lone value counts as a list of one
+and a missing value as an empty list, which suits VCF INFO fields:
+
+```javascript
+jexl.eval('any(feature.INFO.AF, af => af > 0.05)', context)
+jexl.eval('map(xs, (x, i) => x * i)', { xs: [1, 2, 3] }) // [0, 2, 6]
+jexl.eval('xs.filter(x => x > 1)', { xs: [1, 2, 3] }) // [2, 3]
+```
+
+A host function of the same name replaces the built-in one.
+
 ### Variable Assignment
 
 Assign values to variables using `=` (no `let`, `var`, or `const` needed). An assignment returns the assigned value, and the variable lasts for the rest of that evaluation. The context is never written to, so one context object can be reused across evaluations:
@@ -172,7 +210,8 @@ jexl.eval('y = x * 2; x = y + 1; x', context)
 // context is still { x: 1 }
 ```
 
-Separate multiple expressions with semicolons. The result is the value of the last expression:
+Separate multiple expressions with semicolons. The result is the value of the
+last expression.
 
 ## API
 
@@ -255,6 +294,27 @@ for (const feature of features) {
 ```
 
 A name the expression assigns reads the assignment once it has run, and goes through `variableReader` before then.
+
+### Analyzing Expressions
+
+`analyze` reports what an expression reads, without evaluating it or needing
+its functions registered:
+
+```javascript
+const expr = jexl.compile("get(feature, 'score') > 10 ? feature.name : 'n/a'")
+expr.analyze({ accessors: { get: [] }, row: 'feature' })
+// {
+//   variables: ['feature'],
+//   fields: [{ path: ['score'] }, { path: ['name'] }],
+//   bare: false,
+//   ...
+// }
+```
+
+`accessors` names functions that read a path off their first argument, so
+`get(feature, 'score')` and `feature.score` both read the field `score`. An
+expression with no `variables` is a constant; one whose `bare` is true is only
+a path, which a host can read without jexl.
 
 ## License
 

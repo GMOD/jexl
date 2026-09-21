@@ -47,10 +47,7 @@ class Expression {
    * @returns {Expression} this Expression instance, for convenience
    */
   compile() {
-    const parser = new Parser(this._grammar, this._lexer)
-    const tokens = this._lexer.tokenize(this._exprStr)
-    parser.addTokens(tokens)
-    this._ast = parser.complete()
+    this._ast = new Parser(this._grammar, this._lexer).parse(this._exprStr)
     // lower the tree to closures once, here, so that eval() is just a call
     this._fn = this._ast ? compileExpression(this._ast, this._grammar) : null
     this._compiled = true
