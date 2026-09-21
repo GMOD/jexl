@@ -2,6 +2,18 @@
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [v5.0.2]
+
+### Changed
+
+- **A bundle that uses only `Jexl` leaves the checker out.** `Expression`
+  imported `analyze` and `check` for two convenience methods, so every bundle
+  carried both, and `print` lived inside the checker, so reading filter rows
+  with `conditions()` carried it too. The methods are gone — call
+  `analyze(expr.ast)` and `check(expr.ast, options)` — `print` has a module of
+  its own, and the package declares `"sideEffects": false`. A worker bundling
+  only `Jexl` drops from 43.5 kB to 21.4 kB minified.
+
 ## [v5.0.1]
 
 ### Performance
@@ -102,7 +114,7 @@ expression what it reads.
   whose records keep their fields behind an accessor no longer needs a Proxy
   per record, and can resolve bare names against the current record. An
   instance with neither evaluates exactly as before.
-- **`analyze(ast)` and `Expression#analyze()` list what an expression reads**
+- **`analyze(ast)` lists what an expression reads**
   without evaluating it or needing its functions registered: the context
   variables, each path used (`feature.INFO.DP[0]` as `feature.INFO.DP.0`), the
   row's fields, every call with its arguments classified, and the names it
@@ -110,7 +122,7 @@ expression what it reads.
   and `feature.get('x')` read `feature.x`; `env` supports a host that binds a
   row's fields as variables; `bare` says whether the expression is nothing but
   a path. A lambda's parameters are bound, not read.
-- **`check(ast, options)` and `Expression#check()` check an expression against
+- **`check(ast, options)` checks an expression against
   the fields a file header declares and the functions a host registers**,
   without evaluating it. A schema lists each field's path, type, cardinality
   (`one`, `perAlt`, `perAllele`, `perGenotype`, `many` or a fixed count),

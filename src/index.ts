@@ -8,7 +8,8 @@ export type { JexlOptions } from './Jexl.ts'
 export type { GetMember, VariableReader } from './grammar.ts'
 export { default as Expression } from './Expression.ts'
 export { analyze } from './analyze.ts'
-export { check, print, recordOf, union } from './check.ts'
+export { check, recordOf, union } from './check.ts'
+export { print } from './print.ts'
 export {
   callSubject,
   conditions,

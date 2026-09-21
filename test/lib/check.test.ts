@@ -6,7 +6,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { Jexl } from '../../src/Jexl.ts'
-import { check, print, recordOf } from '../../src/check.ts'
+import { check, recordOf } from '../../src/check.ts'
+import { print } from '../../src/print.ts'
 import {
   BAM_SCHEMA,
   BED_SCHEMA,

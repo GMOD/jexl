@@ -347,8 +347,10 @@ A name the expression assigns reads the assignment once it has run, and goes thr
 its functions registered:
 
 ```javascript
-const expr = jexl.compile("get(feature, 'score') > 10 ? feature.name : 'n/a'")
-expr.analyze({ accessors: { get: [] }, row: 'feature' })
+import { analyze } from '@jbrowse/jexl'
+
+const ast = jexl.parse("get(feature, 'score') > 10 ? feature.name : 'n/a'")
+analyze(ast, { accessors: { get: [] }, row: 'feature' })
 // {
 //   variables: ['feature'],
 //   fields: [{ path: ['score'] }, { path: ['name'] }],

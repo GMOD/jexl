@@ -8,6 +8,7 @@
     "import": "./esm/index.js",
     "require": "./dist/index.js"
   },
+  "sideEffects": false,
   "files": [
     "dist",
     "esm",

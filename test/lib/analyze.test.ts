@@ -45,7 +45,7 @@ type Summary = Partial<
 > & { bare?: true }
 
 function summary(expr: string, options = JBROWSE): Summary {
-  const a = jexl.compile(expr).analyze(options)
+  const a = analyze(jexl.parse(expr), options)
   const shown = {
     variables: a.variables,
     reads: a.reads.map(showRead),
@@ -513,7 +513,7 @@ describe('analyze', () => {
     })
 
     it('reads its path from the row under a data mask', () => {
-      const a = jexl.compile('INFO.DP[0]').analyze({ env: [] })
+      const a = analyze(jexl.parse('INFO.DP[0]'), { env: [] })
       expect(a.bare).toBe(true)
       expect(a.fields).toEqual([{ path: ['INFO', 'DP', 0] }])
     })
@@ -521,7 +521,7 @@ describe('analyze', () => {
 
   describe('calls', () => {
     it('classifies each argument', () => {
-      const { calls } = jexl.compile("f('a', 2, feature.x, g(), [1])").analyze()
+      const { calls } = analyze(jexl.parse("f('a', 2, feature.x, g(), [1])"))
       expect(calls[0]!.args).toEqual([
         { type: 'literal', value: 'a' },
         { type: 'literal', value: 2 },
@@ -571,8 +571,8 @@ describe('analyze', () => {
     })
   })
 
-  it('compiles an expression it has not yet compiled', () => {
+  it('reads the tree of an expression not yet compiled', () => {
     const expr = jexl.createExpression('feature.score')
-    expect(expr.analyze().variables).toEqual(['feature'])
+    expect(analyze(expr.ast).variables).toEqual(['feature'])
   })
 })

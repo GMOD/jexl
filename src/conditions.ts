@@ -4,7 +4,7 @@
  */
 
 import { analyze } from './analyze.ts'
-import { print } from './check.ts'
+import { print } from './print.ts'
 
 import type { PathKey } from './analyze.ts'
 import type { AstNode, AstNodeUnion } from './types.ts'
