@@ -89,13 +89,32 @@ jexl.eval('`Price: \\$100`')
 
 - Arithmetic: `+`, `-`, `*`, `/`, `//` (floor division), `%`, `^` (power)
 - Comparison: `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`
-- Logical: `&&`, `||`
+- Logical: `&&`, `||`, `??` (falls back only for `null` and `undefined`)
 - Assignment: `=` (assigns a value to a bare variable name; `a.b = 1` is not
   supported)
 
 **Ternary:** `condition ? consequent : alternate`
 
 **Sequence:** `;` (separates multiple expressions)
+
+From loosest to tightest:
+
+| Operators                              | Groups             |
+| -------------------------------------- | ------------------ |
+| `;`                                    |                    |
+| `=`, lambdas                           | right to left      |
+| `? :`                                  | right to left      |
+| `\|\|`, `??`                           | left to right      |
+| `&&`                                   | left to right      |
+| `==`, `!=`, `>`, `>=`, `<`, `<=`, `in` | left to right      |
+| `+`, `-`                               | left to right      |
+| `*`, `/`, `//`                         | left to right      |
+| `%`, `^`                               | `^` from the right |
+| prefix `!`, `-`                        |                    |
+| `.`, `[]`, calls                       | left to right      |
+
+As in JavaScript, `??` does not mix with `&&` or `||` without parentheses:
+`a ?? b || c` is a syntax error, `(a ?? b) || c` is not.
 
 ### Identifiers
 
@@ -143,6 +162,24 @@ jexl.eval("split(refName, ' ')[0]", { refName: 'chr1 description' }) // "chr1"
 
 Note that this is a naming convention, not method dispatch: `a.b(x)` calls the
 function named `b` in the pool, never a method on the value of `a`.
+
+### Lambdas
+
+`x => body` and `(a, b) => body` are functions a registered function can call.
+A parameter shadows the context variable of the same name; any other name reads
+the context. A lambda body cannot assign.
+
+Jexl registers `any`, `all`, `count`, `map`, `filter`, `find`, `sort` and
+`reduce`, each taking a list and a lambda. A lone value counts as a list of one
+and a missing value as an empty list, which suits VCF INFO fields:
+
+```javascript
+jexl.eval('any(feature.INFO.AF, af => af > 0.05)', context)
+jexl.eval('map(xs, (x, i) => x * i)', { xs: [1, 2, 3] }) // [0, 2, 6]
+jexl.eval('xs.filter(x => x > 1)', { xs: [1, 2, 3] }) // [2, 3]
+```
+
+A host function of the same name replaces the built-in one.
 
 ### Variable Assignment
 

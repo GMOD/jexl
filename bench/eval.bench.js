@@ -58,3 +58,24 @@ describe('single evaluation of a compiled expression', () => {
     template.eval(context)
   })
 })
+
+describe('lambdas over 1000 contexts', () => {
+  const anyAF = inst.compile('any(feature.INFO.AF, af => af > threshold)')
+  const doubled = inst.compile('map(xs, (x) => x * 2)')
+  const variants = Array.from({ length: 1000 }, (_, i) => ({
+    feature: { INFO: { AF: [0.01, 0.02, (i % 10) / 100] } },
+    xs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    threshold: 0.05
+  }))
+
+  bench('any over a multi-valued INFO field', () => {
+    for (const context of variants) {
+      anyAF.eval(context)
+    }
+  })
+  bench('map over a ten-element list', () => {
+    for (const context of variants) {
+      doubled.eval(context)
+    }
+  })
+})
