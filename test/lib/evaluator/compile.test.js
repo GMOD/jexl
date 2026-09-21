@@ -229,4 +229,26 @@ describe('compileAst', () => {
       ).toBe('12345')
     })
   })
+  describe('literal lookup tables', () => {
+    it('indexes a table of primitives', () => {
+      const fn = compileAst(toTree('{CDS: "red", exon: "blue"}[t]'), grammar)
+      expect(fn({ t: 'exon' })).toBe('blue')
+      expect(fn({ t: 'CDS' })).toBe('red')
+      expect(fn({ t: 'gene' })).toBeUndefined()
+      expect(evaluate('["a", "b", "c"][i]', { i: 2 })).toBe('c')
+    })
+    it('keeps a __proto__ key as an ordinary entry', () => {
+      expect(evaluate('{"__proto__": "x"}["__proto__"]')).toBe('x')
+    })
+    it('still evaluates a table holding expressions per context', () => {
+      const fn = compileAst(toTree('{a: x}["a"]'), grammar)
+      expect(fn({ x: 1 })).toBe(1)
+      expect(fn({ x: 2 })).toBe(2)
+    })
+    it('builds a fresh nested value per evaluation', () => {
+      const fn = compileAst(toTree('{a: {b: 1}}["a"]'), grammar)
+      expect(fn({})).toEqual({ b: 1 })
+      expect(fn({})).not.toBe(fn({}))
+    })
+  })
 })

@@ -8,7 +8,8 @@ import type {
   AssignmentExpression,
   AstNode,
   AstNodeUnion,
-  JexlValue
+  JexlValue,
+  Literal
 } from '../types.ts'
 
 /** The variables an expression is evaluated against. */
@@ -83,6 +84,32 @@ function isKeyPart(
     typeof value === 'number' ||
     typeof value === 'boolean'
   )
+}
+
+/**
+ * The value of an object or array literal holding only primitives, built once.
+ * Indexing such a table, as in `{CDS: 'red', exon: 'blue'}[feature.type]`,
+ * can only yield a primitive, so the table never escapes and one frozen copy
+ * serves every evaluation.
+ */
+function literalTable(node: AstNode) {
+  const literal = node as AstNodeUnion
+  if (literal.type === 'ArrayLiteral') {
+    return literal.value.every((item) => item.type === 'Literal')
+      ? Object.freeze(literal.value.map((item) => (item as Literal).value))
+      : undefined
+  }
+  if (literal.type === 'ObjectLiteral') {
+    const entries = Object.entries(literal.value)
+    if (entries.every(([, value]) => value.type === 'Literal')) {
+      const table: Context = {}
+      for (const [key, value] of entries) {
+        defineOwn(table, key, (value as Literal).value)
+      }
+      return Object.freeze(table)
+    }
+  }
+  return undefined
 }
 
 const unassigned = Symbol('unassigned')
@@ -293,7 +320,10 @@ export function compileAst(
     }
 
     case 'FilterExpression': {
-      const subject = compileAst(node.subject, grammar, scope)
+      const table = literalTable(node.subject)
+      const subject = table
+        ? () => table
+        : compileAst(node.subject, grammar, scope)
       const index = compileAst(node.expr, grammar, scope)
       const { getMember } = grammar
       if (getMember) {
