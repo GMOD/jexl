@@ -40,6 +40,8 @@ export interface BinaryOp {
    * which is how `-x` is distinguished from `a - x`.
    */
   unaryEval?: (right: JexlValue) => JexlValue
+  /** Groups a chain from the right, so `a ^ b ^ c` is `a ^ (b ^ c)`. */
+  rightAssociative?: boolean
 }
 
 export type UnaryOpEval = (right: JexlValue) => JexlValue
@@ -133,6 +135,7 @@ export const getGrammar = (): Grammar => ({
     '^': {
       type: 'binaryOp',
       precedence: 50,
+      rightAssociative: true,
       eval: (left, right) => (left as number) ** (right as number)
     },
     '==': {
@@ -167,7 +170,7 @@ export const getGrammar = (): Grammar => ({
     },
     '&&': {
       type: 'binaryOp',
-      precedence: 10,
+      precedence: 11,
       evalOnDemand: (left, right) => {
         const leftVal = left.eval()
         if (!leftVal) {

@@ -117,7 +117,12 @@ class Parser {
     return node
   }
 
-  _binary(minPrecedence: number): AstNodeUnion {
+  /**
+   * Parses operands joined by binary operators that bind tighter than `floor`.
+   * One exactly at `floor` binds only when it continues a right-associative
+   * chain, which is how `a ^ b ^ c` groups from the right.
+   */
+  _binary(floor: number, rightAssociative = false): AstNodeUnion {
     let left = this._unary()
     for (;;) {
       const token = this._peek()
@@ -126,7 +131,11 @@ class Parser {
       }
       const operator = token.value as string
       const op = this._grammar.elements[operator]!
-      if (op.type !== 'binaryOp' || op.precedence <= minPrecedence) {
+      if (
+        op.type !== 'binaryOp' ||
+        op.precedence < floor ||
+        (op.precedence === floor && !(rightAssociative && op.rightAssociative))
+      ) {
         return left
       }
       this._pos++
@@ -134,7 +143,7 @@ class Parser {
         type: 'BinaryExpression',
         operator,
         left,
-        right: this._binary(op.precedence)
+        right: this._binary(op.precedence, op.rightAssociative)
       }
     }
   }

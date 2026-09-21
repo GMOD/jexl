@@ -390,6 +390,29 @@ describe('regressions', () => {
       expect(context).toEqual({ a: 5 })
     })
   })
+  describe('operator precedence', () => {
+    it('binds && tighter than ||, as JS and SQL do', () => {
+      // both sat at 10 and grouped left to right, so this was (1 || 0) && 0
+      expect(inst.eval('1 || 0 && 0')).toBe(1)
+      const filter = "type == 'gene' || type == 'mRNA' && score > 5"
+      expect(inst.eval(filter, { type: 'gene', score: 1 })).toBe(true)
+      expect(inst.eval(filter, { type: 'mRNA', score: 1 })).toBe(false)
+      expect(inst.eval('0 && 1 || 1')).toBe(1)
+    })
+    it('groups a chain of ^ from the right', () => {
+      expect(inst.eval('2 ^ 3 ^ 2')).toBe(512)
+      expect(inst.eval('(2 ^ 3) ^ 2')).toBe(64)
+      expect(inst.eval('-x ^ 2 ^ 1', { x: 2 })).toBe(4)
+    })
+    it('still groups ^ and % left to right, as they share a precedence', () => {
+      expect(inst.eval('2 % 3 ^ 2')).toBe(4)
+      expect(inst.eval('2 ^ 3 % 3')).toBe(2)
+    })
+    it('still binds a host operator at 15 tighter than both', () => {
+      inst.addBinaryOp('&', 15, (a, b) => a & b)
+      expect(inst.eval('flags & 2 && flags & 4', { flags: 6 })).toBe(4)
+    })
+  })
   describe('malformed input', () => {
     it('rejects an empty slot with a syntax error rather than a TypeError', () => {
       for (const expr of ['a[]', '1 + ()', '()', '{a: }', '(', '1; (']) {
