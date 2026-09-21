@@ -162,7 +162,16 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
         return (ctx) => ctx[name]
       }
       const from = compileAst(node.from, grammar)
-      return (ctx) => readMember(from(ctx), name)
+      // readMember's rule, written out: calling it measured 1.03-1.15x on a
+      // four-member chain, interleaved min of 41
+      return (ctx) => {
+        const subject = from(ctx)
+        if (subject == null) {
+          return undefined
+        }
+        const target = Array.isArray(subject) ? subject[0] : subject
+        return target == null ? undefined : (target as Context)[name]
+      }
     }
 
     case 'BinaryExpression': {
