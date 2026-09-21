@@ -20,9 +20,9 @@ describe('lambdas', () => {
       const expr = inst.compile('any(feature.INFO.AF, af => af > 0.05)')
       expect(expr.eval(variant([0.01, 0.2]))).toBe(true)
       expect(expr.eval(variant([0.01, 0.02]))).toBe(false)
-      // the comparison it replaces is false for any multi-valued field
+      // a comparison on the list itself asks the same question
       expect(inst.eval('feature.INFO.AF > 0.05', variant([0.01, 0.2]))).toBe(
-        false
+        true
       )
     })
     it('reads a lone value as a list of one and a missing one as empty', () => {

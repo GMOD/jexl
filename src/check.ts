@@ -111,6 +111,8 @@ export type DiagnosticCode =
   | 'arity'
   | 'argument-type'
   | 'list-operand'
+  | 'list-lengths'
+  | 'invalid-pattern'
   | 'string-numeric'
   | 'never-equal'
   | 'unknown-category'
@@ -165,6 +167,8 @@ const PRECEDENCE: Record<string, number> = {
   '&&': 11,
   '==': 20,
   '!=': 20,
+  '~': 20,
+  '!~': 20,
   '<': 20,
   '<=': 20,
   '>': 20,
@@ -426,6 +430,23 @@ function isMulti(type: Type): type is OfKind<'list'> {
 
 function isBoxed(type: Type): type is OfKind<'list'> {
   return type.kind === 'list' && type.cardinality === 1
+}
+
+function isPattern(pattern: string) {
+  try {
+    new RegExp(pattern.startsWith('(?i)') ? pattern.slice(4) : pattern)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Whether lists of two cardinalities pair value by value everywhere: they do
+ * when they are the same, or when either is a single value.
+ */
+function pairs(a: Cardinality, b: Cardinality) {
+  return a === b || a === 1 || b === 1
 }
 
 function isNumberish(type: Type): boolean {
@@ -1016,18 +1037,6 @@ export function check(
     return found
   }
 
-  function suggestAny(
-    list: AstNode,
-    build: (item: string) => string,
-    node: AstNode
-  ) {
-    if (!functions?.any) {
-      return []
-    }
-    const param = paramName(list, node)
-    return [`any(${print(list)}, ${param} => ${build(param)})`]
-  }
-
   function memberFor(
     element: Type,
     value: Type,
@@ -1126,79 +1135,64 @@ export function check(
     const left = infer(node.left)
     const right = infer(rightNode)
 
-    for (const [list, other, listNode, otherNode, onLeft] of [
-      [left, right, node.left, rightNode, true],
-      [right, left, rightNode, node.left, false]
-    ] as const) {
-      if (operator === 'in' || !isMulti(list)) {
-        continue
-      }
-      const otherText = operand(otherNode, (PRECEDENCE[operator] ?? 0) + 1)
-      const suggestions =
-        EQUALITY.has(operator) && literalOf(other) !== undefined
-          ? [
-              operator === '=='
-                ? `${print(otherNode)} in ${print(listNode)}`
-                : `!(${print(otherNode)} in ${print(listNode)})`
-            ]
-          : []
-      suggestions.push(
-        ...suggestAny(
-          listNode,
-          (item) =>
-            onLeft
-              ? `${item} ${operator} ${otherText}`
-              : `${otherText} ${operator} ${item}`,
-          node
+    if (operator === '~' || operator === '!~') {
+      const pattern = literalOf(right)
+      if (typeof pattern === 'string' && !isPattern(pattern)) {
+        report(
+          'invalid-pattern',
+          'error',
+          node,
+          `${quote(pattern)} is not a valid regular expression`
         )
-      )
-      report(
-        'list-operand',
-        'warning',
-        node,
-        `${print(listNode)} ${holding(list)}, so ${operator} ${EQUALITY.has(operator) || ORDER.has(operator) ? 'compares' : 'applies to'} the whole list and only answers correctly when there is exactly one`,
-        suggestions
-      )
-      return EQUALITY.has(operator) || ORDER.has(operator) ? BOOLEAN : UNKNOWN
+      }
+      return BOOLEAN
     }
 
+    const lists = [left, right].filter(
+      (type): type is OfKind<'list'> => type.kind === 'list'
+    )
+    const [first, second] = lists
+    if (
+      first &&
+      second &&
+      (ARITHMETIC.has(operator) || operator === '+') &&
+      !pairs(first.cardinality, second.cardinality)
+    ) {
+      report(
+        'list-lengths',
+        'warning',
+        node,
+        `${print(node.left)} ${holding(first)} and ${print(rightNode)} ${holding(second)}, so ${operator} pairs them only where both hold one value`
+      )
+    }
+    const leftItem = left.kind === 'list' ? left.of : left
+    const rightItem = right.kind === 'list' ? right.of : right
+    const eachOf = (item: Type): Type =>
+      first ? { kind: 'list', of: item, cardinality: first.cardinality } : item
+
     if (operator === '+') {
-      const boxed = [
-        [left, node.left],
-        [right, rightNode]
-      ].find(([type]) => isBoxed(type as Type)) as
-        | [OfKind<'list'>, AstNode]
-        | undefined
-      if (boxed && (isNumberish(left) || isNumberish(right))) {
-        report(
-          'list-operand',
-          'warning',
-          node,
-          `${print(boxed[1])} is a one-element list, so + joins it as text: [25] + 1 is '251'`,
-          [print(node).replace(print(boxed[1]), `${print(boxed[1])}[0]`)]
-        )
-        return STRING
-      }
-      if (left.kind === 'string' || right.kind === 'string') {
+      if (leftItem.kind === 'string' || rightItem.kind === 'string') {
         const values =
-          left.kind === 'string' &&
-          right.kind === 'string' &&
-          left.values &&
-          right.values &&
-          left.values.length * right.values.length <= MAX_VALUES
-            ? left.values.flatMap((a) => right.values!.map((b) => a + b))
+          leftItem.kind === 'string' &&
+          rightItem.kind === 'string' &&
+          leftItem.values &&
+          rightItem.values &&
+          leftItem.values.length * rightItem.values.length <= MAX_VALUES
+            ? leftItem.values.flatMap((a) =>
+                rightItem.values!.map((b) => a + b)
+              )
             : undefined
-        return values ? { kind: 'string', values } : STRING
+        return eachOf(values ? { kind: 'string', values } : STRING)
       }
-      return isNumberish(left) && isNumberish(right)
-        ? arithmetic('+', left, right)
+      return isNumberish(leftItem) && isNumberish(rightItem)
+        ? eachOf(arithmetic('+', leftItem, rightItem))
         : UNKNOWN
     }
 
     if (ARITHMETIC.has(operator) || ORDER.has(operator)) {
       for (const [type, typeNode, other] of [
-        [left, node.left, right],
-        [right, rightNode, left]
+        [leftItem, node.left, rightItem],
+        [rightItem, rightNode, leftItem]
       ] as const) {
         const numericOther = ARITHMETIC.has(operator) || isNumberish(other)
         if (type.kind === 'string' && type.field && numericOther) {
@@ -1218,33 +1212,31 @@ export function check(
           )
         }
       }
-      return ORDER.has(operator) ? BOOLEAN : arithmetic(operator, left, right)
+      return ORDER.has(operator)
+        ? BOOLEAN
+        : eachOf(arithmetic(operator, leftItem, rightItem))
     }
 
     if (EQUALITY.has(operator)) {
-      const leftLiteral = literalOf(left)
-      const rightLiteral = literalOf(right)
+      const leftLiteral = literalOf(leftItem)
+      const rightLiteral = literalOf(rightItem)
       if (rightLiteral !== undefined && node.right?.type === 'Literal') {
-        compareLiteral(left, rightLiteral, node)
+        compareLiteral(leftItem, rightLiteral, node)
       } else if (leftLiteral !== undefined && node.left.type === 'Literal') {
-        compareLiteral(right, leftLiteral, node)
+        compareLiteral(rightItem, leftLiteral, node)
       }
       return BOOLEAN
     }
 
     if (operator === 'in') {
       if (right.kind === 'list') {
-        memberFor(right.of, left, node.left, rightNode, node)
-      } else if (
-        right.kind === 'record' ||
-        right.kind === 'number' ||
-        right.kind === 'boolean'
-      ) {
+        memberFor(right.of, leftItem, node.left, rightNode, node)
+      } else if (right.kind === 'number' || right.kind === 'boolean') {
         report(
           'never-equal',
           'warning',
           node,
-          `in tests a list or text, and ${print(rightNode)} is ${describe(right)}`
+          `in tests a list, text or an object's keys, and ${print(rightNode)} is ${describe(right)}`
         )
       }
       return BOOLEAN

@@ -86,24 +86,8 @@ function messages(ast: string | AstNode, options: CheckOptions) {
   ).diagnostics.map(({ severity, message }) => `${severity}: ${message}`)
 }
 
-/**
- * `name(list, param => body)`, built by hand: the parser here has no lambdas
- * yet, and this is the node a Pratt parser with them would produce.
- */
-function lambdaCall(
-  name: string,
-  list: string,
-  param: string,
-  body: string
-): AstNode {
-  const lambda = { type: 'Lambda', params: [param], body: parse(body) }
-  const node: FunctionCall = {
-    type: 'FunctionCall',
-    name,
-    args: [parse(list), lambda]
-  }
-  return node
-}
+const lambdaCall = (name: string, list: string, param: string, body: string) =>
+  parse(`${name}(${list}, ${param} => ${body})`)
 
 describe('check', () => {
   describe('jbrowse expressions against a VCF header, v5 data model', () => {
@@ -143,20 +127,22 @@ describe('check', () => {
         []
       ],
       [
-        'a scalar operator on a Number=A field',
+        'a comparison on a Number=A field, true when any allele passes',
         'feature.INFO.AF > 0.1',
         'boolean',
-        [
-          'list-operand @ feature.INFO.AF > 0.1 → any(feature.INFO.AF, af => af > 0.1)'
-        ]
+        []
+      ],
+      [
+        'per-allele frequencies from counts',
+        'feature.INFO.AC / feature.INFO.AN',
+        'list<number>/perAlt',
+        []
       ],
       [
         'ClinVar significance, which is Number=.',
         "feature.INFO.CLNSIG == 'Pathogenic' ? 'red' : 'blue'",
         'string{red,blue}',
-        [
-          "list-operand @ feature.INFO.CLNSIG == 'Pathogenic' → 'Pathogenic' in feature.INFO.CLNSIG | any(feature.INFO.CLNSIG, clnsig => clnsig == 'Pathogenic')"
-        ]
+        []
       ],
       [
         'ClinVar colour through a local',
@@ -237,9 +223,7 @@ describe('check', () => {
         'a Number=R FORMAT field used whole',
         'feature.samples.NA12878.AD > 10',
         'boolean',
-        [
-          'list-operand @ feature.samples.NA12878.AD > 10 → any(feature.samples.NA12878.AD, ad => ad > 10)'
-        ]
+        []
       ],
       [
         'the first ALT of a Number=R field',
@@ -298,8 +282,13 @@ describe('check', () => {
       expect(messages('feature.INFO.LV[0]', V5)).toEqual([
         'warning: feature.INFO.LV holds one value, so [0] reads nothing'
       ])
-      expect(messages('feature.INFO.AF > 0.1', V5)).toEqual([
-        'warning: feature.INFO.AF holds one value per ALT allele, so > compares the whole list and only answers correctly when there is exactly one'
+      expect(
+        messages('feature.INFO.AF * feature.samples.NA12878.AD', V5)
+      ).toEqual([
+        'warning: feature.INFO.AF holds one value per ALT allele and feature.samples.NA12878.AD holds one value per allele, REF first, so * pairs them only where both hold one value'
+      ])
+      expect(messages("feature.ID ~ '(unclosed'", V5)).toEqual([
+        "error: '(unclosed' is not a valid regular expression"
       ])
       expect(messages('feature.INFO.DPP', V5)).toEqual([
         'warning: feature.INFO has no field DPP; did you mean DP?'
@@ -334,7 +323,7 @@ describe('check', () => {
       ).toEqual({ type: 'boolean', diagnostics: [] })
     })
 
-    it('knows Consequence holds several terms joined by &', () => {
+    it('compares any term of a Consequence joined by &', () => {
       expect(
         summary(
           lambdaCall(
@@ -345,9 +334,7 @@ describe('check', () => {
           ),
           V5
         ).diagnostics
-      ).toEqual([
-        "list-operand @ c.Consequence == 'missense_variant' → 'missense_variant' in c.Consequence | any(c.Consequence, consequence => consequence == 'missense_variant')"
-      ])
+      ).toEqual([])
     })
 
     it('checks a subfield against its categories and its name', () => {
@@ -396,11 +383,7 @@ describe('check', () => {
 
   describe('migrating from the v4 data model', () => {
     it.each([
-      [
-        'feature.INFO.DP + 1',
-        'string',
-        ['list-operand @ feature.INFO.DP + 1 → feature.INFO.DP[0] + 1']
-      ],
+      ['feature.INFO.DP + 1', 'list<number>/1', []],
       ['feature.INFO.DP > 20', 'boolean', []],
       ['feature.INFO.SVTYPE[0]', 'string{DEL,INS,DUP,INV,CNV,BND}', []],
       ['feature.INFO.LV[0] == 0', 'boolean', []]

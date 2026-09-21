@@ -6,6 +6,7 @@
 /* eslint eqeqeq:0 */
 
 import { collectionFunctions } from './collections.ts'
+import { anyValue, eachValue, isIn, matches } from './operators.ts'
 
 import type { JexlValue } from './types.ts'
 
@@ -106,6 +107,8 @@ export interface Grammar {
   variableReader?: VariableReader
 }
 
+const equals = anyValue((left, right) => left == right)
+
 export const getGrammar = (): Grammar => ({
   /**
    * A map of all expression elements to their properties. Note that changes
@@ -128,69 +131,84 @@ export const getGrammar = (): Grammar => ({
     '+': {
       type: 'binaryOp',
       precedence: 30,
-      eval: (left, right) => (left as number) + (right as number)
+      eval: eachValue((left, right) => (left as number) + (right as number))
     },
     '-': {
       type: 'binaryOp',
       precedence: 30,
-      eval: (left, right) => (left as number) - (right as number),
-      unaryEval: (right) => -(right as number)
+      eval: eachValue((left, right) => (left as number) - (right as number)),
+      unaryEval: (right) =>
+        Array.isArray(right)
+          ? right.map((value) => -(value as number))
+          : -(right as number)
     },
     '*': {
       type: 'binaryOp',
       precedence: 40,
-      eval: (left, right) => (left as number) * (right as number)
+      eval: eachValue((left, right) => (left as number) * (right as number))
     },
     '/': {
       type: 'binaryOp',
       precedence: 40,
-      eval: (left, right) => (left as number) / (right as number)
+      eval: eachValue((left, right) => (left as number) / (right as number))
     },
     '//': {
       type: 'binaryOp',
       precedence: 40,
-      eval: (left, right) => Math.floor((left as number) / (right as number))
+      eval: eachValue((left, right) =>
+        Math.floor((left as number) / (right as number))
+      )
     },
     '%': {
       type: 'binaryOp',
       precedence: 50,
-      eval: (left, right) => (left as number) % (right as number)
+      eval: eachValue((left, right) => (left as number) % (right as number))
     },
     '^': {
       type: 'binaryOp',
       precedence: 50,
       rightAssociative: true,
-      eval: (left, right) => (left as number) ** (right as number)
+      eval: eachValue((left, right) => (left as number) ** (right as number))
     },
     '==': {
       type: 'binaryOp',
       precedence: 20,
-      eval: (left, right) => left == right
+      eval: equals
     },
     '!=': {
       type: 'binaryOp',
       precedence: 20,
-      eval: (left, right) => left != right
+      eval: (left, right) => !equals(left, right)
+    },
+    '~': {
+      type: 'binaryOp',
+      precedence: 20,
+      eval: matches
+    },
+    '!~': {
+      type: 'binaryOp',
+      precedence: 20,
+      eval: (left, right) => !matches(left, right)
     },
     '>': {
       type: 'binaryOp',
       precedence: 20,
-      eval: (left, right) => (left as number) > (right as number)
+      eval: anyValue((left, right) => (left as number) > (right as number))
     },
     '>=': {
       type: 'binaryOp',
       precedence: 20,
-      eval: (left, right) => (left as number) >= (right as number)
+      eval: anyValue((left, right) => (left as number) >= (right as number))
     },
     '<': {
       type: 'binaryOp',
       precedence: 20,
-      eval: (left, right) => (left as number) < (right as number)
+      eval: anyValue((left, right) => (left as number) < (right as number))
     },
     '<=': {
       type: 'binaryOp',
       precedence: 20,
-      eval: (left, right) => (left as number) <= (right as number)
+      eval: anyValue((left, right) => (left as number) <= (right as number))
     },
     '&&': {
       type: 'binaryOp',
@@ -222,20 +240,7 @@ export const getGrammar = (): Grammar => ({
     in: {
       type: 'binaryOp',
       precedence: 20,
-      eval: (left, right) => {
-        if (typeof right === 'string') {
-          // only a primitive has a meaningful substring form. An absent or
-          // structured left operand is not "in" a string, and must not be
-          // coerced to '' — every string contains the empty string, so that
-          // made `feature.missingAttr in "someString"` true for every feature.
-          return typeof left === 'string' ||
-            typeof left === 'number' ||
-            typeof left === 'boolean'
-            ? right.includes(String(left))
-            : false
-        }
-        return Array.isArray(right) ? right.includes(left) : false
-      }
+      eval: isIn
     },
     '!': {
       type: 'unaryOp',

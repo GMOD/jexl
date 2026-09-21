@@ -30,6 +30,46 @@ function callback(name: string, fn: JexlValue): JexlFunction {
   return fn
 }
 
+/**
+ * The numbers a list holds, each read through `fn` when there is one. A
+ * boolean counts as 1 or 0, so `mean(samples, s => s.GQ > 90)` is the
+ * fraction that pass; anything else that is not a number is skipped, as
+ * bcftools skips a missing value.
+ */
+function numbers(name: string, list: JexlValue, fn: JexlValue) {
+  const read = callback(name, fn)
+  const out: number[] = []
+  for (const item of toList(list)) {
+    const value = read(item)
+    if (typeof value === 'number' && !Number.isNaN(value)) {
+      out.push(value)
+    } else if (typeof value === 'boolean') {
+      out.push(Number(value))
+    }
+  }
+  return out
+}
+
+/**
+ * The numbers `min` and `max` compare: a list and an optional lambda, as the
+ * other aggregates take, or any number of values and lists, as `Math.max`
+ * takes.
+ */
+function extremes(name: string, args: JexlValue[]) {
+  const last = args.at(-1)
+  return typeof last === 'function'
+    ? numbers(name, args[0], last)
+    : numbers(name, args.flat(), undefined)
+}
+
+function sum(values: number[]) {
+  let total = 0
+  for (const value of values) {
+    total += value
+  }
+  return total
+}
+
 function ascending(a: JexlValue, b: JexlValue) {
   return (a as number) < (b as number)
     ? -1
@@ -52,6 +92,28 @@ export const collectionFunctions: Record<string, GrammarFn> = {
   sort: (list, fn) => {
     const compare = fn === undefined ? ascending : callback('sort', fn)
     return [...toList(list)].sort((a, b) => compare(a, b) as number)
+  },
+  sum: (list, fn) => sum(numbers('sum', list, fn)),
+  mean: (list, fn) => {
+    const values = numbers('mean', list, fn)
+    return values.length > 0 ? sum(values) / values.length : undefined
+  },
+  median: (list, fn) => {
+    const values = numbers('median', list, fn).sort((a, b) => a - b)
+    const mid = values.length >> 1
+    return values.length === 0
+      ? undefined
+      : values.length % 2
+        ? values[mid]
+        : (values[mid - 1]! + values[mid]!) / 2
+  },
+  min: (...args) => {
+    const values = extremes('min', args)
+    return values.length > 0 ? Math.min(...values) : undefined
+  },
+  max: (...args) => {
+    const values = extremes('max', args)
+    return values.length > 0 ? Math.max(...values) : undefined
   },
   reduce: (list, fn, ...initial) => {
     const items = toList(list)
