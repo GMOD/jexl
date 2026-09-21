@@ -21,6 +21,7 @@ import type {
   CheckOptions,
   Diagnostic,
   FieldSchema,
+  Signature,
   Type
 } from '../../src/check.ts'
 import type { AstNode, FunctionCall } from '../../src/types.ts'
@@ -38,6 +39,15 @@ const V5: CheckOptions = { ...JBROWSE, schema: vcfFieldSchema(VCF_METADATA) }
 const V4: CheckOptions = {
   ...JBROWSE,
   schema: vcfFieldSchema(VCF_METADATA, 'v4')
+}
+const WALK: Signature = {
+  params: ['list', 'lambda', 'any'],
+  optional: 2,
+  returns: { kind: 'unknown' }
+}
+const WALKS: CheckOptions = {
+  ...V5,
+  functions: { ...JBROWSE_FUNCTIONS, sort: WALK, reduce: WALK }
 }
 
 function showType(type: Type): string {
@@ -88,6 +98,99 @@ function messages(ast: string | AstNode, options: CheckOptions) {
 
 const lambdaCall = (name: string, list: string, param: string, body: string) =>
   parse(`${name}(${list}, ${param} => ${body})`)
+
+/** Expressions built from every form the grammar has, most of them valid. */
+function randomExpressions(count: number, seed: number) {
+  let state = seed
+  const random = () => {
+    state = (state * 1_103_515_245 + 12_345) & 0x7f_ff_ff_ff
+    return state / 0x7f_ff_ff_ff
+  }
+  const pick = <T>(items: readonly T[]) =>
+    items[Math.floor(random() * items.length)]!
+  const words = (text: string) => text.split(' ')
+  const operators = words('+ - * / // % ^ == != < <= > >= && || ?? in ~ !~')
+  const atoms = words(
+    String.raw`a xs o 1 0 -1 -0 0.5 2e3 true null [] {} 's' 'it\'s' 'a\\b'`
+  )
+  const statics = words(String.raw`t \\ \` \${ $ a\\b`)
+  const names = words('length k é')
+
+  function expression(depth: number, inLambda: boolean): string {
+    if (depth <= 0 || random() < 0.15) {
+      return pick(atoms)
+    }
+    const next = () => expression(depth - 1, inLambda)
+    switch (Math.floor(random() * 20)) {
+      case 0:
+      case 1:
+      case 2: {
+        return `${next()} ${pick(operators)} ${next()}`
+      }
+      case 3: {
+        return `(${next()})`
+      }
+      case 4: {
+        return `${pick(['-', '!'])}${next()}`
+      }
+      case 5: {
+        return `${pick(['-', '!'])}(${next()})`
+      }
+      case 6: {
+        return `${next()} ? ${next()} : ${next()}`
+      }
+      case 7: {
+        return `${next()} ?: ${next()}`
+      }
+      case 8: {
+        return `(${next()} ? ${next()} :)`
+      }
+      case 9: {
+        const params = pick(['p', '(p)', '(p, i)', '()'])
+        return `map(xs, ${params} => ${expression(depth - 1, true)})`
+      }
+      case 10: {
+        return `[${next()}, ${next()}]`
+      }
+      case 11: {
+        return `{k: ${next()}, 'a b': ${next()}, 'in': 1, true: 2, 1: 3}`
+      }
+      case 12: {
+        return `${next()}[${next()}]`
+      }
+      case 13: {
+        return `(${next()}).${pick(names)}`
+      }
+      case 14: {
+        return `\`${pick(statics)}\${${next()}}${pick(statics)}\``
+      }
+      case 15: {
+        return inLambda ? next() : `(${pick(['v', 'w'])} = ${next()})`
+      }
+      case 16: {
+        return `(${next()}; ${next()})`
+      }
+      case 17: {
+        return `(${next()};)`
+      }
+      case 18: {
+        return `${pick(atoms)}.f(${next()}, ${next()})`
+      }
+      default: {
+        return `(${next()})${pick(['.k', '[0]'])}`
+      }
+    }
+  }
+
+  const tops = [
+    () => `${expression(4, false)}; ${expression(4, false)}`,
+    () => `v = ${expression(4, false)}`,
+    () => `${expression(4, false)} ? ${expression(4, false)} :`,
+    () => expression(5, false),
+    () => expression(5, false)
+  ]
+  return Array.from({ length: count }, () => pick(tops)())
+}
 
 describe('check', () => {
   describe('jbrowse expressions against a VCF header, v5 data model', () => {
@@ -182,11 +285,61 @@ describe('check', () => {
         ["unknown-category @ 'LowQaul' in feature.FILTER → 'LowQual'"]
       ],
       [
-        'the first transcript only',
+        'a name read off a list of records, which is undefined',
         "feature.INFO.CSQ.IMPACT == 'HIGH'",
         'boolean',
-        ['dot-through-list @ feature.INFO.CSQ.IMPACT']
+        [
+          'dot-through-list @ feature.INFO.CSQ.IMPACT → feature.INFO.CSQ[0].IMPACT'
+        ]
       ],
+      [
+        'a list of records reads undefined',
+        'feature.INFO.CSQ.IMPACT',
+        'undefined',
+        [
+          'dot-through-list @ feature.INFO.CSQ.IMPACT → feature.INFO.CSQ[0].IMPACT'
+        ]
+      ],
+      [
+        'a list of text has no fields',
+        'feature.ALT.foo',
+        'undefined',
+        ['dot-through-list @ feature.ALT.foo']
+      ],
+      [
+        'the length of a list',
+        'feature.INFO.CSQ.length',
+        'number[0,Infinity]',
+        []
+      ],
+      [
+        'the length of a list, bracketed',
+        "feature.ALT['length']",
+        'number[0,Infinity]',
+        []
+      ],
+      [
+        'negating a list negates each value',
+        '-feature.INFO.AF',
+        'list<number>/perAlt',
+        []
+      ],
+      ['null is missing', 'null', 'undefined', []],
+      [
+        'text joins rather than pairing',
+        "feature.REF + '>' + feature.ALT",
+        'string',
+        []
+      ],
+      [
+        'text joins lists of any length',
+        'feature.ALT + feature.samples.NA12878.AD',
+        'string',
+        []
+      ],
+      ['text joins a number', "'chr' + 1", 'string{chr1}', []],
+      ['numbers still pair', 'feature.INFO.AC + 1', 'list<number>/perAlt', []],
+      ['in tests an object for a key', "'DP' in feature.INFO", 'boolean', []],
       [
         'chord colour through get',
         "get(feature,'INFO').SVTYPE=='BND'?'#d95f02':'rgba(255,133,0,0.32)'",
@@ -305,6 +458,23 @@ describe('check', () => {
       expect(messages('consequnces(feature)', V5)).toEqual([
         'error: no function consequnces; did you mean consequences, consequence?'
       ])
+      expect(messages('feature.INFO.CSQ.IMPACT', V5)).toEqual([
+        "warning: feature.INFO.CSQ is a list, so .IMPACT is undefined; [0].IMPACT reads the first entry's, and any() tests each"
+      ])
+      expect(messages("'a' in feature.INFO.DP", V5)).toEqual([
+        "warning: in tests a list, text, a Set, a Map or an object's keys, and feature.INFO.DP is a number"
+      ])
+    })
+
+    it('suggests map for a name read off a list, where the host has map', () => {
+      expect(
+        summary('feature.INFO.CSQ.IMPACT', {
+          ...V5,
+          functions: { ...JBROWSE_FUNCTIONS, map: WALK }
+        }).diagnostics
+      ).toEqual([
+        'dot-through-list @ feature.INFO.CSQ.IMPACT → feature.INFO.CSQ[0].IMPACT | map(feature.INFO.CSQ, csq => csq.IMPACT)'
+      ])
     })
   })
 
@@ -378,6 +548,44 @@ describe('check', () => {
       expect(summary('any(feature.INFO.AF, 0.05)', V5).diagnostics).toEqual([
         'argument-type @ 0.05'
       ])
+    })
+
+    it('binds an index as the second param of any', () => {
+      expect(
+        summary('any(feature.INFO.CSQ, (c, i) => i.IMPACT)', V5).diagnostics
+      ).toEqual(['unknown-field @ i.IMPACT'])
+    })
+
+    it('binds both params of sort to records', () => {
+      expect(
+        summary('sort(feature.INFO.CSQ, (a, b) => a.IMPACT < b.IMPACT)', WALKS)
+          .diagnostics
+      ).toEqual([])
+    })
+
+    it('binds the second param of reduce to a record', () => {
+      expect(
+        summary(
+          "reduce(feature.INFO.CSQ, (n, c) => n + (c.IMPCT == 'HIGH'), 0)",
+          WALKS
+        ).diagnostics
+      ).toEqual(['unknown-field @ c.IMPCT → c.IMPACT'])
+    })
+
+    it('checks the body of a lambda passed to an unknown function', () => {
+      expect(
+        summary('whatever(feature.INFO.CSQ, c => c.x > feature.INFO.DPP)', V5)
+          .diagnostics
+      ).toEqual([
+        'unknown-field @ feature.INFO.DPP → feature.INFO.DP',
+        'unknown-function @ whatever(feature.INFO.CSQ, c => c.x > feature.INFO.DPP)'
+      ])
+      expect(
+        summary('map(feature.INFO.CSQ, c => c.x > feature.INFO.DPP)', {
+          schema: V5.schema,
+          row: 'feature'
+        }).diagnostics
+      ).toEqual(['unknown-field @ feature.INFO.DPP → feature.INFO.DP'])
     })
   })
 
@@ -611,13 +819,65 @@ describe('check', () => {
       'a || b && c',
       '(a ?? b) || c',
       'a && (b ?? c)',
-      'any(feature.INFO.AF, (af, i) => af > 0.05 && i > 0)'
+      'any(feature.INFO.AF, (af, i) => af > 0.05 && i > 0)',
+      'a ^ b % c',
+      '(![1,2]).length',
+      '(-x)[0]',
+      'f((a; b))',
+      '[(a; b)]',
+      "{'true': 1, 'null': 2, 'a b': 3, 1: 4}",
+      '`\\${a}\\`${b}`',
+      '-(1[0])',
+      '-0',
+      'a;',
+      '(a ? b :)',
+      'a.é'
     ])('%s parses back to the same tree', (expr) => {
-      const strip = (ast: AstNode) =>
-        JSON.stringify(ast, (name, value: unknown) =>
-          name === '_parent' ? undefined : value
+      expect(parse(print(parse(expr)))).toStrictEqual(parse(expr))
+    })
+
+    it.each([
+      ['(x = a) ? b : c', '(x = a) ? b : c'],
+      ['(x => a) ? b : c', '(x => a) ? b : c'],
+      ['a ^ (b % c)', 'a ^ (b % c)'],
+      ['(a % b) ^ c', 'a % b ^ c'],
+      ['(-x).y', '(-x).y'],
+      ['(!x).y', '(!x).y'],
+      ['a ? (b; c) : d', 'a ? (b; c) : d'],
+      ['x => (x; 1)', 'x => (x; 1)'],
+      ['x = (a; b)', 'x = (a; b)'],
+      ["{'in': 1}", "{'in': 1}"],
+      ['`a\\\\`', '`a\\\\`'],
+      ['-(1)', '-(1)']
+    ])('prints %s as %s', (expr, text) => {
+      expect(print(parse(expr))).toBe(text)
+    })
+
+    it('brackets a member name the grammar reserves', () => {
+      const a: AstNode = { type: 'Identifier', value: 'a' } as AstNode
+      expect(
+        ['in', 'true', 'null', 'ok'].map((value) =>
+          print({ type: 'Identifier', value, from: a } as AstNode)
         )
-      expect(strip(parse(print(parse(expr))))).toBe(strip(parse(expr)))
+      ).toEqual(["a['in']", "a['true']", "a['null']", 'a.ok'])
+    })
+
+    it('parses random expressions back to the same tree', () => {
+      let parsed = 0
+      for (const expr of randomExpressions(3000, 1)) {
+        let ast: AstNode
+        try {
+          ast = parse(expr)
+        } catch {
+          continue
+        }
+        parsed++
+        const printed = print(ast)
+        expect(parse(printed), `${expr}\nprinted as ${printed}`).toStrictEqual(
+          ast
+        )
+      }
+      expect(parsed).toBeGreaterThan(2000)
     })
   })
 })

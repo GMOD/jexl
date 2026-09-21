@@ -183,10 +183,27 @@ const PRECEDENCE: Record<string, number> = {
   '^': 50
 }
 
-const IDENTIFIER = /^[A-Za-z_$][\w$]*$/
+const RIGHT_ASSOCIATIVE = new Set(['^'])
+const LOGICAL = new Set(['||', '&&'])
+
+// how tightly each form binds, mirroring the Parser's levels: `;`, then `=`
+// and lambdas, then `?:`, then binary operators, then prefix operators
+const SEQUENCE = 0
+const ASSIGNMENT = 1
+const CONDITIONAL = 2
+const CUSTOM_BINARY = 3
+const UNARY = 100
+
+const letter = String.raw`a-zA-Zа-яА-Я_À-ÖØ-öø-ÿ$`
+const IDENTIFIER = new RegExp(`^[${letter}][${letter}0-9]*$`)
+const WORDS = new Set(['in', 'true', 'false', 'null'])
+
+function isName(text: string) {
+  return IDENTIFIER.test(text) && !WORDS.has(text)
+}
 
 function key(name: string) {
-  return IDENTIFIER.test(name) ? `.${name}` : `[${quote(name)}]`
+  return isName(name) ? `.${name}` : `[${quote(name)}]`
 }
 
 function quote(text: string) {
@@ -195,18 +212,22 @@ function quote(text: string) {
 
 function precedenceOf(node: Node) {
   switch (node.type) {
-    case 'BinaryExpression': {
-      return PRECEDENCE[node.operator] ?? 0
-    }
-    case 'ConditionalExpression':
-    case 'Lambda': {
-      return 1
-    }
-    case 'AssignmentExpression': {
-      return 2
-    }
     case 'SequenceExpression': {
-      return 0
+      return SEQUENCE
+    }
+    case 'AssignmentExpression':
+    case 'Lambda': {
+      return ASSIGNMENT
+    }
+    case 'ConditionalExpression': {
+      // with no alternate, it ends only before `)`, `]`, `}`, `,`, `;` or the end
+      return node.alternate ? CONDITIONAL : SEQUENCE
+    }
+    case 'BinaryExpression': {
+      return PRECEDENCE[node.operator] ?? CUSTOM_BINARY
+    }
+    case 'UnaryExpression': {
+      return UNARY
     }
     default: {
       return Infinity
@@ -214,89 +235,121 @@ function precedenceOf(node: Node) {
   }
 }
 
-function operand(ast: AstNode, above: number) {
+function within(ast: AstNode, least: number) {
   const text = print(ast)
-  return precedenceOf(ast as Node) < above ? `(${text})` : text
+  return precedenceOf(ast as Node) < least ? `(${text})` : text
 }
 
-const LOGICAL = new Set(['||', '&&'])
-
-// `??` shares an expression with `||` or `&&` only inside parentheses
-function logical(parent: BinaryExpression, child: AstNode, above: number) {
-  const inner = child as Node
-  const mixes =
-    inner.type === 'BinaryExpression' &&
-    ((parent.operator === '??' && LOGICAL.has(inner.operator)) ||
-      (inner.operator === '??' && LOGICAL.has(parent.operator)))
-  return mixes ? `(${print(child)})` : operand(child, above)
+function binaryOperand(parent: BinaryExpression, ast: AstNode, left: boolean) {
+  const own = PRECEDENCE[parent.operator]
+  if (own === undefined) {
+    return within(ast, UNARY)
+  }
+  const child = ast as Node
+  const theirs = precedenceOf(child)
+  const chained =
+    child.type === 'BinaryExpression' &&
+    RIGHT_ASSOCIATIVE.has(parent.operator) &&
+    RIGHT_ASSOCIATIVE.has(child.operator)
+  const mixesNullish =
+    child.type === 'BinaryExpression' &&
+    ((parent.operator === '??' && LOGICAL.has(child.operator)) ||
+      (child.operator === '??' && LOGICAL.has(parent.operator)))
+  const text = print(ast)
+  return theirs < own || (theirs === own && left === chained) || mixesNullish
+    ? `(${text})`
+    : text
 }
 
-/** Renders a tree back to expression text, for messages and suggestions. */
+/**
+ * Renders a tree back to expression text, for messages and suggestions. The
+ * text parses back to the same tree.
+ */
 export function print(ast: AstNode): string {
   const node = ast as Node
   switch (node.type) {
     case 'Literal': {
-      return typeof node.value === 'string'
-        ? quote(node.value)
-        : String(node.value)
+      const { value } = node
+      return typeof value === 'string'
+        ? quote(value)
+        : Object.is(value, -0)
+          ? '-0'
+          : String(value)
     }
     case 'Identifier': {
       return node.from
-        ? operand(node.from, Infinity) + key(node.value)
+        ? within(node.from, Infinity) + key(node.value)
         : node.value
     }
     case 'FilterExpression': {
-      return `${operand(node.subject, Infinity)}[${print(node.expr)}]`
+      return `${within(node.subject, Infinity)}[${within(node.expr, ASSIGNMENT)}]`
     }
     case 'BinaryExpression': {
-      const own = PRECEDENCE[node.operator] ?? 0
-      const [left, right] =
-        node.operator === '^' ? [own + 1, own] : [own, own + 1]
-      return `${logical(node, node.left, left)} ${node.operator} ${logical(node, node.right!, right)}`
+      return `${binaryOperand(node, node.left, true)} ${node.operator} ${binaryOperand(node, node.right!, false)}`
     }
     case 'UnaryExpression': {
-      return node.operator + operand(node.right!, Infinity)
+      const { operator } = node
+      const right = within(node.right!, UNARY)
+      // the Lexer folds a minus before a digit into the number
+      if (operator === '-' && /^\d/.test(right)) {
+        return `-(${right})`
+      }
+      return IDENTIFIER.test(operator)
+        ? `${operator} ${right}`
+        : operator + right
     }
     case 'ConditionalExpression': {
-      const test = operand(node.test, 2)
-      const alternate = node.alternate ? print(node.alternate) : 'undefined'
-      return node.consequent
-        ? `${test} ? ${print(node.consequent)} : ${alternate}`
-        : `${test} ?: ${alternate}`
+      const test = within(node.test, CUSTOM_BINARY)
+      const consequent = node.consequent
+        ? ` ${within(node.consequent, ASSIGNMENT)} `
+        : ''
+      const alternate = node.alternate
+        ? ` ${within(node.alternate, ASSIGNMENT)}`
+        : ''
+      return `${test} ?${consequent}:${alternate}`
     }
     case 'FunctionCall': {
-      return `${node.name}(${node.args.map(print).join(', ')})`
+      const args = node.args.map((arg) => within(arg, ASSIGNMENT))
+      return `${node.name}(${args.join(', ')})`
     }
     case 'ArrayLiteral': {
-      return `[${node.value.map(print).join(', ')}]`
+      const items = node.value.map((item) => within(item, ASSIGNMENT))
+      return `[${items.join(', ')}]`
     }
     case 'ObjectLiteral': {
       const entries = Object.entries(node.value).map(
         ([name, value]) =>
-          `${IDENTIFIER.test(name) ? name : quote(name)}: ${print(value)}`
+          `${isName(name) ? name : quote(name)}: ${within(value, ASSIGNMENT)}`
       )
       return `{${entries.join(', ')}}`
     }
     case 'TemplateLiteral': {
       const parts = node.parts.map((part) =>
         part.type === 'static'
-          ? part.value.replaceAll('`', '\\`').replaceAll('${', '\\${')
+          ? part.value
+              .replaceAll('\\', '\\\\')
+              .replaceAll('`', '\\`')
+              .replaceAll('${', '\\${')
           : `\${${print(part.value)}}`
       )
       return `\`${parts.join('')}\``
     }
     case 'SequenceExpression': {
-      return node.expressions.map(print).join('; ')
+      const { expressions } = node
+      const text = expressions
+        .map((expr) => within(expr, ASSIGNMENT))
+        .join('; ')
+      return expressions.length === 1 ? `${text};` : text
     }
     case 'AssignmentExpression': {
-      return `${node.left.value} = ${operand(node.right!, 3)}`
+      return `${node.left.value} = ${within(node.right!, ASSIGNMENT)}`
     }
     case 'Lambda': {
       const params =
         node.params.length === 1
           ? node.params[0]
           : `(${node.params.join(', ')})`
-      return `${params} => ${print(node.body)}`
+      return `${params} => ${within(node.body, ASSIGNMENT)}`
     }
     default: {
       return '?'
@@ -657,13 +710,77 @@ function arithmetic(
   }
 }
 
+function textValues(type: Type) {
+  return type.kind === 'string' || type.kind === 'number'
+    ? type.values?.map(String)
+    : undefined
+}
+
+/**
+ * `+` with text on either side joins as JavaScript joins, rather than pairing
+ * list values, so `REF + '>' + ALT` is one string.
+ */
+function joined(left: Type, right: Type): Type {
+  const a = textValues(left)
+  const b = textValues(right)
+  return a && b && a.length * b.length <= MAX_VALUES
+    ? { kind: 'string', values: a.flatMap((x) => b.map((y) => x + y)) }
+    : STRING
+}
+
+const PASSES_INDEX = new Set(['map', 'filter', 'any', 'all', 'count', 'find'])
+
+/** The params of a lambda that a function walks over a list's items. */
+function lambdaParams(name: string, item: Type): Type[] {
+  switch (name) {
+    case 'sort': {
+      return [item, item]
+    }
+    case 'reduce': {
+      return [UNKNOWN, item]
+    }
+    default: {
+      return PASSES_INDEX.has(name) ? [item, NUMBER] : [item]
+    }
+  }
+}
+
+function negate(type: Type): Type {
+  switch (type.kind) {
+    case 'list': {
+      return {
+        kind: 'list',
+        of: negate(type.of),
+        cardinality: type.cardinality
+      }
+    }
+    case 'union': {
+      return unionAll(type.of.map(negate))
+    }
+    case 'unknown': {
+      return UNKNOWN
+    }
+    case 'number': {
+      if (type.values) {
+        return { kind: 'number', values: type.values.map((v) => -v) }
+      }
+      return type.domain
+        ? { kind: 'number', domain: [-type.domain[1], -type.domain[0]] }
+        : NUMBER
+    }
+    default: {
+      return NUMBER
+    }
+  }
+}
+
 function paramName(subject: AstNode, context: AstNode) {
   const node = subject as Node
   const base =
     node.type === 'Identifier'
       ? node.value.toLowerCase().replaceAll(/\W/g, '')
       : ''
-  const name = IDENTIFIER.test(base) ? base : 'x'
+  const name = isName(base) ? base : 'x'
   const text = print(context)
   let candidate = name
   for (let i = 2; new RegExp(String.raw`\b${candidate}\b`).test(text); i++) {
@@ -811,20 +928,32 @@ export function check(
         if (name === 'length') {
           return { kind: 'number', domain: [0, Infinity] }
         }
-        if (subject.of.kind !== 'record') {
-          break
+        const item = subject.of
+        const entriesHave =
+          item.kind === 'unknown' ||
+          (item.kind === 'record' &&
+            (item.open || !!item.each || item.fields.has(name)))
+        const suggestions: string[] = []
+        if (entriesHave && subjectNode && node.type === 'Identifier') {
+          const list = print(subjectNode)
+          const param = paramName(subjectNode, node)
+          suggestions.push(`${list}[0]${key(name)}`)
+          if (functions?.map) {
+            suggestions.push(`map(${list}, ${param} => ${param}${key(name)})`)
+          }
         }
-        const item = field(subject.of, name, node, subjectNode, spell)
-        if (isMulti(subject)) {
-          report(
-            'dot-through-list',
-            'warning',
-            node,
-            `${where} ${holding(subject)}; ${key(name)} reads only the first one's` +
-              (functions?.any ? ', where any() would test each' : '')
-          )
-        }
-        return item
+        report(
+          'dot-through-list',
+          'warning',
+          node,
+          `${where} is a list, so ${key(name)} is undefined` +
+            (entriesHave
+              ? `; [0]${key(name)} reads the first entry's` +
+                (functions?.any ? ', and any() tests each' : '')
+              : ''),
+          suggestions
+        )
+        return UNDEFINED
       }
       case 'string': {
         if (name === 'length') {
@@ -1148,6 +1277,15 @@ export function check(
       return BOOLEAN
     }
 
+    const leftItem = left.kind === 'list' ? left.of : left
+    const rightItem = right.kind === 'list' ? right.of : right
+    if (
+      operator === '+' &&
+      (leftItem.kind === 'string' || rightItem.kind === 'string')
+    ) {
+      return joined(left, right)
+    }
+
     const lists = [left, right].filter(
       (type): type is OfKind<'list'> => type.kind === 'list'
     )
@@ -1165,25 +1303,10 @@ export function check(
         `${print(node.left)} ${holding(first)} and ${print(rightNode)} ${holding(second)}, so ${operator} pairs them only where both hold one value`
       )
     }
-    const leftItem = left.kind === 'list' ? left.of : left
-    const rightItem = right.kind === 'list' ? right.of : right
     const eachOf = (item: Type): Type =>
       first ? { kind: 'list', of: item, cardinality: first.cardinality } : item
 
     if (operator === '+') {
-      if (leftItem.kind === 'string' || rightItem.kind === 'string') {
-        const values =
-          leftItem.kind === 'string' &&
-          rightItem.kind === 'string' &&
-          leftItem.values &&
-          rightItem.values &&
-          leftItem.values.length * rightItem.values.length <= MAX_VALUES
-            ? leftItem.values.flatMap((a) =>
-                rightItem.values!.map((b) => a + b)
-              )
-            : undefined
-        return eachOf(values ? { kind: 'string', values } : STRING)
-      }
       return isNumberish(leftItem) && isNumberish(rightItem)
         ? eachOf(arithmetic('+', leftItem, rightItem))
         : UNKNOWN
@@ -1236,7 +1359,7 @@ export function check(
           'never-equal',
           'warning',
           node,
-          `in tests a list, text or an object's keys, and ${print(rightNode)} is ${describe(right)}`
+          `in tests a list, text, a Set, a Map or an object's keys, and ${print(rightNode)} is ${describe(right)}`
         )
       }
       return BOOLEAN
@@ -1278,10 +1401,10 @@ export function check(
     }
   }
 
-  function lambda(node: Lambda, item: Type): Type {
+  function lambda(node: Lambda, types: readonly Type[] = []): Type {
     const saved = node.params.map((name) => [name, scope.get(name)] as const)
     node.params.forEach((name, i) => {
-      scope.set(name, i === 0 ? item : NUMBER)
+      scope.set(name, types[i] ?? UNKNOWN)
     })
     const returns = infer(node.body)
     for (const [name, previous] of saved) {
@@ -1325,11 +1448,7 @@ export function check(
     const signature =
       functions && Object.hasOwn(functions, name) ? functions[name] : undefined
     if (!signature) {
-      for (const arg of args) {
-        if ((arg as Node).type !== 'Lambda') {
-          infer(arg)
-        }
-      }
+      args.forEach(infer)
       if (functions) {
         const near = nearest(name, Object.keys(functions))
         report(
@@ -1370,7 +1489,7 @@ export function check(
       if ((arg as Node).type === 'Lambda') {
         const item =
           lastCollection?.kind === 'list' ? lastCollection.of : UNKNOWN
-        types.push(lambda(arg as Lambda, item))
+        types.push(lambda(arg as Lambda, lambdaParams(name, item)))
         continue
       }
       const type = infer(arg)
@@ -1427,7 +1546,9 @@ export function check(
           ? { kind: 'number', values: [value] }
           : typeof value === 'string'
             ? { kind: 'string', values: [value] }
-            : BOOLEAN
+            : value === null
+              ? UNDEFINED
+              : BOOLEAN
       }
       case 'Identifier': {
         if (!node.from) {
@@ -1446,7 +1567,7 @@ export function check(
           return index(subject, at, node, node.subject)
         }
         if (typeof at === 'string') {
-          if (subject.kind === 'list') {
+          if (subject.kind === 'list' && at !== 'length') {
             report(
               'unknown-field',
               'warning',
@@ -1483,21 +1604,7 @@ export function check(
           return BOOLEAN
         }
         if (node.operator === '-') {
-          if (isMulti(right)) {
-            report(
-              'list-operand',
-              'warning',
-              node,
-              `${print(node.right!)} ${holding(right)}, so - negates only a lone value`
-            )
-          }
-          const domain = domainOf(right)
-          if (right.kind === 'number' && right.values) {
-            return { kind: 'number', values: right.values.map((v) => -v) }
-          }
-          return domain
-            ? { kind: 'number', domain: [-domain[1], -domain[0]] }
-            : NUMBER
+          return negate(right)
         }
         return UNKNOWN
       }
@@ -1538,11 +1645,7 @@ export function check(
           if (part.type === 'static') {
             values = values?.map((value) => value + part.value)
           } else {
-            const type = infer(part.value)
-            const options =
-              type.kind === 'string' || type.kind === 'number'
-                ? type.values?.map(String)
-                : undefined
+            const options = textValues(infer(part.value))
             values =
               values && options && values.length * options.length <= MAX_VALUES
                 ? values.flatMap((value) =>
@@ -1566,7 +1669,7 @@ export function check(
         return value
       }
       case 'Lambda': {
-        return lambda(node, UNKNOWN)
+        return lambda(node)
       }
       default: {
         throw new Error(`Corrupt AST: unknown node type '${ast.type}'`)
