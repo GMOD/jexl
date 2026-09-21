@@ -47,12 +47,16 @@ describe('single evaluation of a compiled expression', () => {
     d: 4
   }
   const nested = { a: { b: { c: { d: 1 } } } }
+  const throughArray = { a: { b: [{ c: { d: 1 } }] } }
 
   bench('arithmetic', () => {
     arithmetic.eval(context)
   })
   bench('identifier chain', () => {
     chain.eval(nested)
+  })
+  bench('identifier chain through an array', () => {
+    chain.eval(throughArray)
   })
   bench('template literal', () => {
     template.eval(context)

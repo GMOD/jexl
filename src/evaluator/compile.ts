@@ -116,13 +116,16 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
         return (ctx) => ctx[name]
       }
       const from = compileAst(node.from, grammar)
+      // an identifier chained off an array reads through its first element,
+      // except `length`, which is the array's own
+      const projectsArrays = name !== 'length'
       return (ctx) => {
         const subject = from(ctx)
         if (subject == null) {
           return undefined
         }
-        // an identifier chained off an array reads through its first element
-        const target = Array.isArray(subject) ? subject[0] : subject
+        const target =
+          projectsArrays && Array.isArray(subject) ? subject[0] : subject
         return target == null ? undefined : (target as Context)[name]
       }
     }

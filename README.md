@@ -115,7 +115,12 @@ jexl.eval('name.first', context) // "Malory"
 jexl.eval('name["last"]', context) // "Archer"
 jexl.eval('exes[2]', context) // "Burt"
 jexl.eval('exes[lastEx - 1]', context) // "Len"
+jexl.eval('exes.length', context) // 3
 ```
+
+A name chained off an array reads through its first element, so `list.name`
+means `list[0].name`. The exception is `length`, which the array answers
+itself: `exes.length` is 3, not the length of `"Nikolai"`.
 
 ### Functions
 

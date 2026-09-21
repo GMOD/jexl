@@ -62,6 +62,21 @@ describe('compileAst', () => {
     }
     expect(evaluate('foo.bar.tek.hello', context)).toBe('world')
   })
+  it("reads an array's own length rather than its first element's", () => {
+    expect(evaluate('["foo", "bar"].length')).toBe(2)
+    expect(evaluate('[].length')).toBe(0)
+    expect(evaluate('alt.length', { alt: ['DEL'] })).toBe(1)
+    expect(evaluate('features.length', { features: [{}, {}, {}] })).toBe(3)
+    expect(evaluate('f.alt.length', { f: { alt: ['A', 'TT'] } })).toBe(2)
+    expect(evaluate('alt[0].length', { alt: ['DEL'] })).toBe(3)
+    expect(evaluate('"DEL".length')).toBe(3)
+  })
+  it('still reads every other name through the first element', () => {
+    const context = { alt: [{ type: 'SNV', map: 'm' }] }
+    expect(evaluate('alt.type', context)).toBe('SNV')
+    expect(evaluate('alt.map', context)).toBe('m')
+    expect(evaluate('[].type')).toBeUndefined()
+  })
   it('makes array elements addressable by index', () => {
     const context = {
       foo: {
