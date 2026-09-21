@@ -8,7 +8,13 @@ import { compileAst, readIndex, readMember, stringify } from './compile.ts'
 
 import type { Grammar, GrammarFn } from '../grammar.ts'
 import type { Context } from './compile.ts'
-import type { AstNode, AstNodeUnion, Identifier, JexlValue } from '../types.ts'
+import type {
+  AstNode,
+  AstNodeUnion,
+  Identifier,
+  JexlValue,
+  Literal
+} from '../types.ts'
 
 /** Named columns holding one value per row. A typed array is a column. */
 export type Columns = Record<string, ArrayLike<unknown>>
@@ -371,6 +377,22 @@ function template(parts: readonly (string | ColumnNode)[]): ColumnNode {
   }
 }
 
+// `test ? 'red' : 'blue'`, the usual colour rule: neither branch has anything
+// to evaluate, so one pass picks between the two values
+function choose(test: ColumnNode, yes: JexlValue, no: JexlValue): ColumnNode {
+  return (columns, rows, n) => {
+    const t = test(columns, rows, n)
+    if (t instanceof Scalar) {
+      return new Scalar(t.value ? yes : no)
+    }
+    const out: JexlValue[] = new Array(n)
+    for (let k = 0; k < n; k++) {
+      out[k] = t[k] ? yes : no
+    }
+    return out
+  }
+}
+
 function conditional(
   test: ColumnNode,
   consequent: ColumnNode | undefined,
@@ -475,6 +497,17 @@ function columnar(
     }
 
     case 'ConditionalExpression': {
+      const { consequent, alternate } = node
+      if (
+        consequent?.type === 'Literal' &&
+        (alternate === undefined || alternate.type === 'Literal')
+      ) {
+        return choose(
+          sub(node.test),
+          (consequent as Literal).value,
+          (alternate as Literal | undefined)?.value
+        )
+      }
       return conditional(
         sub(node.test),
         node.consequent && sub(node.consequent),
