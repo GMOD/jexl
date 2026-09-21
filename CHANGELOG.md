@@ -2,6 +2,74 @@
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [v5.0.0] (draft)
+
+A Pratt parser replaces the state machine. It builds the same tree for every
+expression 4.0.1 parsed correctly, which differential testing against 4.0.1 over
+about two million generated expressions confirmed, and parses about three times
+as fast. Evaluation speed is unchanged.
+
+### BREAKING CHANGES
+
+- **`&&` binds tighter than `||`**, as in JS and SQL. Both sat at precedence 10
+  and grouped left to right, so `type == 'gene' || type == 'mRNA' && score > 5`
+  meant `(… || …) && score > 5`. `&&` is now 11. A mix that is already
+  parenthesized reads the same.
+- **`^` groups from the right**: `2 ^ 3 ^ 2` is 512, not 64. `%` and `^` still
+  share a precedence and group left to right with each other.
+- **`=` only takes a bare name, and binds loosest of all.** `1 + x = 3` used to
+  assign `x` and return 4; `!x = 1`, `a < b = c` and the like did the same. Each
+  is now a syntax error. A host operator registered at precedence 2 or below now
+  binds tighter than `=`, so `x = a OP b` assigns the whole of `a OP b`.
+- **An empty slot is a syntax error.** `f(1,,2)`, `[1,,2]`, `[,]` and `f(,)`
+  dropped the hole. A trailing comma is still allowed.
+- **An empty or unclosed group is a syntax error.** `()`, `(` and `1; (`
+  evaluated to `undefined`; `1 + ()`, `a[]` and `{a: }` threw a `TypeError`.
+- **`;` separates statements only at the top level and inside parentheses.**
+  `f(a; b)`, `[a; b]` and `c ? a; b : d` are syntax errors.
+- **`=>` and `??` are tokens.** Each already failed to parse as two tokens.
+- **The function pool starts with `any`, `all`, `count`, `map`, `filter`,
+  `find`, `sort` and `reduce`.** A host function of the same name replaces one.
+- **Parse errors are `JexlSyntaxError`**, a subclass of `Error` whose `name` is
+  `'JexlSyntaxError'`. Every message keeps its wording. The assignment error now
+  quotes the expression up to the `=`, as the others already did.
+- **Types**: `JexlValue` includes `JexlFunction`, the type of a lambda's value.
+  `AstNodeUnion` includes `Lambda`. `AstNode` loses `_parent`, which the old
+  parser set on every node as a non-enumerable property. `BinaryOp` gains
+  `rightAssociative`.
+- **Internals**: `src/parser/states.ts` and `src/parser/handlers.ts` are gone,
+  and `precedenceOf` with them. `Parser` keeps `addTokens()` and `complete()`
+  and adds `parse(source)`; it loses `addToken()` and the constructor's prefix
+  and stop-map arguments. The package entry point never exported any of these.
+
+### Added
+
+- **`??`**, which falls back only for `null` and `undefined`, where `||`
+  replaced a real `0` score. It shares `||`'s precedence and, as in JS, refuses
+  to mix with `&&` or `||` without parentheses.
+- **Lambdas**: `x => body` and `(a, b) => body`. A lambda is a plain JS
+  function, so any registered function can call it; jbrowse's
+  `interpolate(score, s => …)` becomes usable from config. A parameter shadows
+  the context variable of its name, any other name reads the context, and a
+  lambda body cannot assign.
+- **Collection functions** taking a list and a lambda. A lone value reads as a
+  list of one and a missing value as empty, so
+  `any(feature.INFO.AF, af => af > 0.05)` works whether `AF` holds one value or
+  several.
+- **`JexlSyntaxError.offset`**, the character offset in the source where
+  parsing failed, including inside a template interpolation.
+
+### Fixed
+
+- **`(x = a) ? b : c` tests the assignment.** The ternary reached into the group
+  and parsed it as `x = (a ? b : c)`.
+- **`(-x).y` and `(!x).y` read the property.** Both were refused as relative
+  paths.
+- **A sequence continues past a ternary into a group or literal.**
+  `a ? 1 : 2; [3]` failed with "Unexpected end of expression".
+- **Calling something other than a name says so.** `(a)(1)` and `f(1)(2)` now
+  fail with "Functions must be called by name".
+
 ## [v4.0.1]
 
 ### Fixed
