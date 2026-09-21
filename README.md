@@ -93,6 +93,8 @@ jexl.eval('`Price: \\$100`')
 
 - Arithmetic: `+`, `-`, `*`, `/`, `//` (floor division), `%`, `^` (power)
 - Comparison: `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`
+- Regular expression match: `~`, `!~` (`name ~ '^BRCA'`; a leading `(?i)`
+  ignores case)
 - Logical: `&&`, `||`, `??` (`a ?? b` is `b` only when `a` is `null` or
   `undefined`, so `score ?? 0` keeps a real 0)
 - Assignment: `=` (assigns a value to a bare variable name; `a.b = 1` is not
@@ -104,22 +106,64 @@ jexl.eval('`Price: \\$100`')
 
 From loosest to tightest:
 
-| Operators                              | Groups             |
-| -------------------------------------- | ------------------ |
-| `;`                                    |                    |
-| `=`, lambdas                           | right to left      |
-| `? :`                                  | right to left      |
-| `\|\|`, `??`                           | left to right      |
-| `&&`                                   | left to right      |
-| `==`, `!=`, `>`, `>=`, `<`, `<=`, `in` | left to right      |
-| `+`, `-`                               | left to right      |
-| `*`, `/`, `//`                         | left to right      |
-| `%`, `^`                               | `^` from the right |
-| prefix `!`, `-`                        |                    |
-| `.`, `[]`, calls                       | left to right      |
+| Operators                                         | Groups             |
+| ------------------------------------------------- | ------------------ |
+| `;`                                               |                    |
+| `=`, lambdas                                      | right to left      |
+| `? :`                                             | right to left      |
+| `\|\|`, `??`                                      | left to right      |
+| `&&`                                              | left to right      |
+| `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`, `~`, `!~` | left to right      |
+| `+`, `-`                                          | left to right      |
+| `*`, `/`, `//`                                    | left to right      |
+| `%`, `^`                                          | `^` from the right |
+| prefix `!`, `-`                                   |                    |
+| `.`, `[]`, calls                                  | left to right      |
 
 As in JavaScript, `??` does not mix with `&&` or `||` without parentheses:
 `a ?? b || c` is a syntax error, `(a ?? b) || c` is not.
+
+### Lists
+
+Operators read a list the way bcftools reads a multi-valued VCF tag.
+
+A comparison holds when it holds for any value of the list, and `!=` and `!~`
+hold when no value matches, so each stays the negation of `==` and `~`:
+
+```javascript
+const context = {
+  AF: [0.01, 0.2],
+  FILTER: ['PASS'],
+  CSQ: ['T|missense_variant|MODERATE', 'T|synonymous_variant|LOW']
+}
+
+jexl.eval('AF > 0.05', context) // true: the second allele's frequency is
+jexl.eval("FILTER != 'PASS'", context) // false
+jexl.eval("CSQ ~ 'missense_variant'", context) // true
+jexl.eval("['DEL'] in ['DEL', 'INS']") // true
+```
+
+Arithmetic pairs lists value by value, and a single value, or a list of one,
+pairs with every value of the other side:
+
+```javascript
+jexl.eval('AC / AN', { AC: [2, 4], AN: [10] }) // [0.2, 0.4]
+jexl.eval('DP + 1', { DP: [25] }) // [26]
+```
+
+`in` finds a substring of a string, a member of a list or Set, or a key of an
+object or Map, so a host can hand an expression a gene list loaded from a file
+as a Set: `name in genes`.
+
+`sum`, `mean`, `median`, `min` and `max` aggregate a list, reading each value
+through an optional lambda. They skip missing values, and count a boolean as 1
+or 0, which makes `mean` of a test the fraction that pass:
+
+```javascript
+jexl.eval('min(DV / DP) > 0.3', context) // bcftools MIN(DV/DP)>0.3
+jexl.eval('count(samples, s => s.GQ > 90)', context) // bcftools N_PASS(GQ>90)
+jexl.eval('mean(samples, s => s.GQ > 90)', context) // bcftools F_PASS(GQ>90)
+```
 
 ### Identifiers
 
@@ -179,7 +223,7 @@ A parameter shadows the context variable of the same name; any other name reads
 the context. A lambda body cannot assign.
 
 Jexl registers `any`, `all`, `count`, `map`, `filter`, `find`, `sort` and
-`reduce`, each taking a list and a lambda. A lone value counts as a list of one
+`reduce`, each taking a list and a lambda, and the aggregates above. A lone value counts as a list of one
 and a missing value as an empty list, which suits VCF INFO fields:
 
 ```javascript

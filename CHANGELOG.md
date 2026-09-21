@@ -24,6 +24,18 @@ expression what it reads.
   so one context can be reused across evaluations without the last one's
   variables leaking into the next. Code that read assigned values back off the
   context after `eval()` has to return them from the expression instead.
+- **A comparison holds when it holds for any value of a list**, as bcftools
+  compares a multi-valued tag: `feature.INFO.AF > 0.05` is true when any
+  allele's frequency is, and `feature.INFO.CLNSIG == 'Pathogenic'` when any
+  significance is. Each compared the list itself before, which answered only
+  for a list of one, through JavaScript's coercion of `[25]` to `25`. `!=`
+  holds when no value matches, so `feature.FILTER != 'PASS'` means "did not
+  pass" and stays the negation of `==`; bcftools' own `!=` is existential, a
+  trap its manual warns about. `in` finds any value of a list on its left.
+- **Arithmetic pairs lists value by value.** `AC / AN` gives each allele's
+  frequency, and a list of one, or a single value, pairs with every value of
+  the other side, so `feature.INFO.DP + 1` is `[26]` where it was the text
+  `'251'`. Lists of two other lengths yield `undefined`.
 - **`=` only takes a bare name, and binds loosest of all.** `1 + x = 3` used to
   assign `x` and return 4; `!x = 1`, `a < b = c` and the like did the same. Each
   is now a syntax error. A host operator registered at precedence 2 or below now
@@ -99,6 +111,18 @@ expression what it reads.
   list of one and a missing value as empty, so
   `any(feature.INFO.AF, af => af > 0.05)` works whether `AF` holds one value or
   several.
+- **`~` and `!~` match a regular expression**, against any value of a list:
+  `feature.INFO.CSQ ~ 'missense_variant'` finds the term in a raw CSQ entry,
+  where `includes(feature.INFO.CSQ, 'missense_variant')` compared whole
+  entries and was false for every real record. A leading `(?i)` ignores case.
+- **`sum`, `mean`, `median`, `min` and `max` aggregate a list**, through an
+  optional lambda, skipping missing values and counting a boolean as 1 or 0.
+  With `count` they cover bcftools' `SUM`, `AVG`, `MEDIAN`, `MIN`, `MAX`,
+  `N_PASS` and `F_PASS`: `mean(samples, s => s.GQ > 90)` is `F_PASS(GQ>90)`.
+  `min` and `max` also take several values, as `Math.min` does.
+- **`in` looks up a Set, a Map or an object's keys**, so `'DP' in feature.INFO`
+  asks whether a field is present, and a host can hand an expression a gene
+  list loaded from a file as a Set, as bcftools reads one with `ID=@file`.
 - **`??` falls back only on `null` and `undefined`.** A real score of 0 loses
   to the fallback in `get(feature, 'score') || 1` and survives in
   `get(feature, 'score') ?? 1`. It shares `||`'s precedence and, as in JS,
