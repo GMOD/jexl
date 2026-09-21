@@ -10,13 +10,26 @@ import { getGrammar } from './grammar.ts'
 import type {
   BinaryOpEval,
   BinaryOpEvalOnDemand,
+  GetMember,
   Grammar,
   GrammarElement,
   GrammarFn,
   UnaryOpEval,
-  UncheckedFn
+  UncheckedFn,
+  VariableReader
 } from './grammar.ts'
 import type { JexlValue } from './types.ts'
+
+/**
+ * Hooks for a host whose values keep their fields behind an accessor. Both are
+ * fixed at construction, since a compiled expression binds them.
+ */
+export interface JexlOptions {
+  /** Resolves `a.b` and `a[k]`. */
+  getMember?: GetMember
+  /** Resolves a bare name, such as a field of the current row. */
+  variableReader?: VariableReader
+}
 
 /**
  * Jexl is the Javascript Expression Language, capable of parsing and
@@ -30,8 +43,8 @@ class Jexl {
   // element-splitting regex is built once rather than per compile
   _lexer: Lexer
 
-  constructor() {
-    this._grammar = getGrammar()
+  constructor({ getMember, variableReader }: JexlOptions = {}) {
+    this._grammar = { ...getGrammar(), getMember, variableReader }
     this._lexer = new Lexer(this._grammar)
     this.expr = this.expr.bind(this)
   }

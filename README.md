@@ -219,6 +219,33 @@ jexl.addUnaryOp('~', (right) => Math.floor(right))
 jexl.eval('~3.7') // 3
 ```
 
+### Resolving Names Through the Host
+
+When the values in a context keep their fields behind an accessor, a Jexl instance can resolve names itself instead of reading plain properties. Both hooks are fixed when the instance is constructed.
+
+```javascript
+import { Jexl } from '@jbrowse/jexl'
+
+const jexl = new Jexl({
+  // `a.b` and `a[k]`, on any value that isn't null or undefined
+  getMember: (subject, key) =>
+    subject instanceof Feature ? subject.get(key) : subject[key],
+  // a bare name, asked once per name as an expression compiles; returning
+  // undefined keeps the plain `context[name]` read
+  variableReader: (name) =>
+    name === 'feature'
+      ? undefined
+      : (context) => context.feature.get(name) ?? context[name]
+})
+
+const expr = jexl.compile('feature.score > 10 && -log10(pvalue) > 2')
+for (const feature of features) {
+  expr.eval({ feature })
+}
+```
+
+`a.b` on an array still reads its first element's `b`: `getMember` is handed that element.
+
 ## License
 
 MIT License, same as TomFrost/Jexl

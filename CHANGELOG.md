@@ -2,6 +2,17 @@
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **`new Jexl({ getMember, variableReader })`.** `getMember(subject, key)`
+  resolves `a.b` and `a[k]`; `variableReader(name)`, asked once per bare name
+  at compile time, may return a reader that replaces `context[name]`. A host
+  whose records keep their fields behind an accessor no longer needs a Proxy
+  per record, and can resolve bare names against the current record. An
+  instance with neither evaluates exactly as before.
+
 ## [v4.0.1]
 
 ### Fixed

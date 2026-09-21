@@ -76,9 +76,29 @@ export type GrammarElement = BinaryOp | UnaryOp | SimpleElement
 /** A registered function, as jexl calls it once the operands are evaluated. */
 export type GrammarFn = (...args: JexlValue[]) => JexlValue
 
+/**
+ * Reads `key` off `subject` for `subject.key` and `subject[key]`, in place of
+ * a plain property read. Like a registered function, it is handed host values
+ * jexl has no type for, so the subject is only promised not to be nullish.
+ */
+export type GetMember = (
+  subject: NonNullable<unknown>,
+  key: string | number
+) => unknown
+
+/**
+ * Called once per bare variable name as an expression compiles. A reader it
+ * returns replaces `context[name]` for that name; `undefined` keeps it.
+ */
+export type VariableReader = (
+  name: string
+) => ((context: Record<string, unknown>) => unknown) | undefined
+
 export interface Grammar {
   elements: Record<string, GrammarElement>
   functions: Record<string, GrammarFn>
+  getMember?: GetMember
+  variableReader?: VariableReader
 }
 
 /**

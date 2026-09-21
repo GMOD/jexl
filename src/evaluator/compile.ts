@@ -36,15 +36,29 @@ function assignOwn(target: Context, key: string, value: JexlValue) {
   target[key] = value
 }
 
+// an identifier chained off an array reads through its first element
+function readThrough(subject: JexlValue) {
+  return Array.isArray(subject) ? subject[0] : subject
+}
+
+/** The key `subject[index]` reads under, or undefined when it reads nothing. */
+function memberKey(index: JexlValue) {
+  return typeof index === 'string' || typeof index === 'number'
+    ? index
+    : indexKey(index)
+}
+
 /**
  * The key a bracket index that is neither a string nor a number reads under:
  * its string form, when it has one worth using.
  *
  * A boolean and an array of primitives do — `['a']` is the key `'a'`, exactly
- * as JS would index by it. A plain object does not, since '[object Object]' is
- * not a key anything is stored under, so it and an array holding one answer
- * `undefined` instead; indexing by either reached that lookup and missed
- * anyway. null and undefined are the same case.
+ * as JS would index by it, and how a `@gmod/vcf` INFO value (always a list,
+ * `Number=1` included) indexes a lookup table. A multi-valued list is the key
+ * `'a,b'`, and misses rather than guess which value was meant. A plain object
+ * does not, since '[object Object]' is not a key anything is stored under, so
+ * it and an array holding one answer `undefined` instead. null and undefined
+ * are the same case.
  */
 function indexKey(value: JexlValue): string | undefined {
   if (typeof value === 'boolean') {
@@ -113,16 +127,23 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     case 'Identifier': {
       const name = node.value
       if (!node.from) {
-        return (ctx) => ctx[name]
+        return (
+          (grammar.variableReader?.(name) as CompiledNode | undefined) ??
+          ((ctx) => ctx[name])
+        )
       }
       const from = compileAst(node.from, grammar)
-      return (ctx) => {
-        const subject = from(ctx)
-        if (subject == null) {
-          return undefined
+      const { getMember } = grammar
+      if (getMember) {
+        return (ctx) => {
+          const target = readThrough(from(ctx))
+          return target == null
+            ? undefined
+            : (getMember(target, name) as JexlValue)
         }
-        // an identifier chained off an array reads through its first element
-        const target = Array.isArray(subject) ? subject[0] : subject
+      }
+      return (ctx) => {
+        const target = readThrough(from(ctx))
         return target == null ? undefined : (target as Context)[name]
       }
     }
@@ -194,37 +215,22 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     case 'FilterExpression': {
       const subject = compileAst(node.subject, grammar)
       const index = compileAst(node.expr, grammar)
+      const { getMember } = grammar
+      if (getMember) {
+        return (ctx) => {
+          const subjectVal = subject(ctx)
+          const key = memberKey(index(ctx))
+          return subjectVal == null || key === undefined
+            ? undefined
+            : (getMember(subjectVal, key) as JexlValue)
+        }
+      }
       return (ctx) => {
         const subjectVal = subject(ctx)
-        const indexVal = index(ctx)
-        if (subjectVal == null) {
-          return undefined
-        }
-        if (typeof indexVal === 'string' || typeof indexVal === 'number') {
-          return (subjectVal as Record<string | number, JexlValue>)[indexVal]
-        }
-        // A value with a meaningful string form is indexed by it, which is what
-        // JS does and what this did until the evaluator was lowered to closures
-        // — the tree-walking version was a bare `subject?.[index]`. Answering
-        // `undefined` for everything else reads as a deliberate strictness and
-        // is not: nothing wanted it, and the shape it rejects is common.
-        //
-        // That shape is a one-element array. Every `@gmod/vcf` INFO value is a
-        // list — `Number=1` included, so `CLNSIG=Pathogenic` parses to
-        // `['Pathogenic']` — and the natural way to colour by one is a lookup
-        // table indexed by it. The miss is silent, because such an expression
-        // always carries a `|| fallback` for the values it has no entry for,
-        // and that fallback then answers for every record.
-        //
-        // A multi-valued list still misses — `['a','b']` is the key 'a,b' —
-        // which is the honest answer rather than a lucky one: reading through
-        // to the first element would be the index guessing which value was
-        // meant. `Identifier` above does read through a one-element array, but
-        // it is navigating rather than selecting, so it has nothing to guess.
-        const key = indexKey(indexVal)
-        return key === undefined
+        const key = memberKey(index(ctx))
+        return subjectVal == null || key === undefined
           ? undefined
-          : (subjectVal as Record<string, JexlValue>)[key]
+          : (subjectVal as Record<string | number, JexlValue>)[key]
       }
     }
 
