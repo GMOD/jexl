@@ -27,7 +27,7 @@ const tokenized = EXPRESSIONS.map((expression) =>
 describe('parse and compile', () => {
   bench('realistic mix: lex, parse, compile', () => {
     for (const expression of EXPRESSIONS) {
-      inst.compile(expression)
+      inst.createExpression(expression).compile()
     }
   })
   bench('realistic mix: parse only', () => {

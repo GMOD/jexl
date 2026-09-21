@@ -31,6 +31,11 @@ describe('one expression over 1000 contexts', () => {
 
   bench('parsed and compiled per context', () => {
     for (const context of contexts) {
+      inst.createExpression(EXPR).eval(context)
+    }
+  })
+  bench('eval by string, served from the compile cache', () => {
+    for (const context of contexts) {
       inst.eval(EXPR, context)
     }
   })

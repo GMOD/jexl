@@ -5,7 +5,6 @@
 
 import type { Grammar } from '../grammar.ts'
 import type {
-  AssignmentExpression,
   AstNode,
   AstNodeUnion,
   JexlFunction,
@@ -195,13 +194,69 @@ function climb(hops: number, index: number): CompiledNode {
   }
 }
 
-function assignedNames(node: unknown, names = new Set<string>()) {
-  if (typeof node === 'object' && node !== null) {
-    if ((node as AstNode).type === 'AssignmentExpression') {
-      names.add((node as AssignmentExpression).left.value)
+function assignedNames(ast: AstNode | undefined, names = new Set<string>()) {
+  const node = ast as AstNodeUnion | undefined
+  switch (node?.type) {
+    case 'AssignmentExpression': {
+      names.add(node.left.value)
+      assignedNames(node.right, names)
+      break
     }
-    for (const child of Object.values(node)) {
-      assignedNames(child, names)
+    case 'Identifier': {
+      assignedNames(node.from, names)
+      break
+    }
+    case 'BinaryExpression': {
+      assignedNames(node.left, names)
+      assignedNames(node.right, names)
+      break
+    }
+    case 'UnaryExpression': {
+      assignedNames(node.right, names)
+      break
+    }
+    case 'ConditionalExpression': {
+      assignedNames(node.test, names)
+      assignedNames(node.consequent, names)
+      assignedNames(node.alternate, names)
+      break
+    }
+    case 'FilterExpression': {
+      assignedNames(node.subject, names)
+      assignedNames(node.expr, names)
+      break
+    }
+    case 'ArrayLiteral':
+    case 'FunctionCall':
+    case 'SequenceExpression': {
+      const children =
+        node.type === 'ArrayLiteral'
+          ? node.value
+          : node.type === 'FunctionCall'
+            ? node.args
+            : node.expressions
+      for (const child of children) {
+        assignedNames(child, names)
+      }
+      break
+    }
+    case 'ObjectLiteral': {
+      for (const child of Object.values(node.value)) {
+        assignedNames(child, names)
+      }
+      break
+    }
+    case 'TemplateLiteral': {
+      for (const part of node.parts) {
+        if (part.type === 'expression') {
+          assignedNames(part.value, names)
+        }
+      }
+      break
+    }
+    case 'Lambda': {
+      assignedNames(node.body, names)
+      break
     }
   }
   return names
