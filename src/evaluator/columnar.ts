@@ -11,6 +11,7 @@ import type { Context } from './compile.ts'
 import type {
   AstNode,
   AstNodeUnion,
+  FilterExpression,
   Identifier,
   JexlValue,
   Literal
@@ -292,6 +293,21 @@ function identifier(
   }
 }
 
+// `feature['Study ID']`: the data pronoun indexed by a literal names a column
+// no identifier can, as R's `.data[["Study ID"]]` does
+function pronounKey(node: FilterExpression, options: ColumnarOptions) {
+  const subject = node.subject as AstNodeUnion
+  const index = node.expr as AstNodeUnion
+  return options.dataPronoun !== undefined &&
+    subject.type === 'Identifier' &&
+    !subject.from &&
+    subject.value === options.dataPronoun &&
+    index.type === 'Literal' &&
+    typeof index.value === 'string'
+    ? index.value
+    : undefined
+}
+
 function logical(
   left: ColumnNode,
   right: ColumnNode,
@@ -516,6 +532,11 @@ function columnar(
     }
 
     case 'FilterExpression': {
+      const key = pronounKey(node, options)
+      if (key !== undefined) {
+        return (columns, rows, n) =>
+          Object.hasOwn(columns, key) ? gather(columns[key]!, rows, n) : NOTHING
+      }
       const subject = sub(node.subject)
       const index = sub(node.expr)
       return (columns, rows, n) =>

@@ -104,6 +104,27 @@ describe('compileColumnar', () => {
     expect(Array.from(actual)).toEqual(expected)
   })
 
+  it('reads a column no identifier can name through the pronoun', () => {
+    const cols = {
+      'Study ID': ['GCST1', 'GCST2', undefined],
+      'collection-date': ['2020', undefined, '2021']
+    }
+    const expr = jexl.compile(
+      "feature['Study ID'] || feature['collection-date']"
+    )
+    const expected = [0, 1, 2].map((i) =>
+      expr.eval({
+        feature: {
+          'Study ID': cols['Study ID'][i],
+          'collection-date': cols['collection-date'][i]
+        }
+      })
+    )
+    expect(expr.compileColumnar({ dataPronoun: 'feature' })(cols, 3)).toEqual(
+      expected
+    )
+  })
+
   it('prefers a column to the environment under the mask', () => {
     const fn = jexl.compile('threshold').compileColumnar({ env })
     expect(fn({ threshold: [1, 2] }, 2)).toEqual([1, 2])
