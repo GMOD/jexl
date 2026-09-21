@@ -12,7 +12,11 @@ import type { TemplatePart, Token } from './types.ts'
 // disagree on some input, and each disagreement is an "Invalid expression
 // token" for something the splitter was happy to produce.
 const identChars = String.raw`a-zA-Zа-яА-Я_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF$`
-const identPattern = `[${identChars}][${identChars}0-9]*`
+const identPart = `[${identChars}0-9]`
+const identPattern = `[${identChars}]${identPart}*`
+// a word operator such as `in`, but not part of a longer name. \b would do only
+// for ASCII names, and split `in$` or `inà` into the operator and a remainder
+const wholeWord = (word: string) => `(?<!${identPart})${word}(?!${identPart})`
 // unsigned: whether a leading '-' negates is decided separately, in getTokens
 const numberPattern = String.raw`(?:(?:[0-9]*\.[0-9]+)|[0-9]+)(?:[eE][+-]?[0-9]+)?`
 
@@ -35,9 +39,6 @@ const preOpRegexElems = [
   String.raw`"(?:(?:\\")|[^"])*"`,
   // Whitespace
   String.raw`\s+`,
-  // Booleans
-  String.raw`\btrue\b`,
-  String.raw`\bfalse\b`,
   // ahead of the grammar's '.', so that '.5' is a number rather than a dot
   numberPattern
 ]
@@ -221,18 +222,16 @@ class Lexer {
 
   /**
    * Escapes a string so that it can be treated as a string literal within a
-   * regular expression.
+   * regular expression. A word such as `in` also stops matching inside a
+   * longer name.
    * @param {string} str The string to be escaped
    * @returns {string} the RegExp-escaped string.
    * @see https://developer.mozilla.org/en/docs/Web/JavaScript/Guide/Regular_Expressions
    * @private
    */
   _escapeRegExp(str: string) {
-    str = str.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
-    if (identRegex.exec(str)) {
-      str = String.raw`\b` + str + String.raw`\b`
-    }
-    return str
+    const escaped = str.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
+    return identRegex.exec(str) ? wholeWord(escaped) : escaped
   }
 
   /**

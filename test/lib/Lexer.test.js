@@ -77,6 +77,37 @@ describe('Lexer', () => {
       const elems = inst.getElements(str)
       expect(elems).toEqual([str])
     })
+    it('keeps a keyword followed by a non-ASCII or $ character in one identifier', () => {
+      for (const str of ['in$', 'inà', 'inя', 'true$', 'trueà', 'falseé']) {
+        expect(inst.getElements(str), str).toEqual([str])
+        expect(inst.tokenize(str)[0].type, str).toBe('identifier')
+      }
+    })
+    it('still splits a keyword off punctuation and whitespace', () => {
+      expect(inst.getElements('a in[b]')).toEqual([
+        'a',
+        ' ',
+        'in',
+        '[',
+        'b',
+        ']'
+      ])
+      expect(inst.getElements('(true)')).toEqual(['(', 'true', ')'])
+    })
+    it('matches a host word operator that starts with $', () => {
+      const lexer = new Lexer({
+        ...grammar,
+        elements: { ...grammar.elements, $and: { type: 'binaryOp' } }
+      })
+      expect(lexer.getElements('a $and b')).toEqual([
+        'a',
+        ' ',
+        '$and',
+        ' ',
+        'b'
+      ])
+      expect(lexer.getElements('$andy')).toEqual(['$andy'])
+    })
   })
   describe('Tokens', () => {
     it('unquotes string elements', () => {
