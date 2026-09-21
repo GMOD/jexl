@@ -8,6 +8,7 @@ export { default as Expression } from './Expression.ts'
 export { default as Lexer } from './Lexer.ts'
 export { getGrammar } from './grammar.ts'
 export type * from './types.ts'
+export type { InferredType, JexlType, TypeEnv } from './analysis/inferType.ts'
 export type {
   ColumnarFn,
   ColumnarOptions,

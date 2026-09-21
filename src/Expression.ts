@@ -4,10 +4,12 @@
  */
 
 import Lexer from './Lexer.ts'
+import { inferType } from './analysis/inferType.ts'
 import { compileColumnar } from './evaluator/columnar.ts'
 import { compileAst } from './evaluator/compile.ts'
 import Parser from './parser/Parser.ts'
 
+import type { TypeEnv } from './analysis/inferType.ts'
 import type { ColumnarOptions } from './evaluator/columnar.ts'
 import type { CompiledNode } from './evaluator/compile.ts'
 import type { Grammar } from './grammar.ts'
@@ -88,6 +90,20 @@ class Expression {
       this.compile()
     }
     return compileColumnar(this._ast, this._grammar, options)
+  }
+
+  /**
+   * The types the expression can answer, read off its text, and the answers
+   * themselves where they are a finite set of literals.
+   * @param {TypeEnv} [env] the declared types of the names and functions the
+   *      expression may read
+   * @returns {InferredType} `{ types, values? }`
+   */
+  inferType(env?: TypeEnv) {
+    if (!this._compiled) {
+      this.compile()
+    }
+    return inferType(this._ast, env)
   }
 }
 
