@@ -90,6 +90,9 @@ jexl.eval('`Price: \\$100`')
 - Arithmetic: `+`, `-`, `*`, `/`, `//` (floor division), `%`, `^` (power)
 - Comparison: `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`
 - Logical: `&&`, `||`
+- Nullish coalescing: `??` (`a ?? b` is `b` only when `a` is `null` or
+  `undefined`, so `score ?? 0` keeps a real 0; as in JS, it needs parentheses
+  to share an expression with `&&` or `||`)
 - Assignment: `=` (assigns a value to a bare variable name; `a.b = 1` is not
   supported)
 
