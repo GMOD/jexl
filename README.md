@@ -54,9 +54,10 @@ jexl.eval('assoc[1].first', context)
 | Type             | Examples                                             |
 | ---------------- | ---------------------------------------------------- |
 | Booleans         | `true`, `false`                                      |
+| Null             | `null`                                               |
 | Strings          | `"Hello \"user\""`, `'Hey there!'`                   |
 | Template Strings | `` `Hello ${name}` ``, `` `Total: ${price * qty}` `` |
-| Numerics         | `6`, `-7.2`, `5`, `-3.14159`                         |
+| Numerics         | `6`, `-7.2`, `.5`, `1e3`, `-5e-8`                    |
 | Objects          | `{hello: "world!"}`                                  |
 | Arrays           | `['hello', 'world!']`                                |
 
@@ -90,6 +91,9 @@ jexl.eval('`Price: \\$100`')
 - Arithmetic: `+`, `-`, `*`, `/`, `//` (floor division), `%`, `^` (power)
 - Comparison: `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`
 - Logical: `&&`, `||`
+- Nullish coalescing: `??` (`a ?? b` is `b` only when `a` is `null` or
+  `undefined`, so `score ?? 0` keeps a real 0; as in JS, it needs parentheses
+  to share an expression with `&&` or `||`)
 - Assignment: `=` (assigns a value to a bare variable name; `a.b = 1` is not
   supported)
 
@@ -112,7 +116,11 @@ jexl.eval('name.first', context) // "Malory"
 jexl.eval('name["last"]', context) // "Archer"
 jexl.eval('exes[2]', context) // "Burt"
 jexl.eval('exes[lastEx - 1]', context) // "Len"
+jexl.eval('exes.length', context) // 3
 ```
+
+A name chained off an array reads the array itself, so `exes.length` is 3 and
+`list.name` is `undefined`; index the element you mean, `list[0].name`.
 
 ### Functions
 
@@ -246,7 +254,7 @@ for (const feature of features) {
 }
 ```
 
-`a.b` on an array still reads its first element's `b`: `getMember` is handed that element. A name the expression assigns reads the assignment once it has run, and goes through `variableReader` before then.
+A name the expression assigns reads the assignment once it has run, and goes through `variableReader` before then.
 
 ## License
 

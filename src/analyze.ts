@@ -22,7 +22,7 @@ export interface Read {
 }
 
 export type CallArg =
-  | { type: 'literal'; value: string | number | boolean }
+  | { type: 'literal'; value: string | number | boolean | null }
   | { type: 'path'; read: Read }
   | { type: 'dynamic' }
 
@@ -52,8 +52,7 @@ export interface Analysis {
   /**
    * Whether the expression is only a path: a name, then dots and literal
    * subscripts, as in `score` or `feature.INFO.DP[0]`. Its one read is then
-   * its value, which a host can read without jexl, minding that a dot on an
-   * array reads through its first element.
+   * its value, which a host can read without jexl.
    */
   bare: boolean
   /** Every call, outermost first, including accessor calls. */
@@ -88,7 +87,7 @@ type Scope = Map<string, Binding>
 
 function literalKey(node: AstNode) {
   const value = literalValue(node)
-  return typeof value === 'boolean' ? String(value) : value
+  return typeof value === 'boolean' ? String(value) : (value ?? undefined)
 }
 
 function literalValue(ast: AstNode) {

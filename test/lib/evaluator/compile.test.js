@@ -31,6 +31,29 @@ describe('compileAst', () => {
       'Hello8Wo"rld'
     )
   })
+  it('compares against scientific notation', () => {
+    const context = { feature: { pvalue: 1e-9 } }
+    expect(evaluate('feature.pvalue < 5e-8', context)).toBe(true)
+    expect(evaluate('feature.pvalue > -5e-8', context)).toBe(true)
+    expect(evaluate('.5e1 + .5')).toBe(5.5)
+  })
+  it('rejects an e that does not complete an exponent', () => {
+    expect(() => evaluate('2e')).toThrow(/unexpected/)
+    expect(() => evaluate('1e3e')).toThrow(/unexpected/)
+  })
+  it('evaluates null as a literal rather than a context lookup', () => {
+    expect(evaluate('null')).toBeNull()
+    expect(evaluate('null', { null: 'shadowed' })).toBeNull()
+    expect(evaluate('[null, {a: null}]')).toEqual([null, { a: null }])
+    expect(evaluate('ok ? 1 : null', { ok: false })).toBeNull()
+  })
+  it('compares against null loosely, as before', () => {
+    expect(evaluate('x == null', {})).toBe(true)
+    expect(evaluate('x == null', { x: null })).toBe(true)
+    expect(evaluate('x == null', { x: 0 })).toBe(false)
+    expect(evaluate('x != null', { x: '' })).toBe(true)
+    expect(evaluate('x ?? null', {})).toBeNull()
+  })
   it('evaluates a true comparison expression', () => {
     expect(evaluate('2 > 1')).toBe(true)
   })
@@ -44,13 +67,23 @@ describe('compileAst', () => {
     const context = { foo: { baz: { bar: 'tek' } } }
     expect(evaluate('foo.baz.bar', context)).toBe(context.foo.baz.bar)
   })
-  it('assumes array index 0 when traversing', () => {
+  it('reads a name off an array from the array itself', () => {
     const context = {
       foo: {
         bar: [{ tek: { hello: 'world' } }, { tek: { hello: 'universe' } }]
       }
     }
-    expect(evaluate('foo.bar.tek.hello', context)).toBe('world')
+    expect(evaluate('foo.bar.tek.hello', context)).toBeUndefined()
+    expect(evaluate('foo.bar[1].tek.hello', context)).toBe('universe')
+  })
+  it("reads an array's own length rather than its first element's", () => {
+    expect(evaluate('["foo", "bar"].length')).toBe(2)
+    expect(evaluate('[].length')).toBe(0)
+    expect(evaluate('alt.length', { alt: ['DEL'] })).toBe(1)
+    expect(evaluate('features.length', { features: [{}, {}, {}] })).toBe(3)
+    expect(evaluate('f.alt.length', { f: { alt: ['A', 'TT'] } })).toBe(2)
+    expect(evaluate('alt[0].length', { alt: ['DEL'] })).toBe(3)
+    expect(evaluate('"DEL".length')).toBe(3)
   })
   it('makes array elements addressable by index', () => {
     const context = {

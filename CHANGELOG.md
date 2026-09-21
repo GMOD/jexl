@@ -11,6 +11,19 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   so one context can be reused across evaluations without the last one's
   variables leaking into the next. Code that read assigned values back off the
   context after `eval()` has to return them from the expression instead.
+- **`a.b` on an array reads the array, not its first element.** The rule dated
+  from filter expressions, which returned a list and were removed in 3.0; what
+  it left behind was `['DEL'].length` answering 3, the length of `'DEL'`, and
+  jbrowse's `nAlt()` existing because `feature.ALT.length` could not be
+  written. `list.length` is now the list's length, and a name read off a list,
+  `feature.ALT.type`, is `undefined` rather than the first element's field;
+  write `feature.ALT[0].type`.
+- **`null` is a literal.** It was a name that read `context.null`, normally
+  `undefined`, so `x == null` only worked because `==` is loose, and
+  `ok ? 1 : null` returned `undefined`. It now differs from `undefined` in a
+  returned value and in `{a: null}` once serialized, and `a.null` is a parse
+  error as `a.true` already was. `undefined` stays a name, as in JS, so
+  jbrowse's `{phase: undefined}` idiom is unaffected.
 
 ### Added
 
@@ -20,7 +33,6 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   whose records keep their fields behind an accessor no longer needs a Proxy
   per record, and can resolve bare names against the current record. An
   instance with neither evaluates exactly as before.
-
 - **`analyze(ast)` and `Expression#analyze()` list what an expression reads**
   without evaluating it or needing its functions registered: the context
   variables, each path used (`feature.INFO.DP[0]` as `feature.INFO.DP.0`), the
@@ -29,6 +41,38 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   and `feature.get('x')` read `feature.x`; `env` supports a host that binds a
   row's fields as variables; `bare` says whether the expression is nothing but
   a path.
+- **`Jexl#compile` and `Jexl#eval` cache what they compile.** The same string
+  returns the same Expression, so a host no longer wraps `compile` in a memo of
+  its own. Adding or removing an operator empties the cache.
+- **`??` falls back only on `null` and `undefined`.** A real score of 0 loses
+  to the fallback in `get(feature, 'score') || 1` and survives in
+  `get(feature, 'score') ?? 1`. As in JS, `??` refuses to share an expression
+  with `&&` or `||` unless parentheses say which goes first, so `a ?? b || c`
+  fails to compile rather than picking a grouping nobody would guess. It binds
+  looser than comparison and tighter than `?:`, so `a ?? b ? c : d` tests
+  `a ?? b`.
+- **Numbers can use scientific notation or start with a dot.**
+  `feature.pvalue < 5e-8` threw, because `5e` lexed as `5` followed by the name
+  `e`; `1e3`, `1.5e-3`, `.5e3` and `-5e-8` now read as numbers. `.5` threw
+  `Relative paths are not supported`, because the lexer tried the grammar's `.`
+  before the number pattern. Every spelling this changes was an error before.
+
+### Fixed
+
+- **`in` ends at the end of a name in any script.** The lexer bounded word
+  operators with `\b`, which only knows ASCII, so `in$`, `inà` and `inя` split
+  into the operator and a stray name instead of lexing as one identifier. A
+  host operator starting with `$` lost its bounds entirely and matched inside
+  longer names. `true` and `false` had the same bug and turn out to need no
+  pattern of their own. `a in$b`, which read as `a in $b`, now needs the space,
+  as in JS.
+
+### Performance
+
+- **A literal lookup table is built once.** `{CDS: 'red', exon: 'blue'}[type]`
+  rebuilt its object on every evaluation. A table of primitives can only yield
+  a primitive, so one frozen copy now serves every evaluation: 290ns to 96ns
+  per eval.
 
 ## [v4.0.1]
 

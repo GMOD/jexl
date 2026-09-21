@@ -49,9 +49,9 @@ describe('getMember', () => {
     expect(ev('feature[key]')).toBe(12)
   })
 
-  it('sees the element a dotted member reads through an array to', () => {
-    expect(ev('feature.subfeatures.type')).toBe('exon')
+  it('reads an element of an array by index', () => {
     expect(ev('feature.subfeatures[0].type')).toBe('exon')
+    expect(ev('feature.subfeatures.length')).toBe(1)
   })
 
   it('reaches a host object anywhere, not only at the root', () => {

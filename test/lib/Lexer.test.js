@@ -77,6 +77,37 @@ describe('Lexer', () => {
       const elems = inst.getElements(str)
       expect(elems).toEqual([str])
     })
+    it('keeps a keyword followed by a non-ASCII or $ character in one identifier', () => {
+      for (const str of ['in$', 'inà', 'inя', 'true$', 'trueà', 'falseé']) {
+        expect(inst.getElements(str), str).toEqual([str])
+        expect(inst.tokenize(str)[0].type, str).toBe('identifier')
+      }
+    })
+    it('still splits a keyword off punctuation and whitespace', () => {
+      expect(inst.getElements('a in[b]')).toEqual([
+        'a',
+        ' ',
+        'in',
+        '[',
+        'b',
+        ']'
+      ])
+      expect(inst.getElements('(true)')).toEqual(['(', 'true', ')'])
+    })
+    it('matches a host word operator that starts with $', () => {
+      const lexer = new Lexer({
+        ...grammar,
+        elements: { ...grammar.elements, $and: { type: 'binaryOp' } }
+      })
+      expect(lexer.getElements('a $and b')).toEqual([
+        'a',
+        ' ',
+        '$and',
+        ' ',
+        'b'
+      ])
+      expect(lexer.getElements('$andy')).toEqual(['$andy'])
+    })
   })
   describe('Tokens', () => {
     it('unquotes string elements', () => {
@@ -103,6 +134,16 @@ describe('Lexer', () => {
           raw: 'false'
         }
       ])
+    })
+    it('recognizes null', () => {
+      expect(inst.tokenize('null')).toEqual([
+        { type: 'literal', value: null, raw: 'null' }
+      ])
+      for (const str of ['nullable', '_null', 'null$', 'nullя']) {
+        expect(inst.tokenize(str), str).toEqual([
+          { type: 'identifier', value: str, raw: str }
+        ])
+      }
     })
     it('recognizes numerics', () => {
       const tokens = inst.getTokens(['-7.6', '20'])
@@ -185,6 +226,50 @@ describe('Lexer', () => {
       { type: 'literal', value: 'baz"foz', raw: String.raw`"baz\"foz"` },
       { type: 'closeBracket', value: ']', raw: ']' }
     ])
+  })
+  describe('Numbers', () => {
+    const valueOf = (str) => {
+      const tokens = inst.tokenize(str)
+      expect(tokens).toHaveLength(1)
+      expect(tokens[0].type).toBe('literal')
+      return tokens[0].value
+    }
+    it('reads scientific notation', () => {
+      expect(valueOf('1e3')).toBe(1000)
+      expect(valueOf('1E3')).toBe(1000)
+      expect(valueOf('1e+3')).toBe(1000)
+      expect(valueOf('1e-8')).toBe(1e-8)
+      expect(valueOf('1.5e-3')).toBe(0.0015)
+      expect(valueOf('.5e3')).toBe(500)
+    })
+    it('folds a prefix minus into scientific notation', () => {
+      expect(inst.tokenize('-5e-8')).toEqual([
+        { type: 'literal', value: -5e-8, raw: '-5e-8' }
+      ])
+      expect(inst.tokenize('x - 5e-8')).toEqual([
+        { type: 'identifier', value: 'x', raw: 'x ' },
+        { type: 'binaryOp', value: '-', raw: '- ' },
+        { type: 'literal', value: 5e-8, raw: '5e-8' }
+      ])
+    })
+    it('reads a leading-dot decimal as a number rather than a dot', () => {
+      expect(valueOf('.5')).toBe(0.5)
+      expect(valueOf('-.5')).toBe(-0.5)
+      expect(inst.getElements('[.5]')).toEqual(['[', '.5', ']'])
+    })
+    it('leaves an e that does not complete an exponent to the identifier', () => {
+      expect(inst.getElements('e')).toEqual(['e'])
+      expect(inst.getElements('e3')).toEqual(['e3'])
+      expect(inst.getElements('a.e3')).toEqual(['a', '.', 'e3'])
+      expect(inst.getElements('x1e3')).toEqual(['x1e3'])
+      expect(inst.getElements('2e')).toEqual(['2', 'e'])
+      expect(inst.getElements('1e3e')).toEqual(['1e3', 'e'])
+    })
+    it('still splits member access off a number, name or group', () => {
+      expect(inst.getElements('a.b')).toEqual(['a', '.', 'b'])
+      expect(inst.getElements('a[0].b')).toEqual(['a', '[', '0', ']', '.', 'b'])
+      expect(inst.getElements('f(1).x')).toEqual(['f', '(', '1', ')', '.', 'x'])
+    })
   })
   it('considers minus to be negative appropriately', () => {
     expect(inst.tokenize('-1?-2:-3')).toEqual([

@@ -42,11 +42,6 @@ function assignOwn(target: Context, key: string, value: JexlValue) {
   target[key] = value
 }
 
-// an identifier chained off an array reads through its first element
-function readThrough(subject: JexlValue) {
-  return Array.isArray(subject) ? subject[0] : subject
-}
-
 /** The key `subject[index]` reads under, or undefined when it reads nothing. */
 function memberKey(index: JexlValue) {
   return typeof index === 'string' || typeof index === 'number'
@@ -243,14 +238,14 @@ export function compileAst(
       const { getMember } = grammar
       if (getMember) {
         return (ctx) => {
-          const target = readThrough(from(ctx))
+          const target = from(ctx)
           return target == null
             ? undefined
             : (getMember(target, name) as JexlValue)
         }
       }
       return (ctx) => {
-        const target = readThrough(from(ctx))
+        const target = from(ctx)
         return target == null ? undefined : (target as Context)[name]
       }
     }

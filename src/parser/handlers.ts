@@ -24,6 +24,16 @@ import type {
   UnaryExpression
 } from '../types.ts'
 
+const logicalOps = new Set(['&&', '||'])
+
+/**
+ * Whether two operators are `??` and `&&` or `||`, which JS refuses to chain
+ * without parentheses because no reading of `a ?? b || c` is obvious.
+ */
+function mixesCoalescing(a: string, b: string) {
+  return (a === '??' && logicalOps.has(b)) || (b === '??' && logicalOps.has(a))
+}
+
 /**
  * Handles a subexpression that's used to define a transform argument's value.
  * @param {{type: <string>}} ast The subexpression tree
@@ -89,6 +99,11 @@ export function binaryOp(this: Parser, token: Token) {
     const parentExpr = parent as BinaryExpression
     if (!parentExpr.operator) {
       break
+    }
+    if (mixesCoalescing(tokenValue, parentExpr.operator)) {
+      throw new Error(
+        `Cannot mix ${parentExpr.operator} and ${tokenValue} without parentheses: ${this._exprStr}`
+      )
     }
     // a prefix operator binds tighter than any binary one, so `-x ^ 2` groups
     // as `(-x) ^ 2` — the same way `-2 ^ 2` already does, since the Lexer folds
@@ -204,7 +219,7 @@ export function identifier(this: Parser, token: Token) {
 export function literal(this: Parser, token: Token) {
   const node: Literal = {
     type: 'Literal',
-    value: token.value as string | number | boolean
+    value: token.value as Literal['value']
   }
   this._placeAtCursor(node)
 }

@@ -19,7 +19,7 @@ export type JexlValue =
 
 export interface Token {
   type: string
-  value: string | number | boolean | TemplatePart[]
+  value: string | number | boolean | null | TemplatePart[]
   raw: string
 }
 
@@ -31,7 +31,7 @@ export interface AstNode {
 
 export interface Literal extends AstNode {
   type: 'Literal'
-  value: string | number | boolean
+  value: string | number | boolean | null
 }
 
 export interface Identifier extends AstNode {
