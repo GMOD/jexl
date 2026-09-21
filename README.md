@@ -54,6 +54,7 @@ jexl.eval('assoc[1].first', context)
 | Type             | Examples                                             |
 | ---------------- | ---------------------------------------------------- |
 | Booleans         | `true`, `false`                                      |
+| Null             | `null`                                               |
 | Strings          | `"Hello \"user\""`, `'Hey there!'`                   |
 | Template Strings | `` `Hello ${name}` ``, `` `Total: ${price * qty}` `` |
 | Numerics         | `6`, `-7.2`, `.5`, `1e3`, `-5e-8`                    |

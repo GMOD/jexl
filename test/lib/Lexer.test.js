@@ -135,6 +135,16 @@ describe('Lexer', () => {
         }
       ])
     })
+    it('recognizes null', () => {
+      expect(inst.tokenize('null')).toEqual([
+        { type: 'literal', value: null, raw: 'null' }
+      ])
+      for (const str of ['nullable', '_null', 'null$', 'nullя']) {
+        expect(inst.tokenize(str), str).toEqual([
+          { type: 'identifier', value: str, raw: str }
+        ])
+      }
+    })
     it('recognizes numerics', () => {
       const tokens = inst.getTokens(['-7.6', '20'])
       expect(tokens).toEqual([

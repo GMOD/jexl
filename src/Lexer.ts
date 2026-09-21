@@ -210,6 +210,8 @@ class Lexer {
       token.value = parseFloat(element)
     } else if (element === 'true' || element === 'false') {
       token.value = element === 'true'
+    } else if (element === 'null') {
+      token.value = null
     } else if (Object.hasOwn(this._grammar.elements, element)) {
       token.type = this._grammar.elements[element]!.type
     } else if (identRegex.exec(element)) {

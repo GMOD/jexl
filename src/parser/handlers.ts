@@ -219,7 +219,7 @@ export function identifier(this: Parser, token: Token) {
 export function literal(this: Parser, token: Token) {
   const node: Literal = {
     type: 'Literal',
-    value: token.value as string | number | boolean
+    value: token.value as Literal['value']
   }
   this._placeAtCursor(node)
 }

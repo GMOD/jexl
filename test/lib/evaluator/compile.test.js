@@ -41,6 +41,19 @@ describe('compileAst', () => {
     expect(() => evaluate('2e')).toThrow(/unexpected/)
     expect(() => evaluate('1e3e')).toThrow(/unexpected/)
   })
+  it('evaluates null as a literal rather than a context lookup', () => {
+    expect(evaluate('null')).toBeNull()
+    expect(evaluate('null', { null: 'shadowed' })).toBeNull()
+    expect(evaluate('[null, {a: null}]')).toEqual([null, { a: null }])
+    expect(evaluate('ok ? 1 : null', { ok: false })).toBeNull()
+  })
+  it('compares against null loosely, as before', () => {
+    expect(evaluate('x == null', {})).toBe(true)
+    expect(evaluate('x == null', { x: null })).toBe(true)
+    expect(evaluate('x == null', { x: 0 })).toBe(false)
+    expect(evaluate('x != null', { x: '' })).toBe(true)
+    expect(evaluate('x ?? null', {})).toBeNull()
+  })
   it('evaluates a true comparison expression', () => {
     expect(evaluate('2 > 1')).toBe(true)
   })
