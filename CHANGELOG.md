@@ -2,6 +2,52 @@
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **`??` falls back only on `null` and `undefined`.** A real score of 0 loses
+  to the fallback in `get(feature, 'score') || 1` and survives in
+  `get(feature, 'score') ?? 1`. As in JS, `??` refuses to share an expression
+  with `&&` or `||` unless parentheses say which goes first, so `a ?? b || c`
+  fails to compile rather than picking a grouping nobody would guess. That also
+  leaves a later parser free to settle the precedence without changing what any
+  accepted expression means. It binds looser than comparison and tighter than
+  `?:`, so `a ?? b ? c : d` tests `a ?? b`.
+- **Numbers can use scientific notation or start with a dot.**
+  `feature.pvalue < 5e-8` threw, because `5e` lexed as `5` followed by the name
+  `e`; `1e3`, `1.5e-3`, `.5e3` and `-5e-8` now read as numbers. `.5` threw
+  `Relative paths are not supported`, because the lexer tried the grammar's `.`
+  before the number pattern. The number pattern now goes first, which leaves
+  `a.b`, `a[0].b` and `f(1).x` alone, since none has a digit after its dot.
+  Every spelling this changes was an error before.
+- **`null` is a literal.** It was a name that read `context.null`, normally
+  `undefined`, so `x == null` only worked because `==` is loose, and
+  `ok ? 1 : null` returned `undefined`. **This is a behavior change** wherever
+  `null` and `undefined` differ: a returned value, `{a: null}` once
+  serialized, and `a.null`, which is now a parse error as `a.true` already
+  was. `undefined` stays a name, as in JS, so jbrowse's `{phase: undefined}`
+  idiom is unaffected.
+
+### Fixed
+
+- **`.length` on an array is the array's length.** A name chained off an array
+  reads through its first element, so `['DEL'].length` was 3, the length of
+  `'DEL'`, and an array of objects answered `undefined`. jbrowse added `nAlt()`
+  because `feature.ALT.length` could not be written. The array now answers
+  `length` itself; every other name still reads through the first element, so
+  `feature.ALT.type` is unchanged. The compiler decides this once per name, so
+  a chain that never says `length` does no extra work. **This is a behavior
+  change** for an expression that used `list.length` to mean the first
+  element's length; write `list[0].length`.
+- **`in` ends at the end of a name in any script.** The lexer bounded word
+  operators with `\b`, which only knows ASCII, so `in$`, `inà` and `inя` split
+  into the operator and a stray name instead of lexing as one identifier. A
+  host operator starting with `$` lost its bounds entirely and matched inside
+  longer names. `true` and `false` had the same bug and turn out to need no
+  pattern of their own. `a in$b`, which read as `a in $b`, now needs the space,
+  as in JS.
+
 ## [v4.0.1]
 
 ### Fixed
