@@ -26,6 +26,17 @@ const omittedAlternateBefore = new Set([
   'semicolon'
 ])
 
+/** A malformed expression. `offset` is where in the source the parser gave up. */
+export class JexlSyntaxError extends Error {
+  offset: number
+
+  constructor(message: string, offset: number) {
+    super(message)
+    this.name = 'JexlSyntaxError'
+    this.offset = offset
+  }
+}
+
 /**
  * Converts the tokens from the {@link Lexer} into an Abstract Syntax Tree, for
  * {@link compileAst} to lower to closures. A Pratt parser: each level of the
@@ -38,14 +49,21 @@ class Parser {
   _lexer: Lexer
   _tokens: Token[] = []
   _pos = 0
+  _offset: number
   _grouped?: WeakSet<AstNode>
 
-  constructor(grammar: Grammar, lexer: Lexer) {
+  /**
+   * @param offset where the tokens start in the source, so that an error
+   *      inside a template interpolation reports its place in the whole
+   */
+  constructor(grammar: Grammar, lexer: Lexer, offset = 0) {
     this._grammar = grammar
     this._lexer = lexer
+    this._offset = offset
   }
 
   parse(source: string) {
+    this._offset += source.length - source.trimStart().length
     this.addTokens(this._lexer.tokenize(source))
     return this.complete()
   }
@@ -56,7 +74,7 @@ class Parser {
 
   /**
    * @returns the expression tree, or null for an expression with no tokens
-   * @throws {Error} if the tokens do not form exactly one expression
+   * @throws {JexlSyntaxError} if the tokens do not form exactly one expression
    */
   complete(): AstNodeUnion | null {
     if (this._tokens.length === 0) {
@@ -92,7 +110,10 @@ class Parser {
       return left
     }
     if (left.type !== 'Identifier' || left.from) {
-      throw new Error('Left side of assignment must be a variable name')
+      throw this._error(
+        'Left side of assignment must be a variable name',
+        this._pos
+      )
     }
     this._pos++
     return {
@@ -234,7 +255,7 @@ class Parser {
         return { type: 'Identifier', value: token.value as string }
       }
       case 'templateString': {
-        return this._template(token.value as TemplatePart[])
+        return this._template(token.value as TemplatePart[], this._pos - 1)
       }
       case 'openParen': {
         const node = this._sequence()
@@ -293,17 +314,25 @@ class Parser {
     return node
   }
 
-  _template(tokenParts: TemplatePart[]): TemplateLiteral {
+  _template(tokenParts: TemplatePart[], index: number): TemplateLiteral {
+    let offset = this._offsetOf(index) + '`'.length
     const parts: TemplateLiteral['parts'] = tokenParts.map((part) => {
       if (part.type === 'static') {
+        offset += part.value.length
         return {
           type: 'static',
           value: this._lexer._unescapeTemplateString(part.value)
         }
       }
-      const value = new Parser(this._grammar, this._lexer).parse(part.value)
+      const start = offset + '${'.length
+      offset = start + part.value.length + '}'.length
+      const sub = new Parser(this._grammar, this._lexer, start)
+      const value = sub.parse(part.value)
       if (!value) {
-        throw new Error('Empty interpolation in template string')
+        throw new JexlSyntaxError(
+          'Empty interpolation in template string',
+          start
+        )
       }
       return { type: 'expression', value }
     })
@@ -349,7 +378,15 @@ class Parser {
       .slice(0, index + 1)
       .map((token) => token.raw)
       .join('')
-    return new Error(`${message}: ${source}`)
+    return new JexlSyntaxError(`${message}: ${source}`, this._offsetOf(index))
+  }
+
+  _offsetOf(index: number) {
+    let offset = this._offset
+    for (let i = 0; i < index; i++) {
+      offset += this._tokens[i]!.raw.length
+    }
+    return offset
   }
 }
 

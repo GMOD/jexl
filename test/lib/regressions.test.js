@@ -9,6 +9,7 @@ import Lexer from '../../src/Lexer.ts'
 import { compileAst } from '../../src/evaluator/compile.ts'
 import { getGrammar } from '../../src/grammar.ts'
 import { Jexl } from '../../src/Jexl.ts'
+import { JexlSyntaxError } from '../../src/index.ts'
 
 let inst
 
@@ -491,6 +492,31 @@ describe('regressions', () => {
     it('names the call when the callee is not a name', () => {
       expect(() => inst.compile('(a)(1)')).toThrow(/must be called by name/)
       expect(() => inst.compile('f(1)(2)')).toThrow(/must be called by name/)
+    })
+  })
+  describe('syntax error positions', () => {
+    const offsetOf = (expr) => {
+      try {
+        inst.compile(expr)
+      } catch (err) {
+        expect(err).toBeInstanceOf(JexlSyntaxError)
+        return err.offset
+      }
+      throw new Error(`${expr} compiled`)
+    }
+    it('points at the offending token', () => {
+      expect(offsetOf('f(1,,2)')).toBe(4)
+      expect(offsetOf('  1 + )')).toBe(6)
+      expect(offsetOf('1 + x = 3')).toBe(6)
+      expect(offsetOf('.foo')).toBe(0)
+    })
+    it('points past the end when the expression stops short', () => {
+      expect(offsetOf('a ? b')).toBe(5)
+    })
+    it('points into a template interpolation', () => {
+      expect(offsetOf('`ab ${1 + } c`')).toBe(10)
+      expect(offsetOf('`x${}`')).toBe(4)
+      expect(offsetOf('`\\${1}${ ) }`')).toBe(9)
     })
   })
   describe('template strings', () => {
