@@ -148,3 +148,33 @@ describe('one context reused across rows', () => {
     expect(Object.keys(ctx)).toEqual(['feature'])
   })
 })
+
+describe('hooks inside lambdas', () => {
+  const inst = new Jexl({
+    getMember,
+    variableReader: (name) =>
+      name === 'feature' || name === 'threshold'
+        ? undefined
+        : (ctx) => getMember(ctx.feature as Feature, name)
+  })
+  const ev = (exp: string) => inst.eval(exp, { feature, threshold: 20 })
+
+  it('resolves a member of a lambda parameter through getMember', () => {
+    expect(ev("any(feature.subfeatures, s => s.type == 'exon')")).toBe(true)
+    expect(ev('map(feature.subfeatures, s => s.type)')).toEqual(['exon'])
+  })
+
+  it('resolves a free name in a lambda body through variableReader', () => {
+    expect(ev('any(INFO.DP, dp => dp > threshold)')).toBe(true)
+    expect(ev('any(INFO.DP, dp => dp > score + threshold)')).toBe(false)
+  })
+
+  it('reads a local assigned before the lambda', () => {
+    expect(ev('t = 25; any(INFO.DP, dp => dp > t)')).toBe(true)
+    expect(ev('t = 35; any(INFO.DP, dp => dp > t)')).toBe(false)
+  })
+
+  it('lets a parameter shadow a local and a row field', () => {
+    expect(ev('score = 1; map([5], score => score * 2)')).toEqual([10])
+  })
+})
