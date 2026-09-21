@@ -5,6 +5,8 @@
 
 /* eslint eqeqeq:0 */
 
+import { collectionFunctions } from './collections.ts'
+
 import type { JexlValue } from './types.ts'
 
 export type BinaryOpEval = (left: JexlValue, right: JexlValue) => JexlValue
@@ -71,6 +73,7 @@ export interface SimpleElement {
     | 'closeParen'
     | 'question'
     | 'semicolon'
+    | 'arrow'
 }
 
 export type GrammarElement = BinaryOp | UnaryOp | SimpleElement
@@ -101,6 +104,7 @@ export const getGrammar = (): Grammar => ({
     ')': { type: 'closeParen' },
     '?': { type: 'question' },
     ';': { type: 'semicolon' },
+    '=>': { type: 'arrow' },
     '+': {
       type: 'binaryOp',
       precedence: 30,
@@ -241,5 +245,5 @@ export const getGrammar = (): Grammar => ({
    * than throw. An error is only appropriate when the function would normally
    * return a value, but cannot due to some other failure.
    */
-  functions: {}
+  functions: { ...collectionFunctions }
 })

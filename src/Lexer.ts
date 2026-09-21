@@ -53,7 +53,8 @@ const minusNegatesAfter = new Set([
   'question',
   'colon',
   'comma',
-  'semicolon'
+  'semicolon',
+  'arrow'
 ])
 
 /**

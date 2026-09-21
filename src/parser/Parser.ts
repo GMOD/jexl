@@ -9,6 +9,7 @@ import type {
   AstNode,
   AstNodeUnion,
   ConditionalExpression,
+  Lambda,
   Literal,
   ObjectLiteral,
   TemplateLiteral,
@@ -51,6 +52,7 @@ class Parser {
   _pos = 0
   _offset: number
   _grouped?: WeakSet<AstNode>
+  _lambdaDepth = 0
 
   /**
    * @param offset where the tokens start in the source, so that an error
@@ -104,6 +106,9 @@ class Parser {
   }
 
   _assignment(): AstNodeUnion {
+    if (this._atLambda()) {
+      return this._lambda()
+    }
     const left = this._ternary()
     const token = this._peek()
     if (token?.type !== 'binaryOp' || token.value !== '=') {
@@ -115,6 +120,9 @@ class Parser {
         this._pos
       )
     }
+    if (this._lambdaDepth > 0) {
+      throw this._error('Assignment is not supported in a lambda', this._pos)
+    }
     this._pos++
     return {
       type: 'AssignmentExpression',
@@ -122,6 +130,49 @@ class Parser {
       left,
       right: this._assignment()
     }
+  }
+
+  _atLambda() {
+    let i = this._pos
+    if (this._tokens[i]?.type === 'identifier') {
+      return this._tokens[i + 1]?.type === 'arrow'
+    }
+    if (this._tokens[i]?.type !== 'openParen') {
+      return false
+    }
+    i++
+    while (this._tokens[i]?.type === 'identifier') {
+      i++
+      if (this._tokens[i]?.type !== 'comma') {
+        break
+      }
+      i++
+    }
+    return (
+      this._tokens[i]?.type === 'closeParen' &&
+      this._tokens[i + 1]?.type === 'arrow'
+    )
+  }
+
+  /** Parses the lambda {@link _atLambda} found, whose shape it has checked. */
+  _lambda(): Lambda {
+    const params: string[] = []
+    if (this._eat('openParen')) {
+      while (!this._eat('closeParen')) {
+        params.push(this._next().value as string)
+        this._eat('comma')
+      }
+    } else {
+      params.push(this._next().value as string)
+    }
+    if (new Set(params).size < params.length) {
+      throw this._error('Duplicate lambda parameter name', this._pos)
+    }
+    this._pos++
+    this._lambdaDepth++
+    const body = this._assignment()
+    this._lambdaDepth--
+    return { type: 'Lambda', params, body }
   }
 
   _ternary(): AstNodeUnion {
@@ -327,6 +378,7 @@ class Parser {
       const start = offset + '${'.length
       offset = start + part.value.length + '}'.length
       const sub = new Parser(this._grammar, this._lexer, start)
+      sub._lambdaDepth = this._lambdaDepth
       const value = sub.parse(part.value)
       if (!value) {
         throw new JexlSyntaxError(

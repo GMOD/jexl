@@ -4,7 +4,12 @@
  */
 
 import type { Grammar } from '../grammar.ts'
-import type { AstNode, AstNodeUnion, JexlValue } from '../types.ts'
+import type {
+  AstNode,
+  AstNodeUnion,
+  JexlFunction,
+  JexlValue
+} from '../types.ts'
 
 /** The variables an expression is evaluated against. */
 export type Context = Record<string, JexlValue>
@@ -15,6 +20,58 @@ export type Context = Record<string, JexlValue>
  * a parameter.
  */
 export type CompiledNode = (context: Context) => JexlValue
+
+/**
+ * One call of a lambda. A name the lambda binds reads from `args`, a name bound
+ * by a lambda around it from `outer`, and any other name from `context`.
+ */
+class Frame {
+  args: JexlValue[]
+  outer: Frame | undefined
+  context: Context
+
+  constructor(args: JexlValue[], outer: Frame | undefined, context: Context) {
+    this.args = args
+    this.outer = outer
+    this.context = context
+  }
+}
+
+/** The parameters of the lambdas around a node, innermost first. */
+interface Scope {
+  params: string[]
+  outer: Scope | undefined
+}
+
+// the closures compiled inside a lambda are handed its Frame in place of the
+// context, and only the ones that read a name, below, look inside it
+const asFrame = (env: Context) => env as unknown as Frame
+const asContext = (frame: Frame) => frame as unknown as Context
+
+function compileName(name: string, scope: Scope | undefined): CompiledNode {
+  if (!scope) {
+    return (ctx) => ctx[name]
+  }
+  let hops = 0
+  for (let s: Scope | undefined = scope; s; s = s.outer) {
+    const index = s.params.indexOf(name)
+    if (index !== -1) {
+      return hops === 0 ? (env) => asFrame(env).args[index] : climb(hops, index)
+    }
+    hops++
+  }
+  return (env) => asFrame(env).context[name]
+}
+
+function climb(hops: number, index: number): CompiledNode {
+  return (env) => {
+    let frame = asFrame(env)
+    for (let i = 0; i < hops; i++) {
+      frame = frame.outer!
+    }
+    return frame.args[index]
+  }
+}
 
 /**
  * Writes a key that a plain assignment would mishandle. Storing to
@@ -100,6 +157,15 @@ function stringify(value: JexlValue) {
  * @throws {Error} if the tree contains an unrecognized node type
  */
 export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
+  return compileNode(ast, grammar, undefined)
+}
+
+function compileNode(
+  ast: AstNode,
+  grammar: Grammar,
+  scope: Scope | undefined
+): CompiledNode {
+  const compile = (child: AstNode) => compileNode(child, grammar, scope)
   // AstNode types its `type` as a plain string so the Parser can build the tree
   // loosely; narrowing to the union once, here, lets every case below see its
   // own node type instead of repeating the same cast in each branch
@@ -113,9 +179,9 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     case 'Identifier': {
       const name = node.value
       if (!node.from) {
-        return (ctx) => ctx[name]
+        return compileName(name, scope)
       }
-      const from = compileAst(node.from, grammar)
+      const from = compile(node.from)
       return (ctx) => {
         const subject = from(ctx)
         if (subject == null) {
@@ -134,8 +200,8 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
         // undefined without evaluating either operand
         return () => undefined
       }
-      const left = compileAst(node.left, grammar)
-      const right = compileAst(node.right!, grammar)
+      const left = compile(node.left)
+      const right = compile(node.right!)
       const { evalOnDemand } = op
       if (evalOnDemand) {
         // operands stay unevaluated behind an `eval` thunk, so operators such
@@ -155,7 +221,7 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     }
 
     case 'UnaryExpression': {
-      const right = compileAst(node.right!, grammar)
+      const right = compile(node.right!)
       const elem = grammar.elements[node.operator]
       const fn =
         elem?.type === 'unaryOp'
@@ -174,13 +240,9 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     }
 
     case 'ConditionalExpression': {
-      const test = compileAst(node.test, grammar)
-      const consequent = node.consequent
-        ? compileAst(node.consequent, grammar)
-        : undefined
-      const alternate = node.alternate
-        ? compileAst(node.alternate, grammar)
-        : undefined
+      const test = compile(node.test)
+      const consequent = node.consequent ? compile(node.consequent) : undefined
+      const alternate = node.alternate ? compile(node.alternate) : undefined
       return (ctx) => {
         const res = test(ctx)
         if (res) {
@@ -192,8 +254,8 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     }
 
     case 'FilterExpression': {
-      const subject = compileAst(node.subject, grammar)
-      const index = compileAst(node.expr, grammar)
+      const subject = compile(node.subject)
+      const index = compile(node.expr)
       return (ctx) => {
         const subjectVal = subject(ctx)
         const indexVal = index(ctx)
@@ -229,7 +291,7 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     }
 
     case 'ArrayLiteral': {
-      const items = node.value.map((item) => compileAst(item, grammar))
+      const items = node.value.map((item) => compile(item))
       const len = items.length
       return (ctx) => {
         const out: JexlValue[] = new Array(len)
@@ -243,7 +305,7 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     case 'ObjectLiteral': {
       const entries = Object.entries(node.value)
       const keys = entries.map(([key]) => key)
-      const values = entries.map(([, value]) => compileAst(value, grammar))
+      const values = entries.map(([, value]) => compile(value))
       const len = keys.length
       // resolved once, here, so the common case keeps its plain store
       const store = keys.includes('__proto__') ? defineOwn : assignOwn
@@ -263,7 +325,7 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
           const { value } = part
           return () => value
         }
-        const expr = compileAst(part.value, grammar)
+        const expr = compile(part.value)
         return (ctx) => stringify(expr(ctx))
       })
       return (ctx) => {
@@ -277,7 +339,7 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
 
     case 'FunctionCall': {
       const { name } = node
-      const args = node.args.map((arg) => compileAst(arg, grammar))
+      const args = node.args.map((arg) => compile(arg))
       // hasOwn, so that inherited Object.prototype members such as `toString`
       // and `constructor` aren't callable as Jexl functions. Resolved per call
       // rather than baked in, since functions are routinely registered after
@@ -325,7 +387,7 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     }
 
     case 'SequenceExpression': {
-      const exprs = node.expressions.map((expr) => compileAst(expr, grammar))
+      const exprs = node.expressions.map((expr) => compile(expr))
       const len = exprs.length
       return (ctx) => {
         let last: JexlValue
@@ -337,13 +399,33 @@ export function compileAst(ast: AstNode, grammar: Grammar): CompiledNode {
     }
 
     case 'AssignmentExpression': {
+      if (scope) {
+        throw new Error('Assignment is not supported in a lambda')
+      }
       const name = node.left.value
-      const right = compileAst(node.right!, grammar)
+      const right = compile(node.right!)
       const store = name === '__proto__' ? defineOwn : assignOwn
       return (ctx) => {
         const value = right(ctx)
         store(ctx, name, value)
         return value
+      }
+    }
+
+    case 'Lambda': {
+      const body = compileNode(node.body, grammar, {
+        params: node.params,
+        outer: scope
+      })
+      if (!scope) {
+        return (ctx): JexlFunction =>
+          (...args) =>
+            body(asContext(new Frame(args, undefined, ctx)))
+      }
+      return (env): JexlFunction => {
+        const outer = asFrame(env)
+        return (...args) =>
+          body(asContext(new Frame(args, outer, outer.context)))
       }
     }
 
