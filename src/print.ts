@@ -3,9 +3,7 @@
  * Copyright 2020 Tom Shawver
  */
 
-import type { AstNode, AstNodeUnion, BinaryExpression } from './types.ts'
-
-type Node = AstNodeUnion
+import type { AstNode, BinaryExpression } from './types.ts'
 
 const PRECEDENCE: Record<string, number> = {
   '=': 2,
@@ -57,7 +55,7 @@ export function quote(text: string) {
   return `'${text.replaceAll('\\', '\\\\').replaceAll("'", String.raw`\'`)}'`
 }
 
-function precedenceOf(node: Node) {
+function precedenceOf(node: AstNode) {
   switch (node.type) {
     case 'SequenceExpression': {
       return SEQUENCE
@@ -82,17 +80,20 @@ function precedenceOf(node: Node) {
   }
 }
 
-function within(ast: AstNode, least: number) {
-  const text = print(ast)
-  return precedenceOf(ast as Node) < least ? `(${text})` : text
+function within(node: AstNode, least: number) {
+  const text = print(node)
+  return precedenceOf(node) < least ? `(${text})` : text
 }
 
-function binaryOperand(parent: BinaryExpression, ast: AstNode, left: boolean) {
+function binaryOperand(
+  parent: BinaryExpression,
+  child: AstNode,
+  left: boolean
+) {
   const own = PRECEDENCE[parent.operator]
   if (own === undefined) {
-    return within(ast, UNARY)
+    return within(child, UNARY)
   }
-  const child = ast as Node
   const theirs = precedenceOf(child)
   const chained =
     child.type === 'BinaryExpression' &&
@@ -102,7 +103,7 @@ function binaryOperand(parent: BinaryExpression, ast: AstNode, left: boolean) {
     child.type === 'BinaryExpression' &&
     ((parent.operator === '??' && LOGICAL.has(child.operator)) ||
       (child.operator === '??' && LOGICAL.has(parent.operator)))
-  const text = print(ast)
+  const text = print(child)
   return theirs < own || (theirs === own && left === chained) || mixesNullish
     ? `(${text})`
     : text
@@ -112,8 +113,7 @@ function binaryOperand(parent: BinaryExpression, ast: AstNode, left: boolean) {
  * Renders a tree back to expression text, for messages and suggestions. The
  * text parses back to the same tree.
  */
-export function print(ast: AstNode): string {
-  const node = ast as Node
+export function print(node: AstNode): string {
   switch (node.type) {
     case 'Literal': {
       const { value } = node
@@ -138,11 +138,11 @@ export function print(ast: AstNode): string {
       return `${within(node.subject, Infinity)}[${within(node.expr, ASSIGNMENT)}]`
     }
     case 'BinaryExpression': {
-      return `${binaryOperand(node, node.left, true)} ${node.operator} ${binaryOperand(node, node.right!, false)}`
+      return `${binaryOperand(node, node.left, true)} ${node.operator} ${binaryOperand(node, node.right, false)}`
     }
     case 'UnaryExpression': {
       const { operator } = node
-      const right = within(node.right!, UNARY)
+      const right = within(node.right, UNARY)
       // the Lexer folds a minus before a digit into the number
       if (operator === '-' && /^\d/.test(right)) {
         return `-(${right})`
@@ -195,7 +195,7 @@ export function print(ast: AstNode): string {
       return expressions.length === 1 ? `${text};` : text
     }
     case 'AssignmentExpression': {
-      return `${node.left.value} = ${within(node.right!, ASSIGNMENT)}`
+      return `${node.left.value} = ${within(node.right, ASSIGNMENT)}`
     }
     case 'Lambda': {
       const params =

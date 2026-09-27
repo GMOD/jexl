@@ -9,7 +9,6 @@ import type Lexer from '../Lexer.ts'
 import type { Grammar } from '../grammar.ts'
 import type {
   AstNode,
-  AstNodeUnion,
   ConditionalExpression,
   Lambda,
   Literal,
@@ -79,7 +78,7 @@ class Parser {
    * @returns the expression tree, or null for an expression with no tokens
    * @throws {JexlSyntaxError} if the tokens do not form exactly one expression
    */
-  complete(): AstNodeUnion | null {
+  complete(): AstNode | null {
     if (this._tokens.length === 0) {
       return null
     }
@@ -90,7 +89,7 @@ class Parser {
     return ast
   }
 
-  _sequence(): AstNodeUnion {
+  _sequence(): AstNode {
     const first = this._assignment()
     if (this._peek()?.type !== 'semicolon') {
       return first
@@ -106,7 +105,7 @@ class Parser {
     return { type: 'SequenceExpression', expressions }
   }
 
-  _assignment(): AstNodeUnion {
+  _assignment(): AstNode {
     if (this._atLambda()) {
       return this._lambda()
     }
@@ -176,7 +175,7 @@ class Parser {
     return { type: 'Lambda', params, body }
   }
 
-  _ternary(): AstNodeUnion {
+  _ternary(): AstNode {
     const test = this._binary(-Infinity)
     if (!this._eat('question')) {
       return test
@@ -198,7 +197,7 @@ class Parser {
    * One exactly at `floor` binds only when it continues a right-associative
    * chain, which is how `a ^ b ^ c` groups from the right.
    */
-  _binary(floor: number, rightAssociative = false): AstNodeUnion {
+  _binary(floor: number, rightAssociative = false): AstNode {
     let left = this._unary()
     for (;;) {
       const token = this._peek()
@@ -224,7 +223,7 @@ class Parser {
   }
 
   /** `a ?? b || c` has no grouping a reader can guess; JS refuses it too. */
-  _mixesNullish(operator: string, ...operands: AstNodeUnion[]) {
+  _mixesNullish(operator: string, ...operands: AstNode[]) {
     return operands.some(
       (operand) =>
         operand.type === 'BinaryExpression' &&
@@ -235,7 +234,7 @@ class Parser {
     )
   }
 
-  _unary(): AstNodeUnion {
+  _unary(): AstNode {
     const token = this._peek()
     if (token?.type !== 'unaryOp') {
       return this._postfix(this._primary())
@@ -250,7 +249,7 @@ class Parser {
     }
   }
 
-  _postfix(subject: AstNodeUnion): AstNodeUnion {
+  _postfix(subject: AstNode): AstNode {
     let node = subject
     for (;;) {
       switch (this._peek()?.type) {
@@ -294,7 +293,7 @@ class Parser {
     }
   }
 
-  _primary(): AstNodeUnion {
+  _primary(): AstNode {
     const token = this._next()
     switch (token.type) {
       case 'literal': {

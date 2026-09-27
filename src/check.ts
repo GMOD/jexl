@@ -3,16 +3,16 @@
  * Copyright 2020 Tom Shawver
  */
 
+import { unknownNode } from './errors.ts'
 import { isName, key, print, quote } from './print.ts'
 
 import type { AnalyzeOptions } from './analyze.ts'
 import type {
   AstNode,
-  AstNodeUnion,
+  BinaryExpression,
   FunctionCall,
   Identifier,
-  Lambda,
-  Literal
+  Lambda
 } from './types.ts'
 
 /**
@@ -148,8 +148,6 @@ export interface CheckResult {
   diagnostics: Diagnostic[]
   type: Type
 }
-
-type Node = AstNodeUnion
 
 export const UNKNOWN: Type = { kind: 'unknown' }
 const UNDEFINED: Type = { kind: 'undefined' }
@@ -579,10 +577,9 @@ function negate(type: Type): Type {
 }
 
 function paramName(subject: AstNode, context: AstNode) {
-  const node = subject as Node
   const base =
-    node.type === 'Identifier'
-      ? node.value.toLowerCase().replaceAll(/\W/g, '')
+    subject.type === 'Identifier'
+      ? subject.value.toLowerCase().replaceAll(/\W/g, '')
       : ''
   const name = isName(base) ? base : 'x'
   const text = print(context)
@@ -594,7 +591,7 @@ function paramName(subject: AstNode, context: AstNode) {
 }
 
 function literalValue(node: AstNode) {
-  return node.type === 'Literal' ? (node as Literal).value : undefined
+  return node.type === 'Literal' ? node.value : undefined
 }
 
 function describe(type: Type): string {
@@ -836,27 +833,20 @@ export function check(
     }
   }
 
-  function chain(node: Identifier): { base: AstNode; names: string[] } {
-    const names = [node.value]
-    let base: AstNode = node
-    while (base.type === 'Identifier' && (base as Identifier).from) {
-      base = (base as Identifier).from!
-      if (base.type === 'Identifier') {
-        names.unshift((base as Identifier).value)
-      }
-    }
-    return { base, names }
-  }
-
   function dottedKey(node: Identifier): Type | undefined {
-    if (!node.from) {
+    const names = [node.value]
+    let base = node
+    while (base.from) {
+      if (base.from.type !== 'Identifier') {
+        return undefined
+      }
+      base = base.from
+      names.unshift(base.value)
+    }
+    if (base === node) {
       return undefined
     }
-    const { base, names } = chain(node)
-    if ((base as Identifier).from) {
-      return undefined
-    }
-    let type = variable(base as Identifier, false)
+    let type = variable(base, false)
     let subjectNode: AstNode = base
     for (let i = 1; i < names.length; i++) {
       const record = type.kind === 'record' ? type : undefined
@@ -894,7 +884,7 @@ export function check(
         type: 'Identifier',
         value: names[i]!,
         from: subjectNode
-      } as Identifier
+      }
     }
     return undefined
   }
@@ -938,17 +928,17 @@ export function check(
     return UNKNOWN
   }
 
-  function hyphenated(node: AstNodeUnion): Type | undefined {
+  function hyphenated(node: AstNode): Type | undefined {
     if (
       node.type !== 'BinaryExpression' ||
       node.operator !== '-' ||
       node.left.type !== 'Identifier' ||
-      node.right?.type !== 'Identifier' ||
-      (node.right as Identifier).from
+      node.right.type !== 'Identifier' ||
+      node.right.from
     ) {
       return undefined
     }
-    const left = node.left as Identifier
+    const left = node.left
     const name = left.value
     if (
       !left.from &&
@@ -962,7 +952,7 @@ export function check(
     if (subject.kind !== 'record' || subject.fields.has(name)) {
       return undefined
     }
-    const whole = `${name}-${(node.right as Identifier).value}`
+    const whole = `${name}-${node.right.value}`
     const found = subject.fields.get(whole)
     if (!found) {
       return undefined
@@ -970,9 +960,7 @@ export function check(
     // a bare name can't hold a hyphen, so only a row variable can spell it
     const holder: AstNode | undefined =
       left.from ??
-      (row === undefined
-        ? undefined
-        : ({ type: 'Identifier', value: row } as Identifier))
+      (row === undefined ? undefined : { type: 'Identifier', value: row })
     report(
       'unknown-field',
       'warning',
@@ -1061,11 +1049,9 @@ export function check(
     }
   }
 
-  function binary(
-    node: Extract<AstNodeUnion, { type: 'BinaryExpression' }>
-  ): Type {
+  function binary(node: BinaryExpression): Type {
     const { operator } = node
-    const rightNode = node.right!
+    const rightNode = node.right
     if (operator === '&&' || operator === '||' || operator === '??') {
       const left = infer(node.left)
       const right = infer(rightNode)
@@ -1160,7 +1146,7 @@ export function check(
     if (EQUALITY.has(operator)) {
       const leftLiteral = literalOf(leftItem)
       const rightLiteral = literalOf(rightItem)
-      if (rightLiteral !== undefined && node.right?.type === 'Literal') {
+      if (rightLiteral !== undefined && node.right.type === 'Literal') {
         compareLiteral(leftItem, rightLiteral, node)
       } else if (leftLiteral !== undefined && node.left.type === 'Literal') {
         compareLiteral(rightItem, leftLiteral, node)
@@ -1247,7 +1233,7 @@ export function check(
           type: 'Identifier',
           value: name,
           from: subjectNode
-        } as Identifier
+        }
       }
       for (const name of prefix) {
         step(String(name), node)
@@ -1274,9 +1260,7 @@ export function check(
           node,
           `no function ${name}` +
             (near.length ? `; did you mean ${near.join(', ')}?` : ''),
-          near.map((candidate) =>
-            print({ ...node, name: candidate } as FunctionCall)
-          )
+          near.map((candidate) => print({ ...node, name: candidate }))
         )
       }
       return UNKNOWN
@@ -1303,10 +1287,10 @@ export function check(
       }
       const accepted: readonly ParamType[] =
         typeof declared === 'string' ? [declared] : declared
-      if ((arg as Node).type === 'Lambda') {
+      if (arg.type === 'Lambda') {
         const item =
           lastCollection?.kind === 'list' ? lastCollection.of : UNKNOWN
-        types.push(lambda(arg as Lambda, lambdaParams(name, item)))
+        types.push(lambda(arg, lambdaParams(name, item)))
         continue
       }
       const type = infer(arg)
@@ -1354,8 +1338,7 @@ export function check(
     return returns ?? UNKNOWN
   }
 
-  function infer(ast: AstNode): Type {
-    const node = ast as Node
+  function infer(node: AstNode): Type {
     switch (node.type) {
       case 'Literal': {
         const { value } = node
@@ -1416,7 +1399,7 @@ export function check(
         return binary(node)
       }
       case 'UnaryExpression': {
-        const right = infer(node.right!)
+        const right = infer(node.right)
         if (node.operator === '!') {
           return BOOLEAN
         }
@@ -1481,7 +1464,7 @@ export function check(
         return last
       }
       case 'AssignmentExpression': {
-        const value = infer(node.right!)
+        const value = infer(node.right)
         scope.set(node.left.value, value)
         return value
       }
@@ -1489,7 +1472,7 @@ export function check(
         return lambda(node)
       }
       default: {
-        throw new Error(`Corrupt AST: unknown node type '${ast.type}'`)
+        return unknownNode(node)
       }
     }
   }

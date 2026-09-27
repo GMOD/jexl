@@ -27,41 +27,36 @@ export interface Token {
   raw: string
 }
 
-export interface AstNode {
-  type: string
-  right?: AstNode
-}
-
-export interface Literal extends AstNode {
+export interface Literal {
   type: 'Literal'
   value: string | number | boolean | null
 }
 
-export interface Identifier extends AstNode {
+export interface Identifier {
   type: 'Identifier'
   value: string
   from?: AstNode
 }
 
-export interface BinaryExpression extends AstNode {
+export interface BinaryExpression {
   type: 'BinaryExpression'
   operator: string
   left: AstNode
-  right?: AstNode
+  right: AstNode
 }
 
-export interface UnaryExpression extends AstNode {
+export interface UnaryExpression {
   type: 'UnaryExpression'
   operator: string
-  right?: AstNode
+  right: AstNode
 }
 
-export interface ArrayLiteral extends AstNode {
+export interface ArrayLiteral {
   type: 'ArrayLiteral'
   value: AstNode[]
 }
 
-export interface ObjectLiteral extends AstNode {
+export interface ObjectLiteral {
   type: 'ObjectLiteral'
   value: Record<string, AstNode>
 }
@@ -70,48 +65,49 @@ export type TemplateLiteralPart =
   | { type: 'static'; value: string }
   | { type: 'expression'; value: AstNode }
 
-export interface TemplateLiteral extends AstNode {
+export interface TemplateLiteral {
   type: 'TemplateLiteral'
   parts: TemplateLiteralPart[]
 }
 
-export interface FunctionCall extends AstNode {
+export interface FunctionCall {
   type: 'FunctionCall'
   name: string
   args: AstNode[]
 }
 
-export interface FilterExpression extends AstNode {
+export interface FilterExpression {
   type: 'FilterExpression'
   expr: AstNode
   subject: AstNode
 }
 
-export interface ConditionalExpression extends AstNode {
+export interface ConditionalExpression {
   type: 'ConditionalExpression'
   test: AstNode
   consequent?: AstNode
   alternate?: AstNode
 }
 
-export interface SequenceExpression extends AstNode {
+export interface SequenceExpression {
   type: 'SequenceExpression'
   expressions: AstNode[]
 }
 
-export interface AssignmentExpression extends AstNode {
+export interface AssignmentExpression {
   type: 'AssignmentExpression'
   operator: '='
   left: Identifier
+  right: AstNode
 }
 
-export interface Lambda extends AstNode {
+export interface Lambda {
   type: 'Lambda'
   params: string[]
   body: AstNode
 }
 
-export type AstNodeUnion =
+export type AstNode =
   | Literal
   | Identifier
   | BinaryExpression
@@ -126,7 +122,7 @@ export type AstNodeUnion =
   | AssignmentExpression
   | Lambda
 
-export type NodeByType<T extends AstNodeUnion['type']> = Extract<
-  AstNodeUnion,
+export type NodeByType<T extends AstNode['type']> = Extract<
+  AstNode,
   { type: T }
 >

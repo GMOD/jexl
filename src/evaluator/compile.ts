@@ -4,16 +4,11 @@
  */
 
 import { LAMBDA } from '../collections.ts'
+import { unknownNode } from '../errors.ts'
 import { and, nullish, or } from '../grammar.ts'
 
 import type { Grammar } from '../grammar.ts'
-import type {
-  AstNode,
-  AstNodeUnion,
-  JexlFunction,
-  JexlValue,
-  Literal
-} from '../types.ts'
+import type { AstNode, JexlFunction, JexlValue } from '../types.ts'
 
 /** The variables an expression is evaluated against. */
 export type Context = Record<string, JexlValue>
@@ -101,23 +96,22 @@ function isKeyPart(
  * serves every evaluation.
  */
 function literalTable(node: AstNode) {
-  const literal = node as AstNodeUnion
-  if (literal.type === 'ArrayLiteral') {
-    return literal.value.every((item) => item.type === 'Literal')
-      ? Object.freeze(literal.value.map((item) => (item as Literal).value))
+  if (node.type === 'ArrayLiteral') {
+    return node.value.every((item) => item.type === 'Literal')
+      ? Object.freeze(node.value.map((item) => item.value))
       : undefined
   }
-  if (literal.type === 'ObjectLiteral') {
-    const entries = Object.entries(literal.value)
-    if (entries.every(([, value]) => value.type === 'Literal')) {
-      const table: Context = {}
-      for (const [key, value] of entries) {
-        defineOwn(table, key, (value as Literal).value)
-      }
-      return Object.freeze(table)
-    }
+  if (node.type !== 'ObjectLiteral') {
+    return undefined
   }
-  return undefined
+  const table: Context = {}
+  for (const [key, value] of Object.entries(node.value)) {
+    if (value.type !== 'Literal') {
+      return undefined
+    }
+    defineOwn(table, key, value.value)
+  }
+  return Object.freeze(table)
 }
 
 function lambda(fn: JexlFunction & { [LAMBDA]?: true }) {
@@ -224,8 +218,7 @@ function climb(hops: number, index: number): CompiledNode {
   }
 }
 
-function assignedNames(ast: AstNode | undefined, names = new Set<string>()) {
-  const node = ast as AstNodeUnion | undefined
+function assignedNames(node: AstNode | undefined, names = new Set<string>()) {
   switch (node?.type) {
     case 'AssignmentExpression': {
       names.add(node.left.value)
@@ -351,15 +344,11 @@ function stringify(value: JexlValue) {
 }
 
 function compileNode(
-  ast: AstNode,
+  node: AstNode,
   grammar: Grammar,
   scope: Scope
 ): CompiledNode {
   const compile = (child: AstNode) => compileNode(child, grammar, scope)
-  // AstNode types its `type` as a plain string so the Parser can build the tree
-  // loosely; narrowing to the union once, here, lets every case below see its
-  // own node type instead of repeating the same cast in each branch
-  const node = ast as AstNodeUnion
   switch (node.type) {
     case 'Literal': {
       const { value } = node
@@ -396,7 +385,7 @@ function compileNode(
     case 'BinaryExpression': {
       const op = grammar.elements[node.operator]
       const left = compile(node.left)
-      const right = compile(node.right!)
+      const right = compile(node.right)
       if (op?.type === 'binaryOp' && op.evalOnDemand) {
         const { evalOnDemand } = op
         if (evalOnDemand === and) {
@@ -427,7 +416,7 @@ function compileNode(
     }
 
     case 'UnaryExpression': {
-      const right = compile(node.right!)
+      const right = compile(node.right)
       const elem = grammar.elements[node.operator]
       const fn =
         elem?.type === 'unaryOp'
@@ -590,7 +579,7 @@ function compileNode(
       if (scope.params) {
         throw new Error('Assignment is not supported in a lambda')
       }
-      const right = compile(node.right!)
+      const right = compile(node.right)
       const { slots, frame } = scope.locals!
       const slot = slots.get(node.left.value)!
       return (ctx) => (frame.locals[slot] = right(ctx))
@@ -621,7 +610,7 @@ function compileNode(
     }
 
     default: {
-      throw new Error(`Corrupt AST: unknown node type '${ast.type}'`)
+      return unknownNode(node)
     }
   }
 }

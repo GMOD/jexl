@@ -16,6 +16,12 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   lambda the expression wrote; handing one a function from the context throws.
   A host's `getMember` still decides member reads for itself.
 
+### Changed
+
+- **`AstNode` is the union of the node types**, so checking `node.type` narrows
+  it, and a `BinaryExpression`, `UnaryExpression` or `AssignmentExpression`
+  always has its `right`. `AstNodeUnion`, which `AstNode` now is, is gone.
+
 ## [v5.0.2]
 
 ### Changed

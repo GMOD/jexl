@@ -3,7 +3,9 @@
  * Copyright 2020 Tom Shawver
  */
 
-import type { AstNode, AstNodeUnion, FunctionCall } from './types.ts'
+import { unknownNode } from './errors.ts'
+
+import type { AstNode, FunctionCall } from './types.ts'
 
 export type PathKey = string | number
 
@@ -89,8 +91,7 @@ function literalKey(node: AstNode) {
   return typeof value === 'boolean' ? String(value) : (value ?? undefined)
 }
 
-function literalValue(ast: AstNode) {
-  const node = ast as AstNodeUnion
+function literalValue(node: AstNode) {
   if (node.type === 'Literal') {
     return node.value
   }
@@ -113,8 +114,7 @@ function extend(read: Read, keys: readonly PathKey[], dynamic = false): Read {
     : { root: read.root, path }
 }
 
-function isBarePath(ast: AstNode): boolean {
-  const node = ast as AstNodeUnion
+function isBarePath(node: AstNode): boolean {
   if (node.type === 'Identifier') {
     return !node.from || isBarePath(node.from)
   }
@@ -238,8 +238,7 @@ export function analyze(
     return subject.map((read) => extend(read, keys, dynamic))
   }
 
-  function walk(ast: AstNode, scope: Scope): Read[] {
-    const node = ast as AstNodeUnion
+  function walk(node: AstNode, scope: Scope): Read[] {
     switch (node.type) {
       case 'Literal': {
         return []
@@ -289,7 +288,7 @@ export function analyze(
       }
 
       case 'UnaryExpression': {
-        use(node.right!, scope)
+        use(node.right, scope)
         return []
       }
 
@@ -328,7 +327,7 @@ export function analyze(
       }
 
       case 'AssignmentExpression': {
-        const value = walk(node.right!, scope)
+        const value = walk(node.right, scope)
         const name = node.left.value
         const previous = scope.get(name)
         if (previous && !previous.used) {
@@ -349,7 +348,7 @@ export function analyze(
       }
 
       default: {
-        throw new Error(`Corrupt AST: unknown node type '${ast.type}'`)
+        return unknownNode(node)
       }
     }
   }

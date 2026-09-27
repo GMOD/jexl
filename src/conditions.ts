@@ -7,7 +7,7 @@ import { analyze } from './analyze.ts'
 import { print } from './print.ts'
 
 import type { PathKey } from './analyze.ts'
-import type { AstNode, AstNodeUnion } from './types.ts'
+import type { AstNode } from './types.ts'
 
 export type Scalar = string | number | boolean | null
 
@@ -50,8 +50,7 @@ const FLIP: Record<string, Condition['op']> = {
   '>=': '<='
 }
 
-function scalar(ast: AstNode): { value: Scalar } | undefined {
-  const node = ast as AstNodeUnion
+function scalar(node: AstNode): { value: Scalar } | undefined {
   if (node.type === 'Literal') {
     return { value: node.value }
   }
@@ -61,13 +60,11 @@ function scalar(ast: AstNode): { value: Scalar } | undefined {
     : undefined
 }
 
-function isRow(ast: AstNode | undefined, row: string) {
-  const node = ast as AstNodeUnion | undefined
+function isRow(node: AstNode | undefined, row: string) {
   return node?.type === 'Identifier' && !node.from && node.value === row
 }
 
-function subjectOf(ast: AstNode, opts: ConditionOptions): Subject | undefined {
-  const node = ast as AstNodeUnion
+function subjectOf(node: AstNode, opts: ConditionOptions): Subject | undefined {
   if (
     node.type === 'FunctionCall' &&
     opts.calls?.includes(node.name) &&
@@ -109,12 +106,11 @@ function subjectOf(ast: AstNode, opts: ConditionOptions): Subject | undefined {
 }
 
 function condition(
-  ast: AstNode,
+  node: AstNode,
   opts: ConditionOptions
 ): Condition | undefined {
-  const node = ast as AstNodeUnion
   if (node.type === 'UnaryExpression' && node.operator === '!') {
-    const inner = condition(node.right!, opts)
+    const inner = condition(node.right, opts)
     // only forms whose negation reads as a condition of its own; `!(QUAL > 30)`
     // holds where QUAL is missing, which `QUAL <= 30` does not
     return inner?.op === 'in' || inner?.op === 'has' || inner?.op === 'set'
@@ -126,7 +122,7 @@ function condition(
     return subject && { subject, op: 'set' }
   }
   const { operator, left } = node
-  const right = node.right!
+  const right = node.right
   if (COMPARE.has(operator)) {
     const subject = subjectOf(left, opts)
     const value = scalar(right)
@@ -152,9 +148,8 @@ function condition(
   }
   if (operator === 'in') {
     const subject = subjectOf(left, opts)
-    const list = right as AstNodeUnion
-    if (subject && list.type === 'ArrayLiteral') {
-      const values = list.value.map(scalar)
+    if (subject && right.type === 'ArrayLiteral') {
+      const values = right.value.map(scalar)
       return values.length > 0 && values.every(Boolean)
         ? { subject, op: 'in', value: values.map((value) => value!.value) }
         : undefined
@@ -176,37 +171,35 @@ function condition(
  * misread.
  */
 export function conditions(
-  ast: AstNode | null,
+  node: AstNode | null,
   opts: ConditionOptions
 ): Condition[] | undefined {
-  const node = ast as AstNodeUnion | null
   if (!node) {
     return undefined
   }
   if (node.type === 'BinaryExpression' && node.operator === '&&') {
     const left = conditions(node.left, opts)
-    const right = left && conditions(node.right!, opts)
+    const right = left && conditions(node.right, opts)
     return left && right && [...left, ...right]
   }
   const found = condition(node, opts)
   return found && [found]
 }
 
-const literal = (value: Scalar) =>
-  print({ type: 'Literal', value } as AstNodeUnion)
+const literal = (value: Scalar) => print({ type: 'Literal', value })
 
 /** A subject reading `path` off the row, for a condition built from a picker. */
 export function pathSubject(row: string, path: PathKey[]): Subject {
-  let node: AstNode = { type: 'Identifier', value: row } as AstNodeUnion
+  let node: AstNode = { type: 'Identifier', value: row }
   for (const key of path) {
     node =
       typeof key === 'string'
-        ? ({ type: 'Identifier', value: key, from: node } as AstNodeUnion)
-        : ({
+        ? { type: 'Identifier', value: key, from: node }
+        : {
             type: 'FilterExpression',
             subject: node,
             expr: { type: 'Literal', value: key }
-          } as AstNodeUnion)
+          }
   }
   return { kind: 'path', path, node }
 }
@@ -217,14 +210,14 @@ export function callSubject(
   name: string,
   args: Scalar[] = []
 ): Subject {
-  const node = {
+  const node: AstNode = {
     type: 'FunctionCall',
     name,
     args: [
       { type: 'Identifier', value: row },
-      ...args.map((value) => ({ type: 'Literal', value }))
+      ...args.map((value): AstNode => ({ type: 'Literal', value }))
     ]
-  } as AstNodeUnion
+  }
   return { kind: 'call', name, args, node }
 }
 
