@@ -747,6 +747,15 @@ describe('check', () => {
     })
   })
 
+  it('reads a template with no interpolation as the key it spells', () => {
+    const found = (expr: string) =>
+      check(parse(expr), V5).diagnostics.map(
+        ({ code, message }) => `${code}: ${message}`
+      )
+    expect(found("feature.INFO['DPP']")).not.toEqual([])
+    expect(found('feature.INFO[`DPP`]')).toEqual(found("feature.INFO['DPP']"))
+  })
+
   describe('the host context', () => {
     it('reports a variable the slot does not bind', () => {
       expect(

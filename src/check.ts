@@ -3,6 +3,7 @@
  * Copyright 2020 Tom Shawver
  */
 
+import { literalValue } from './analyze.ts'
 import { unknownNode } from './errors.ts'
 import { toRegExp } from './operators.ts'
 import { isName, key, print, quote } from './print.ts'
@@ -589,10 +590,6 @@ function paramName(subject: AstNode, context: AstNode) {
     candidate = `${name}${i}`
   }
   return candidate
-}
-
-function literalValue(node: AstNode) {
-  return node.type === 'Literal' ? node.value : undefined
 }
 
 function describe(type: Type): string {
