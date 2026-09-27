@@ -82,6 +82,7 @@ export interface SimpleElement {
     | 'question'
     | 'semicolon'
     | 'arrow'
+    | 'assign'
 }
 
 export type GrammarElement = BinaryOp | UnaryOp | SimpleElement
@@ -174,6 +175,7 @@ export const getGrammar = (): Grammar => ({
     '?': { type: 'question' },
     ';': { type: 'semicolon' },
     '=>': { type: 'arrow' },
+    '=': { type: 'assign' },
     '+': {
       type: 'binaryOp',
       precedence: 30,
@@ -300,13 +302,6 @@ export const getGrammar = (): Grammar => ({
     '!': {
       type: 'unaryOp',
       eval: (right) => !right
-    },
-    '=': {
-      type: 'binaryOp',
-      precedence: 2,
-      eval: (_left, _right) => {
-        throw new Error('Assignment handled specially')
-      }
     }
   },
 

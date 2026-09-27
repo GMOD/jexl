@@ -28,8 +28,6 @@ const omittedAlternateBefore = new Set([
   'semicolon'
 ])
 
-export { JexlSyntaxError } from '../errors.ts'
-
 /**
  * Converts the tokens from the {@link Lexer} into an Abstract Syntax Tree, for
  * {@link compileAst} to lower to closures. A Pratt parser: each level of the
@@ -110,8 +108,7 @@ class Parser {
       return this._lambda()
     }
     const left = this._ternary()
-    const token = this._peek()
-    if (token?.type !== 'binaryOp' || token.value !== '=') {
+    if (this._peek()?.type !== 'assign') {
       return left
     }
     if (left.type !== 'Identifier' || left.from) {
@@ -201,7 +198,7 @@ class Parser {
     let left = this._unary()
     for (;;) {
       const token = this._peek()
-      if (token?.type !== 'binaryOp' || token.value === '=') {
+      if (token?.type !== 'binaryOp') {
         return left
       }
       const operator = token.value as string

@@ -24,6 +24,9 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - **A prefix operator's grammar entry has no `precedence`.** Every one was
   `Infinity`, which the parser read only to parse the operand as another
   prefix expression.
+- **`=` is punctuation in the grammar**, like `=>`, rather than a binary
+  operator at precedence 2 whose `eval` threw. `removeOp('=')` no longer
+  removes it.
 
 ## [v5.0.2]
 
