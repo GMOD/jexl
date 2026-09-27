@@ -163,6 +163,10 @@ describe('Jexl', () => {
       expect(inst.eval('5 - 2')).toBe(2)
       expect(inst.eval('-x', { x: 3 })).toBe(-3)
     })
+    it('keeps ^ grouping from the right', () => {
+      inst.addBinaryOp('^', 50, (a, b) => a ** b)
+      expect(inst.eval('2 ^ 3 ^ 2')).toBe(512)
+    })
   })
   describe('syntax errors', () => {
     it('come from the lexer with the offset of the bad token', () => {
