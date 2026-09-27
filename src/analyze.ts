@@ -91,7 +91,8 @@ function literalKey(node: AstNode) {
   return typeof value === 'boolean' ? String(value) : (value ?? undefined)
 }
 
-function literalValue(node: AstNode) {
+/** A literal's value, or a template's with no interpolation. */
+export function literalValue(node: AstNode) {
   if (node.type === 'Literal') {
     return node.value
   }

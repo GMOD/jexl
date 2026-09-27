@@ -3,7 +3,7 @@
  * Copyright 2020 Tom Shawver
  */
 
-import { analyze } from './analyze.ts'
+import { analyze, literalValue } from './analyze.ts'
 import { print } from './print.ts'
 
 import type { PathKey } from './analyze.ts'
@@ -50,13 +50,10 @@ const FLIP: Record<string, Condition['op']> = {
   '>=': '<='
 }
 
-function scalar(node: AstNode): { value: Scalar } | undefined {
-  if (node.type === 'Literal') {
-    return { value: node.value }
-  }
-  return node.type === 'TemplateLiteral' &&
-    node.parts.every((part) => part.type === 'static')
-    ? { value: node.parts.map((part) => part.value).join('') }
+function scalars(nodes: AstNode[]) {
+  const values = nodes.map(literalValue)
+  return values.every((value): value is Scalar => value !== undefined)
+    ? values
     : undefined
 }
 
@@ -70,15 +67,8 @@ function subjectOf(node: AstNode, opts: ConditionOptions): Subject | undefined {
     opts.calls?.includes(node.name) &&
     isRow(node.args[0], opts.row)
   ) {
-    const rest = node.args.slice(1).map(scalar)
-    return rest.every(Boolean)
-      ? {
-          kind: 'call',
-          name: node.name,
-          args: rest.map((arg) => arg!.value),
-          node
-        }
-      : undefined
+    const args = scalars(node.args.slice(1))
+    return args && { kind: 'call', name: node.name, args, node }
   }
   const accessor =
     node.type === 'FunctionCall' &&
@@ -125,39 +115,33 @@ function condition(
   const right = node.right
   if (COMPARE.has(operator)) {
     const subject = subjectOf(left, opts)
-    const value = scalar(right)
-    if (subject && value) {
-      return { subject, op: operator as '==', value: value.value }
+    const value = literalValue(right)
+    if (subject && value !== undefined) {
+      return { subject, op: operator as '==', value }
     }
     const flipped = subjectOf(right, opts)
-    const leftValue = scalar(left)
-    return flipped && leftValue
-      ? {
-          subject: flipped,
-          op: FLIP[operator] as '==',
-          value: leftValue.value
-        }
+    const leftValue = literalValue(left)
+    return flipped && leftValue !== undefined
+      ? { subject: flipped, op: FLIP[operator] as '==', value: leftValue }
       : undefined
   }
   if (operator === '~' || operator === '!~') {
     const subject = subjectOf(left, opts)
-    const value = scalar(right)
-    return subject && typeof value?.value === 'string'
-      ? { subject, op: operator, value: value.value }
+    const value = literalValue(right)
+    return subject && typeof value === 'string'
+      ? { subject, op: operator, value }
       : undefined
   }
   if (operator === 'in') {
     const subject = subjectOf(left, opts)
     if (subject && right.type === 'ArrayLiteral') {
-      const values = right.value.map(scalar)
-      return values.length > 0 && values.every(Boolean)
-        ? { subject, op: 'in', value: values.map((value) => value!.value) }
-        : undefined
+      const values = scalars(right.value)
+      return values?.length ? { subject, op: 'in', value: values } : undefined
     }
-    const key = scalar(left)
+    const key = literalValue(left)
     const container = subjectOf(right, opts)
-    return container && typeof key?.value === 'string'
-      ? { subject: container, op: 'has', value: key.value }
+    return container && typeof key === 'string'
+      ? { subject: container, op: 'has', value: key }
       : undefined
   }
   return undefined
