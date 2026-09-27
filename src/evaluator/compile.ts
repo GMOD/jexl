@@ -3,6 +3,7 @@
  * Copyright 2020 Tom Shawver
  */
 
+import { LAMBDA } from '../collections.ts'
 import { and, nullish, or } from '../grammar.ts'
 
 import type { Grammar } from '../grammar.ts'
@@ -42,6 +43,16 @@ function defineOwn(target: Context, key: string, value: JexlValue) {
 
 function assignOwn(target: Context, key: string, value: JexlValue) {
   target[key] = value
+}
+
+// inherited, these lead from any value to `Function` and `Object.prototype`
+const isUnsafeKey = (key: string | number) =>
+  key === 'constructor' || key === '__proto__'
+
+function member(target: Context, key: string | number) {
+  return isUnsafeKey(key) && !Object.hasOwn(target, key)
+    ? undefined
+    : target[key]
 }
 
 /** The key `subject[index]` reads under, or undefined when it reads nothing. */
@@ -107,6 +118,11 @@ function literalTable(node: AstNode) {
     }
   }
   return undefined
+}
+
+function lambda(fn: JexlFunction & { [LAMBDA]?: true }) {
+  fn[LAMBDA] = true
+  return fn
 }
 
 const unassigned = Symbol('unassigned')
@@ -365,6 +381,12 @@ function compileNode(
             : (getMember(target, name) as JexlValue)
         }
       }
+      if (isUnsafeKey(name)) {
+        return (ctx) => {
+          const target = from(ctx)
+          return target == null ? undefined : member(target as Context, name)
+        }
+      }
       return (ctx) => {
         const target = from(ctx)
         return target == null ? undefined : (target as Context)[name]
@@ -452,7 +474,7 @@ function compileNode(
         const key = memberKey(index(ctx))
         return subjectVal == null || key === undefined
           ? undefined
-          : (subjectVal as Record<string | number, JexlValue>)[key]
+          : member(subjectVal as Context, key)
       }
     }
 
@@ -581,18 +603,20 @@ function compileNode(
       })
       if (!scope.params) {
         const frame = scope.locals?.frame
-        return (ctx): JexlFunction => {
+        return (ctx) => {
           const locals = frame?.locals
-          return (...args) =>
+          return lambda((...args) =>
             body(asContext(new LambdaFrame(args, undefined, ctx, locals)))
+          )
         }
       }
-      return (env): JexlFunction => {
+      return (env) => {
         const outer = asFrame(env)
-        return (...args) =>
+        return lambda((...args) =>
           body(
             asContext(new LambdaFrame(args, outer, outer.context, outer.locals))
           )
+        )
       }
     }
 

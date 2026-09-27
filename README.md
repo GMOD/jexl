@@ -235,7 +235,10 @@ jexl.eval('map(xs, (x, i) => x * i)', { xs: [1, 2, 3] }) // [0, 2, 6]
 jexl.eval('xs.filter(x => x > 1)', { xs: [1, 2, 3] }) // [2, 3]
 ```
 
-A host function of the same name replaces the built-in one.
+A host function of the same name replaces the built-in one. The built-in ones
+call only a lambda the expression wrote, never a function it reads from the
+context, and `a.constructor` and `a.__proto__` find only an own property, so an
+expression cannot reach `Function` and build code to run.
 
 ### Variable Assignment
 

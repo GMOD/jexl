@@ -34,13 +34,23 @@ function isPlainObject(value: JexlValue): value is Record<string, JexlValue> {
   return proto === Object.prototype || proto === null
 }
 
+/**
+ * Marks the functions lambdas evaluate to. A collection function calls only
+ * these, never a function an expression reads, since reads reach host
+ * functions: `reduce(['x', body], ''.constructor.constructor)` built a
+ * function from `body`, and `map` then ran it.
+ */
+export const LAMBDA = Symbol('lambda')
+
+type Lambda = JexlFunction & { [LAMBDA]?: true }
+
 const identity = (value: JexlValue) => value
 
 function callback(name: string, fn: JexlValue): JexlFunction {
   if (fn === undefined) {
     return identity
   }
-  if (typeof fn !== 'function') {
+  if (typeof fn !== 'function' || !(fn as Lambda)[LAMBDA]) {
     throw new TypeError(`${name}() expects a lambda, such as x => x > 1`)
   }
   return fn

@@ -153,6 +153,40 @@ describe('regressions', () => {
       expect({}.polluted).toBeUndefined()
     })
   })
+  describe('reaching host functions', () => {
+    it('reads constructor and __proto__ only as own properties', () => {
+      expect(inst.eval("''.constructor.constructor")).toBeUndefined()
+      expect(inst.eval('(x => 1).constructor')).toBeUndefined()
+      expect(inst.eval("{}['__proto__']")).toBeUndefined()
+      expect(inst.eval("xs['constructor']", { xs: [] })).toBeUndefined()
+      expect(inst.eval('{constructor: 1}.constructor')).toBe(1)
+      expect(
+        inst.eval("o.__proto__ + o['constructor']", {
+          o: JSON.parse('{"__proto__": 1, "constructor": 2}')
+        })
+      ).toBe(3)
+    })
+    it('cannot build and run a function from text', () => {
+      expect(() =>
+        inst.eval(
+          "map([1], reduce(['x', 'return globalThis.pwned = 1'], ''.constructor.constructor))"
+        )
+      ).toThrow(/expects a lambda/)
+      expect(globalThis.pwned).toBeUndefined()
+    })
+    it('cannot pollute Object.prototype', () => {
+      inst.eval('reduce([{}.__proto__, {polluted: 1}], {}.constructor.assign)')
+      expect({}.polluted).toBeUndefined()
+    })
+    it('calls only lambdas from a collection function', () => {
+      const context = { xs: [1, 2], f: (x) => x * 2, F: Function }
+      expect(() => inst.eval('map(xs, f)', context)).toThrow(/expects a lambda/)
+      expect(() => inst.eval("reduce(['x', 'return 1'], F)", context)).toThrow(
+        /expects a lambda/
+      )
+      expect(inst.eval('map(xs, x => x * 2)', context)).toEqual([2, 4])
+    })
+  })
   describe('removeOp', () => {
     it('is a no-op for an operator that is not in the grammar', () => {
       expect(() => inst.removeOp('@@')).not.toThrow()

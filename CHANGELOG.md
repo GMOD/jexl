@@ -2,6 +2,20 @@
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Security
+
+- **An expression can no longer run JavaScript.** Since 5.0,
+  `map([1], reduce(['x', 'return …'], ''.constructor.constructor))` built a
+  function from text and ran it, and `{}.constructor.assign` could write onto
+  `Object.prototype`: a member read reached `Function` and `Object` through the
+  inherited `constructor` and `__proto__`, and the collection functions called
+  whatever function they were handed. Now `constructor` and `__proto__` read
+  only an own property, and `any`, `map`, `reduce` and the rest call only a
+  lambda the expression wrote; handing one a function from the context throws.
+  A host's `getMember` still decides member reads for itself.
+
 ## [v5.0.2]
 
 ### Changed
