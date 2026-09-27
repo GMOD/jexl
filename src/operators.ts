@@ -74,20 +74,24 @@ export function pairwise(
   return out
 }
 
-const patterns = new Map<string, RegExp>()
-const MAX_PATTERNS = 1000
-
 /**
  * The regular expression a pattern string stands for. A leading `(?i)`, the
  * inline flag PCRE, Python and Go read, makes it case-insensitive.
  */
+export function toRegExp(pattern: string) {
+  return pattern.startsWith('(?i)')
+    ? new RegExp(pattern.slice(4), 'i')
+    : new RegExp(pattern)
+}
+
+const patterns = new Map<string, RegExp>()
+const MAX_PATTERNS = 1000
+
 function regex(pattern: string) {
   let re = patterns.get(pattern)
   if (!re) {
     try {
-      re = pattern.startsWith('(?i)')
-        ? new RegExp(pattern.slice(4), 'i')
-        : new RegExp(pattern)
+      re = toRegExp(pattern)
     } catch {
       throw new Error(`Invalid regular expression: ${pattern}`)
     }

@@ -4,6 +4,7 @@
  */
 
 import { unknownNode } from './errors.ts'
+import { toRegExp } from './operators.ts'
 import { isName, key, print, quote } from './print.ts'
 
 import type { AnalyzeOptions } from './analyze.ts'
@@ -289,7 +290,7 @@ function isBoxed(type: Type): type is OfKind<'list'> {
 
 function isPattern(pattern: string) {
   try {
-    new RegExp(pattern.startsWith('(?i)') ? pattern.slice(4) : pattern)
+    toRegExp(pattern)
     return true
   } catch {
     return false
