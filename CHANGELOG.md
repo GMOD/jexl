@@ -16,6 +16,22 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   lambda the expression wrote; handing one a function from the context throws.
   A host's `getMember` still decides member reads for itself.
 
+### Fixed
+
+- **A string ending in an escaped backslash ends at its closing quote.** The
+  lexer read `\'` as an escaped quote even after an escaped backslash, so
+  `'a\\' + 'b'` and `['a\\', 'b']` ran the first string on into the second
+  and failed to parse. `print` writes such strings, so its output failed too.
+  `'a\'`, which never closes, is now a syntax error rather than the text `a\`.
+- **Replacing `^` with `addBinaryOp` keeps it grouping from the right**, as
+  replacing `-` keeps its prefix form.
+- **`check` suggests a spelling of a hyphenated field that reads it:**
+  `feature['collection-date']` with a row variable and none without one, where
+  it suggested `collection-date`, the same subtraction. It also reads a
+  template with no interpolation as the key it spells.
+- **`print` writes a literal too large for a double as `1e999`**, not
+  `Infinity`, which parses as a name.
+
 ### Changed
 
 - **`AstNode` is the union of the node types**, so checking `node.type` narrows

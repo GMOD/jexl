@@ -24,21 +24,20 @@ const numberPattern = String.raw`(?:(?:[0-9]*\.[0-9]+)|[0-9]+)(?:[eE][+-]?[0-9]+
 
 const numericRegex = new RegExp(`^-?${numberPattern}$`)
 export const identRegex = new RegExp(`^${identPattern}$`)
-const escEscRegex = /\\\\/g
-// a string literal opens with one of exactly two quote characters, so the two
-// unescaping regexes can just be named rather than built and cached per quote
-const escQuoteRegex = { "'": /\\'/g, '"': /\\"/g }
-// the escapes a template string's static text recognizes. One pass, so the
-// backslash an escaped backslash yields can't be re-read as the start of the
-// escape that follows it
+// the escapes each kind of literal recognizes. One pass, so the backslash an
+// escaped backslash yields can't be re-read as the start of the escape that
+// follows it
+const quoteEscRegex = { "'": /\\([\\'])/g, '"': /\\([\\"])/g }
 const templateEscRegex = /\\([`$\\])/g
 const whitespaceRegex = /^\s*$/
+// a backslash and the character after it are a pair, so an escaped backslash
+// before the closing quote can't escape that quote
+const quoted = (quote: string) =>
+  String.raw`${quote}(?:\\[\s\S]|[^${quote}\\])*${quote}`
 const preOpRegexElems = [
-  // Template strings
-  '`(?:[^`\\\\]|\\\\.)*`',
-  // Strings
-  String.raw`'(?:(?:\\')|[^'])*'`,
-  String.raw`"(?:(?:\\")|[^"])*"`,
+  quoted('`'),
+  quoted("'"),
+  quoted('"'),
   // Whitespace
   String.raw`\s+`,
   // ahead of the grammar's '.', so that '.5' is a number rather than a dot
@@ -62,6 +61,9 @@ const minusNegatesAfter = new Set([
   'arrow',
   'assign'
 ])
+// whether a `-` after this token negates what follows rather than subtracting
+const negates = (last: Token | undefined) =>
+  !last || minusNegatesAfter.has(last.type)
 
 /**
  * Lexer handles the lexical parsing of a Jexl string. Its responsibility is to
@@ -92,26 +94,14 @@ class Lexer {
     this._splitRegex = undefined
   }
 
-  /**
-   * Splits a Jexl expression string into an array of expression elements.
-   * @param {string} str A Jexl expression string
-   * @returns {Array<string>} An array of substrings defining the functional
-   *      elements of the expression.
-   */
+  /** Splits a Jexl string into its elements: tokens and runs of whitespace. */
   getElements(str: string) {
-    const regex = this._getSplitRegex()
-    return str.split(regex).filter(Boolean)
+    return str.split(this._getSplitRegex()).filter(Boolean)
   }
 
   /**
-   * Converts an array of expression elements into an array of tokens.  Note that
-   * the resulting array may not equal the element array in length, as any
-   * elements that consist only of whitespace get appended to the previous
-   * token's "raw" property.  For the structure of a token object, please see
-   * {@link Lexer#tokenize}.
-   * @param {Array<string>} elements An array of Jexl expression elements to be
-   *      converted to tokens
-   * @returns {Array<{type, value, raw}>} an array of token objects.
+   * The tokens for a list of elements. Whitespace makes no token of its own;
+   * it joins the `raw` of the token before it.
    */
   getTokens(elements: string[]) {
     const tokens: Token[] = []
@@ -122,12 +112,12 @@ class Lexer {
     let pendingMinus: Token | undefined
     let offset = 0
     for (const element of elements) {
-      if (this._isWhitespace(element)) {
+      if (whitespaceRegex.test(element)) {
         const last = pendingMinus ?? tokens.at(-1)
         if (last) {
           last.raw += element
         }
-      } else if (element === '-' && this._isNegative(tokens)) {
+      } else if (element === '-' && negates(tokens.at(-1))) {
         // a second prefix minus in a row ("- -x"): emit the pending one as a
         // unary operator so this one can negate whatever comes next
         if (pendingMinus) {
@@ -135,7 +125,7 @@ class Lexer {
         }
         pendingMinus = unaryMinusToken()
       } else if (pendingMinus) {
-        if (numericRegex.exec(element)) {
+        if (numericRegex.test(element)) {
           // fold the sign into the number, so "-1" stays a single literal
           const token = this._createToken('-' + element, offset)
           token.raw = pendingMinus.raw + element
@@ -159,47 +149,16 @@ class Lexer {
   }
 
   /**
-   * Converts a Jexl string into an array of tokens.  Each token is an object
-   * in the following format:
-   *
-   *     {
-   *         type: <string>,
-   *         [name]: <string>,
-   *         value: <boolean|number|string>,
-   *         raw: <string>
-   *     }
-   *
-   * Type is one of the following:
-   *
-   *      literal, identifier, binaryOp, unaryOp
-   *
-   * OR, if the token is a control character its type is the name of the element
-   * defined in the Grammar.
-   *
-   * Name appears only if the token is a control string found in
-   * {@link grammar#elements}, and is set to the name of the element.
-   *
-   * Value is the value of the token in the correct type (boolean or numeric as
-   * appropriate). Raw is the string representation of this value taken directly
-   * from the expression string, including any trailing spaces.
-   * @param {string} str The Jexl string to be tokenized
-   * @returns {Array<{type, value, raw}>} an array of token objects.
-   * @throws {Error} if the provided string contains an invalid token.
+   * Splits a Jexl string into tokens. A token's `type` is `literal`,
+   * `templateString`, `identifier` or the type of the grammar element it
+   * spells; its `value` is a literal's value or the template's parts; its `raw`
+   * is its source text and any whitespace after it.
+   * @throws {JexlSyntaxError} for text that is no token
    */
   tokenize(str: string) {
-    const elements = this.getElements(str)
-    return this.getTokens(elements)
+    return this.getTokens(this.getElements(str))
   }
 
-  /**
-   * Creates a new token object from an element of a Jexl string. See
-   * {@link Lexer#tokenize} for a description of the token object.
-   * @param {string} element The element from which a token should be made
-   * @returns {{value: number|boolean|string, [name]: string, type: string,
-   *      raw: string}} a token object describing the provided element.
-   * @throws {Error} if the provided string is not a valid expression element.
-   * @private
-   */
   _createToken(element: string, offset = 0): Token {
     const token: Token = {
       type: 'literal',
@@ -212,7 +171,7 @@ class Lexer {
       return token
     } else if (element.startsWith('"') || element.startsWith("'")) {
       token.value = this._unquote(element)
-    } else if (numericRegex.exec(element)) {
+    } else if (numericRegex.test(element)) {
       token.value = parseFloat(element)
     } else if (element === 'true' || element === 'false') {
       token.value = element === 'true'
@@ -220,7 +179,7 @@ class Lexer {
       token.value = null
     } else if (Object.hasOwn(this._grammar.elements, element)) {
       token.type = this._grammar.elements[element]!.type
-    } else if (identRegex.exec(element)) {
+    } else if (identRegex.test(element)) {
       token.type = 'identifier'
     } else {
       throw new JexlSyntaxError(`Invalid expression token: ${element}`, offset)
@@ -228,92 +187,30 @@ class Lexer {
     return token
   }
 
-  /**
-   * Escapes a string so that it can be treated as a string literal within a
-   * regular expression. A word such as `in` also stops matching inside a
-   * longer name.
-   * @param {string} str The string to be escaped
-   * @returns {string} the RegExp-escaped string.
-   * @see https://developer.mozilla.org/en/docs/Web/JavaScript/Guide/Regular_Expressions
-   * @private
-   */
+  /** A grammar element's text as a regex. A word such as `in` also stops
+   * matching inside a longer name. */
   _escapeRegExp(str: string) {
     const escaped = str.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
-    return identRegex.exec(str) ? wholeWord(escaped) : escaped
+    return identRegex.test(str) ? wholeWord(escaped) : escaped
   }
 
-  /**
-   * Gets a RegEx object appropriate for splitting a Jexl string into its core
-   * elements.
-   * @returns {RegExp} An element-splitting RegExp object
-   * @private
-   */
   _getSplitRegex() {
     if (!this._splitRegex) {
-      // Sort by most characters to least, then regex escape each
-      const elemArray = Object.keys(this._grammar.elements)
-        .sort((a, b) => {
-          return b.length - a.length
-        })
-        .map((elem) => {
-          return this._escapeRegExp(elem)
-        })
+      // longest first, so that `==` wins over `=`
+      const elements = Object.keys(this._grammar.elements)
+        .sort((a, b) => b.length - a.length)
+        .map((element) => this._escapeRegExp(element))
       this._splitRegex = new RegExp(
-        '(' +
-          [
-            preOpRegexElems.join('|'),
-            elemArray.join('|'),
-            postOpRegexElems.join('|')
-          ].join('|') +
-          ')'
+        `(${[...preOpRegexElems, ...elements, ...postOpRegexElems].join('|')})`
       )
     }
     return this._splitRegex
   }
 
-  /**
-   * Determines whether the addition of a '-' token should be interpreted as a
-   * negative symbol for an upcoming number, given an array of tokens already
-   * processed.
-   * @param {Array<Object>} tokens An array of tokens already processed
-   * @returns {boolean} true if adding a '-' should be considered a negative
-   *      symbol; false otherwise
-   * @private
-   */
-  _isNegative(tokens: Token[]) {
-    const last = tokens.at(-1)
-    return !last || minusNegatesAfter.has(last.type)
-  }
-
-  /**
-   * A utility function to determine if a string consists of only space
-   * characters.
-   * @param {string} str A string to be tested
-   * @returns {boolean} true if the string is empty or consists of only spaces;
-   *      false otherwise.
-   * @private
-   */
-  _isWhitespace(str: string) {
-    return !!whitespaceRegex.exec(str)
-  }
-
-  /**
-   * Removes the beginning and trailing quotes from a string, unescapes any
-   * escaped quotes on its interior, and unescapes any escaped escape
-   * characters. Note that this function is not defensive; it assumes that the
-   * provided string is not empty, and that its first and last characters are
-   * actually quotes.
-   * @param {string} str A string whose first and last characters are quotes
-   * @returns {string} a string with the surrounding quotes stripped and escapes
-   *      properly processed.
-   * @private
-   */
+  /** A quoted string literal's text, unquoted and unescaped. */
   _unquote(str: string) {
     const quote = str.startsWith('"') ? '"' : "'"
-    return str
-      .slice(1, -1)
-      .replaceAll(escQuoteRegex[quote], quote)
-      .replaceAll(escEscRegex, '\\')
+    return str.slice(1, -1).replaceAll(quoteEscRegex[quote], '$1')
   }
 
   _parseTemplateString(str: string, offset = 0) {

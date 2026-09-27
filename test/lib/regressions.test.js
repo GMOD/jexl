@@ -25,6 +25,12 @@ describe('regressions', () => {
     it('still unescapes a lone escaped backslash', () => {
       expect(inst.eval(String.raw`"a\\b"`)).toBe(String.raw`a\b`)
     })
+    it('ends a string at the quote after an escaped backslash', () => {
+      // the backslash escaped the closing quote, so the string ran on into
+      // the next one
+      expect(inst.eval(String.raw`'a\\' + 'b'`)).toBe(String.raw`a\b`)
+      expect(inst.eval(String.raw`["a\\", "b"]`)).toEqual(['a\\', 'b'])
+    })
   })
   describe('ternary', () => {
     it('evaluates an omitted alternate to undefined', () => {
