@@ -949,23 +949,36 @@ export function check(
       return undefined
     }
     const left = node.left as Identifier
+    const name = left.value
+    if (
+      !left.from &&
+      (scope.has(name) || name === row || (env && Object.hasOwn(env, name)))
+    ) {
+      return undefined
+    }
     const reported = diagnostics.length
     const subject = left.from ? infer(left.from) : root
     diagnostics.length = reported
-    if (subject.kind !== 'record' || subject.fields.has(left.value)) {
+    if (subject.kind !== 'record' || subject.fields.has(name)) {
       return undefined
     }
-    const whole = `${left.value}-${(node.right as Identifier).value}`
+    const whole = `${name}-${(node.right as Identifier).value}`
     const found = subject.fields.get(whole)
     if (!found) {
       return undefined
     }
+    // a bare name can't hold a hyphen, so only a row variable can spell it
+    const holder: AstNode | undefined =
+      left.from ??
+      (row === undefined
+        ? undefined
+        : ({ type: 'Identifier', value: row } as Identifier))
     report(
       'unknown-field',
       'warning',
       node,
       `${print(node)} subtracts; ${whole} is one field`,
-      [text(left.from, whole)]
+      holder ? [text(holder, whole)] : []
     )
     return found
   }

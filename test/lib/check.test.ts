@@ -715,6 +715,38 @@ describe('check', () => {
     })
   })
 
+  describe('a hyphenated bare name', () => {
+    const schema: FieldSchema[] = [
+      { path: ['collection-date'], type: 'string' }
+    ]
+
+    it('suggests reading it off the row', () => {
+      expect(
+        summary("collection-date == '2020'", { schema, row: 'feature' })
+          .diagnostics
+      ).toEqual([
+        "unknown-field @ collection - date → feature['collection-date']"
+      ])
+    })
+
+    it('suggests nothing when no row variable can spell it', () => {
+      expect(
+        summary("collection-date == '2020'", { schema }).diagnostics
+      ).toEqual(['unknown-field @ collection - date'])
+    })
+
+    it('leaves a subtraction of bound names alone', () => {
+      const number: Type = { kind: 'number' }
+      expect(
+        summary('collection - date', {
+          schema,
+          row: 'feature',
+          env: { collection: number, date: number }
+        }).diagnostics
+      ).toEqual([])
+    })
+  })
+
   describe('the host context', () => {
     it('reports a variable the slot does not bind', () => {
       expect(
