@@ -117,11 +117,17 @@ export function print(ast: AstNode): string {
   switch (node.type) {
     case 'Literal': {
       const { value } = node
-      return typeof value === 'string'
-        ? quote(value)
-        : Object.is(value, -0)
-          ? '-0'
-          : String(value)
+      if (typeof value === 'string') {
+        return quote(value)
+      }
+      // a number too large for a double reads as Infinity, which is a name
+      return Object.is(value, -0)
+        ? '-0'
+        : value === Infinity
+          ? '1e999'
+          : value === -Infinity
+            ? '-1e999'
+            : String(value)
     }
     case 'Identifier': {
       return node.from
