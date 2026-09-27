@@ -142,7 +142,6 @@ class Jexl {
   addUnaryOp(operator: string, fn: UncheckedFn) {
     this._addGrammarElement(operator, {
       type: 'unaryOp',
-      precedence: Infinity,
       eval: fn as unknown as UnaryOpEval
     })
   }

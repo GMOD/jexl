@@ -56,9 +56,9 @@ export interface BinaryOp {
 
 export type UnaryOpEval = (right: JexlValue) => JexlValue
 
+/** A prefix operator, which binds tighter than any binary one. */
 export interface UnaryOp {
   type: 'unaryOp'
-  precedence: number
   eval: UnaryOpEval
 }
 
@@ -299,7 +299,6 @@ export const getGrammar = (): Grammar => ({
     },
     '!': {
       type: 'unaryOp',
-      precedence: Infinity,
       eval: (right) => !right
     },
     '=': {

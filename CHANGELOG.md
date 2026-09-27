@@ -21,6 +21,9 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - **`AstNode` is the union of the node types**, so checking `node.type` narrows
   it, and a `BinaryExpression`, `UnaryExpression` or `AssignmentExpression`
   always has its `right`. `AstNodeUnion`, which `AstNode` now is, is gone.
+- **A prefix operator's grammar entry has no `precedence`.** Every one was
+  `Infinity`, which the parser read only to parse the operand as another
+  prefix expression.
 
 ## [v5.0.2]
 

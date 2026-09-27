@@ -240,12 +240,10 @@ class Parser {
       return this._postfix(this._primary())
     }
     this._pos++
-    const operator = token.value as string
-    const op = this._grammar.elements[operator]
     return {
       type: 'UnaryExpression',
-      operator,
-      right: this._binary(op?.type === 'unaryOp' ? op.precedence : Infinity)
+      operator: token.value as string,
+      right: this._unary()
     }
   }
 
