@@ -3,32 +3,20 @@
  * Copyright 2020 Tom Shawver
  */
 
+import { identRegex } from './Lexer.ts'
+import { getGrammar } from './grammar.ts'
+
 import type { AstNode, BinaryExpression } from './types.ts'
 
-const PRECEDENCE: Record<string, number> = {
-  '=': 2,
-  '||': 10,
-  '??': 10,
-  '&&': 11,
-  '==': 20,
-  '!=': 20,
-  '~': 20,
-  '!~': 20,
-  '<': 20,
-  '<=': 20,
-  '>': 20,
-  '>=': 20,
-  in: 20,
-  '+': 30,
-  '-': 30,
-  '*': 40,
-  '/': 40,
-  '//': 40,
-  '%': 50,
-  '^': 50
+const { elements } = getGrammar()
+
+// print knows where only the built-in operators bind, so a host's own ones
+// print with their operands parenthesized
+function builtIn(operator: string) {
+  const element = elements[operator]
+  return element?.type === 'binaryOp' ? element : undefined
 }
 
-const RIGHT_ASSOCIATIVE = new Set(['^'])
 const LOGICAL = new Set(['||', '&&'])
 
 // how tightly each form binds, mirroring the Parser's levels: `;`, then `=`
@@ -39,12 +27,15 @@ const CONDITIONAL = 2
 const CUSTOM_BINARY = 3
 const UNARY = 100
 
-const letter = String.raw`a-zA-Zа-яА-Я_À-ÖØ-öø-ÿ$`
-const IDENTIFIER = new RegExp(`^[${letter}][${letter}0-9]*$`)
-const WORDS = new Set(['in', 'true', 'false', 'null'])
+const WORDS = new Set([
+  'true',
+  'false',
+  'null',
+  ...Object.keys(elements).filter((word) => identRegex.test(word))
+])
 
 export function isName(text: string) {
-  return IDENTIFIER.test(text) && !WORDS.has(text)
+  return identRegex.test(text) && !WORDS.has(text)
 }
 
 export function key(name: string) {
@@ -69,7 +60,7 @@ function precedenceOf(node: AstNode) {
       return node.alternate ? CONDITIONAL : SEQUENCE
     }
     case 'BinaryExpression': {
-      return PRECEDENCE[node.operator] ?? CUSTOM_BINARY
+      return builtIn(node.operator)?.precedence ?? CUSTOM_BINARY
     }
     case 'UnaryExpression': {
       return UNARY
@@ -90,15 +81,16 @@ function binaryOperand(
   child: AstNode,
   left: boolean
 ) {
-  const own = PRECEDENCE[parent.operator]
-  if (own === undefined) {
+  const op = builtIn(parent.operator)
+  if (!op) {
     return within(child, UNARY)
   }
+  const own = op.precedence
   const theirs = precedenceOf(child)
   const chained =
     child.type === 'BinaryExpression' &&
-    RIGHT_ASSOCIATIVE.has(parent.operator) &&
-    RIGHT_ASSOCIATIVE.has(child.operator)
+    !!op.rightAssociative &&
+    !!builtIn(child.operator)?.rightAssociative
   const mixesNullish =
     child.type === 'BinaryExpression' &&
     ((parent.operator === '??' && LOGICAL.has(child.operator)) ||
@@ -147,7 +139,7 @@ export function print(node: AstNode): string {
       if (operator === '-' && /^\d/.test(right)) {
         return `-(${right})`
       }
-      return IDENTIFIER.test(operator)
+      return identRegex.test(operator)
         ? `${operator} ${right}`
         : operator + right
     }

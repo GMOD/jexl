@@ -23,7 +23,7 @@ const wholeWord = (word: string) => `(?<!${identPart})${word}(?!${identPart})`
 const numberPattern = String.raw`(?:(?:[0-9]*\.[0-9]+)|[0-9]+)(?:[eE][+-]?[0-9]+)?`
 
 const numericRegex = new RegExp(`^-?${numberPattern}$`)
-const identRegex = new RegExp(`^${identPattern}$`)
+export const identRegex = new RegExp(`^${identPattern}$`)
 const escEscRegex = /\\\\/g
 // a string literal opens with one of exactly two quote characters, so the two
 // unescaping regexes can just be named rather than built and cached per quote
