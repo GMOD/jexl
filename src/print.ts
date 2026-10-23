@@ -6,7 +6,7 @@
 import { identRegex } from './Lexer.ts'
 import { getGrammar } from './grammar.ts'
 
-import type { AstNode, BinaryExpression } from './types.ts'
+import type { AstNode, BinaryExpression, Literal } from './types.ts'
 
 const { elements } = getGrammar()
 
@@ -200,4 +200,28 @@ export function print(node: AstNode): string {
       return '?'
     }
   }
+}
+
+/**
+ * Writes a value as expression text that evaluates to it, as `JSON.stringify`
+ * writes it as JSON. JSON's own text won't do: jexl reads the `\n` in
+ * `"a\nb"` as a backslash and an n.
+ */
+export function printValue(value: unknown): string | undefined {
+  const json = JSON.stringify(value) as string | undefined
+  return json === undefined ? undefined : printJson(JSON.parse(json))
+}
+
+function printJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(printJson).join(', ')}]`
+  }
+  if (typeof value === 'object' && value !== null) {
+    const entries = Object.entries(value).map(
+      ([name, item]) =>
+        `${isName(name) ? name : quote(name)}: ${printJson(item)}`
+    )
+    return `{${entries.join(', ')}}`
+  }
+  return print({ type: 'Literal', value: value as Literal['value'] })
 }

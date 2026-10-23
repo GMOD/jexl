@@ -9,7 +9,7 @@ export type { GetMember, VariableReader } from './grammar.ts'
 export { default as Expression } from './Expression.ts'
 export { analyze } from './analyze.ts'
 export { check, recordOf, union } from './check.ts'
-export { print } from './print.ts'
+export { print, printValue } from './print.ts'
 export {
   callSubject,
   conditions,

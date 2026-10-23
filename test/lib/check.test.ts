@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 
 import { Jexl } from '../../src/Jexl.ts'
 import { check, recordOf } from '../../src/check.ts'
-import { print } from '../../src/print.ts'
+import { print, printValue } from '../../src/print.ts'
 import {
   BAM_SCHEMA,
   BED_SCHEMA,
@@ -896,6 +896,33 @@ describe('check', () => {
       ['-(1)', '-(1)']
     ])('prints %s as %s', (expr, text) => {
       expect(print(parse(expr))).toBe(text)
+    })
+
+    it.each([
+      'a\nb',
+      'tab\there',
+      "it's",
+      'back\\slash',
+      '\u0001',
+      -3.5,
+      1e21,
+      true,
+      null,
+      ['a', 1, null, ['b']],
+      JSON.parse(
+        '{"score": 1, "a b": "x\\ny", "in": [true], "__proto__": 2, "o": {"k": "v"}}'
+      )
+    ])('printValue writes %j as text that evaluates to it', (value) => {
+      const text = printValue(value)!
+      expect(new Jexl().eval(text)).toStrictEqual(
+        JSON.parse(JSON.stringify(value))
+      )
+    })
+
+    it('printValue follows JSON.stringify where JSON has no text', () => {
+      expect(printValue(undefined)).toBeUndefined()
+      expect(printValue({ a: undefined, b: Number.NaN })).toBe('{b: null}')
+      expect(printValue([undefined])).toBe('[null]')
     })
 
     it('brackets a member name the grammar reserves', () => {

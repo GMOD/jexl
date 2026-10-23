@@ -18,6 +18,13 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   host that passed a function through the context for a registered function
   to call should register a function that closes over it.
 
+### Added
+
+- **`printValue(value)` writes a value as expression text**, as
+  `JSON.stringify` writes JSON. A host that wrote `JSON.stringify(value)` as
+  an expression got `a\nb` back for a string holding a newline, since a jexl
+  string reads `\n` as a backslash and an n.
+
 ## [v6.0.0]
 
 Jexl 6 closes a hole through which an expression could run JavaScript, and
