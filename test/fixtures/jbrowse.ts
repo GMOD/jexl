@@ -9,7 +9,7 @@ import type {
   ParamType,
   Signature,
   Type
-} from '../../src/check.ts'
+} from '../../src/check/index.ts'
 
 /**
  * A header as `@gmod/vcf`'s `getMetadata()` returns it: gnomAD-style

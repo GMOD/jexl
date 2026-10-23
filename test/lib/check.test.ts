@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { Jexl } from '../../src/Jexl.ts'
-import { check, recordOf } from '../../src/check.ts'
+import { check, recordOf } from '../../src/check/index.ts'
 import { print, printValue } from '../../src/print.ts'
 import {
   BAM_SCHEMA,
@@ -24,7 +24,7 @@ import type {
   FieldSchema,
   Signature,
   Type
-} from '../../src/check.ts'
+} from '../../src/check/index.ts'
 import type { AstNode, FunctionCall } from '../../src/types.ts'
 
 const jexl = new Jexl()
