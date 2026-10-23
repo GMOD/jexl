@@ -2,6 +2,18 @@
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [v7.1.0]
+
+### Added
+
+- **`jexl.functionNames()` lists the functions an expression can call**,
+  built-in and registered, so a host can give `check()` a signature for each
+  without reading `_grammar`.
+- **A name can be written in any script.** A name was Latin-1 and Cyrillic
+  `а-я` only, so `ёлка`, `αβγ` and `名前` failed to lex. Now a name starts with
+  a letter of any script, `_` or `$`, and goes on with those, digits and
+  combining marks.
+
 ## [v7.0.0]
 
 Jexl 7 stops an expression from getting a host function called. A host that

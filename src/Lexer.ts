@@ -13,8 +13,9 @@ import type { TemplatePart, Token } from './types.ts'
 // then re-tests the elements it produced. Two spellings of either would
 // disagree on some input, and each disagreement is an "Invalid expression
 // token" for something the splitter was happy to produce.
-const identChars = String.raw`a-zA-Zа-яА-Я_\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF$`
-const identPart = `[${identChars}0-9]`
+// a letter of any script; a combining mark or a digit may follow one
+const identChars = String.raw`\p{L}_$`
+const identPart = String.raw`[${identChars}\p{M}0-9]`
 const identPattern = `[${identChars}]${identPart}*`
 // a word operator such as `in`, but not part of a longer name. \b would do only
 // for ASCII names, and split `in$` or `inà` into the operator and a remainder
@@ -22,8 +23,8 @@ const wholeWord = (word: string) => `(?<!${identPart})${word}(?!${identPart})`
 // unsigned: whether a leading '-' negates is decided separately, in getTokens
 const numberPattern = String.raw`(?:(?:[0-9]*\.[0-9]+)|[0-9]+)(?:[eE][+-]?[0-9]+)?`
 
-const numericRegex = new RegExp(`^-?${numberPattern}$`)
-export const identRegex = new RegExp(`^${identPattern}$`)
+const numericRegex = new RegExp(`^-?${numberPattern}$`, 'u')
+export const identRegex = new RegExp(`^${identPattern}$`, 'u')
 // the escapes each kind of literal recognizes. One pass, so the backslash an
 // escaped backslash yields can't be re-read as the start of the escape that
 // follows it
@@ -201,7 +202,8 @@ class Lexer {
         .sort((a, b) => b.length - a.length)
         .map((element) => this._escapeRegExp(element))
       this._splitRegex = new RegExp(
-        `(${[...preOpRegexElems, ...elements, ...postOpRegexElems].join('|')})`
+        `(${[...preOpRegexElems, ...elements, ...postOpRegexElems].join('|')})`,
+        'u'
       )
     }
     return this._splitRegex

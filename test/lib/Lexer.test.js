@@ -77,8 +77,28 @@ describe('Lexer', () => {
       const elems = inst.getElements(str)
       expect(elems).toEqual([str])
     })
+    it('allows an identifier in any script, with combining marks', () => {
+      for (const str of ['ёлка', 'αβγ', '名前', 'Ǆx', 'café', 'ŁódźΩ2']) {
+        expect(inst.getElements(str), str).toEqual([str])
+        expect(inst.tokenize(str)[0].type, str).toBe('identifier')
+      }
+    })
+    it('lexes no symbol or digit as the start of an identifier', () => {
+      expect(() => inst.tokenize('🧬')).toThrow(/Invalid expression token/)
+      expect(() => inst.tokenize('×')).toThrow(/Invalid expression token/)
+      expect(inst.getElements('2名')).toEqual(['2', '名'])
+    })
     it('keeps a keyword followed by a non-ASCII or $ character in one identifier', () => {
-      for (const str of ['in$', 'inà', 'inя', 'true$', 'trueà', 'falseé']) {
+      for (const str of [
+        'in$',
+        'inà',
+        'inя',
+        'inё',
+        'in名',
+        'true$',
+        'trueà',
+        'falseé'
+      ]) {
         expect(inst.getElements(str), str).toEqual([str])
         expect(inst.tokenize(str)[0].type, str).toBe('identifier')
       }
