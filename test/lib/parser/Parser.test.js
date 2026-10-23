@@ -19,8 +19,7 @@ describe('Parser', () => {
     inst = new Parser(grammar, lexer)
   })
   it('constructs an AST for 1+2', () => {
-    inst.addTokens(lexer.tokenize('1+2'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('1+2')).toEqual({
       type: 'BinaryExpression',
       operator: '+',
       left: { type: 'Literal', value: 1 },
@@ -28,8 +27,7 @@ describe('Parser', () => {
     })
   })
   it('adds heavier operations to the right for 2+3*4', () => {
-    inst.addTokens(lexer.tokenize('2+3*4'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('2+3*4')).toEqual({
       type: 'BinaryExpression',
       operator: '+',
       left: { type: 'Literal', value: 2 },
@@ -42,8 +40,7 @@ describe('Parser', () => {
     })
   })
   it('encapsulates for lighter operation in 2*3+4', () => {
-    inst.addTokens(lexer.tokenize('2*3+4'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('2*3+4')).toEqual({
       type: 'BinaryExpression',
       operator: '+',
       left: {
@@ -56,8 +53,7 @@ describe('Parser', () => {
     })
   })
   it('handles encapsulation of subtree in 2+3*4==5/6-7', () => {
-    inst.addTokens(lexer.tokenize('2+3*4==5/6-7'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('2+3*4==5/6-7')).toEqual({
       type: 'BinaryExpression',
       operator: '==',
       left: {
@@ -85,8 +81,7 @@ describe('Parser', () => {
     })
   })
   it('handles a unary operator', () => {
-    inst.addTokens(lexer.tokenize('1*!!true-2'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('1*!!true-2')).toEqual({
       type: 'BinaryExpression',
       operator: '-',
       left: {
@@ -107,8 +102,7 @@ describe('Parser', () => {
     })
   })
   it('handles a subexpression', () => {
-    inst.addTokens(lexer.tokenize('(2+3)*4'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('(2+3)*4')).toEqual({
       type: 'BinaryExpression',
       operator: '*',
       left: {
@@ -121,8 +115,7 @@ describe('Parser', () => {
     })
   })
   it('handles nested subexpressions', () => {
-    inst.addTokens(lexer.tokenize('(4*(2+3))/5'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('(4*(2+3))/5')).toEqual({
       type: 'BinaryExpression',
       operator: '/',
       left: {
@@ -140,8 +133,7 @@ describe('Parser', () => {
     })
   })
   it('handles object literals', () => {
-    inst.addTokens(lexer.tokenize('{foo: "bar", tek: 1+2}'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('{foo: "bar", tek: 1+2}')).toEqual({
       type: 'ObjectLiteral',
       value: {
         foo: { type: 'Literal', value: 'bar' },
@@ -155,8 +147,7 @@ describe('Parser', () => {
     })
   })
   it('handles dashes in key', () => {
-    inst.addTokens(lexer.tokenize(`{'with-dash': "bar", tek: 1+2}`))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse(`{'with-dash': "bar", tek: 1+2}`)).toEqual({
       type: 'ObjectLiteral',
       value: {
         'with-dash': { type: 'Literal', value: 'bar' },
@@ -170,8 +161,7 @@ describe('Parser', () => {
     })
   })
   it('handles nested object literals', () => {
-    inst.addTokens(lexer.tokenize('{foo: {bar: "tek"}}'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('{foo: {bar: "tek"}}')).toEqual({
       type: 'ObjectLiteral',
       value: {
         foo: {
@@ -184,15 +174,13 @@ describe('Parser', () => {
     })
   })
   it('handles empty object literals', () => {
-    inst.addTokens(lexer.tokenize('{}'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('{}')).toEqual({
       type: 'ObjectLiteral',
       value: {}
     })
   })
   it('handles array literals', () => {
-    inst.addTokens(lexer.tokenize('["foo", 1+2]'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('["foo", 1+2]')).toEqual({
       type: 'ArrayLiteral',
       value: [
         { type: 'Literal', value: 'foo' },
@@ -206,8 +194,7 @@ describe('Parser', () => {
     })
   })
   it('handles nested array literals', () => {
-    inst.addTokens(lexer.tokenize('["foo", ["bar", "tek"]]'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('["foo", ["bar", "tek"]]')).toEqual({
       type: 'ArrayLiteral',
       value: [
         { type: 'Literal', value: 'foo' },
@@ -222,15 +209,13 @@ describe('Parser', () => {
     })
   })
   it('handles empty array literals', () => {
-    inst.addTokens(lexer.tokenize('[]'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('[]')).toEqual({
       type: 'ArrayLiteral',
       value: []
     })
   })
   it('chains traversed identifiers', () => {
-    inst.addTokens(lexer.tokenize('foo.bar.baz + 1'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('foo.bar.baz + 1')).toEqual({
       type: 'BinaryExpression',
       operator: '+',
       left: {
@@ -249,8 +234,7 @@ describe('Parser', () => {
     })
   })
   it('allows dot notation for all operands', () => {
-    inst.addTokens(lexer.tokenize('"foo".length + {foo: "bar"}.foo'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('"foo".length + {foo: "bar"}.foo')).toEqual({
       type: 'BinaryExpression',
       operator: '+',
       left: {
@@ -271,8 +255,7 @@ describe('Parser', () => {
     })
   })
   it('allows dot notation on subexpressions', () => {
-    inst.addTokens(lexer.tokenize('("foo" + "bar").length'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('("foo" + "bar").length')).toEqual({
       type: 'Identifier',
       value: 'length',
       from: {
@@ -284,8 +267,7 @@ describe('Parser', () => {
     })
   })
   it('allows dot notation on arrays', () => {
-    inst.addTokens(lexer.tokenize('["foo", "bar"].length'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('["foo", "bar"].length')).toEqual({
       type: 'Identifier',
       value: 'length',
       from: {
@@ -298,8 +280,7 @@ describe('Parser', () => {
     })
   })
   it('handles a ternary expression', () => {
-    inst.addTokens(lexer.tokenize('foo ? 1 : 0'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('foo ? 1 : 0')).toEqual({
       type: 'ConditionalExpression',
       test: { type: 'Identifier', value: 'foo' },
       consequent: { type: 'Literal', value: 1 },
@@ -307,8 +288,7 @@ describe('Parser', () => {
     })
   })
   it('handles nested and grouped ternary expressions', () => {
-    inst.addTokens(lexer.tokenize('foo ? (bar ? 1 : 2) : 3'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('foo ? (bar ? 1 : 2) : 3')).toEqual({
       type: 'ConditionalExpression',
       test: { type: 'Identifier', value: 'foo' },
       consequent: {
@@ -321,8 +301,7 @@ describe('Parser', () => {
     })
   })
   it('handles nested, non-grouped ternary expressions', () => {
-    inst.addTokens(lexer.tokenize('foo ? bar ? 1 : 2 : 3'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('foo ? bar ? 1 : 2 : 3')).toEqual({
       type: 'ConditionalExpression',
       test: { type: 'Identifier', value: 'foo' },
       consequent: {
@@ -335,8 +314,7 @@ describe('Parser', () => {
     })
   })
   it('handles ternary expression with objects', () => {
-    inst.addTokens(lexer.tokenize('foo ? {bar: "tek"} : "baz"'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('foo ? {bar: "tek"} : "baz"')).toEqual({
       type: 'ConditionalExpression',
       test: { type: 'Identifier', value: 'foo' },
       consequent: {
@@ -349,8 +327,7 @@ describe('Parser', () => {
     })
   })
   it('balances a binary op between complex identifiers', () => {
-    inst.addTokens(lexer.tokenize('a.b == c.d'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('a.b == c.d')).toEqual({
       type: 'BinaryExpression',
       operator: '==',
       left: {
@@ -366,8 +343,7 @@ describe('Parser', () => {
     })
   })
   it('handles whitespace in an expression', () => {
-    inst.addTokens(lexer.tokenize('\t2\r\n+\n\r3\n\n'))
-    expect(inst.complete()).toEqual({
+    expect(inst.parse('\t2\r\n+\n\r3\n\n')).toEqual({
       type: 'BinaryExpression',
       operator: '+',
       left: { type: 'Literal', value: 2 },

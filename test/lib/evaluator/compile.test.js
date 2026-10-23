@@ -13,11 +13,7 @@ import Parser from '../../../src/parser/Parser.ts'
 const grammar = getGrammar()
 const lexer = new Lexer(grammar)
 
-const toTree = (exp) => {
-  const p = new Parser(grammar, lexer)
-  p.addTokens(lexer.tokenize(exp))
-  return p.complete()
-}
+const toTree = (exp) => new Parser(grammar, lexer).parse(exp)
 
 const evaluate = (exp, context = {}) =>
   compileAst(toTree(exp), grammar)(context)
@@ -236,9 +232,8 @@ describe('compileAst', () => {
     })
     const callLexer = new Lexer(withFns)
     const call = (exp, context = {}) => {
-      const p = new Parser(withFns, callLexer)
-      p.addTokens(callLexer.tokenize(exp))
-      return compileAst(p.complete(), withFns)(context)
+      const ast = new Parser(withFns, callLexer).parse(exp)
+      return compileAst(ast, withFns)(context)
     }
     it('passes each spelled-out arity', () => {
       expect(call('count()')).toBe(0)

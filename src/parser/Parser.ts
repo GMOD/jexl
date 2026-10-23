@@ -54,29 +54,21 @@ class Parser {
     this._offset = offset
   }
 
-  parse(source: string) {
+  /**
+   * @returns the expression tree, or null for an expression with no tokens
+   * @throws {JexlSyntaxError} if the tokens do not form exactly one expression
+   */
+  parse(source: string): AstNode | null {
     const start = this._offset
     this._offset += source.length - source.trimStart().length
     try {
-      this.addTokens(this._lexer.tokenize(source))
+      this._tokens = this._lexer.tokenize(source)
     } catch (error) {
       if (error instanceof JexlSyntaxError) {
         error.offset += start
       }
       throw error
     }
-    return this.complete()
-  }
-
-  addTokens(tokens: Token[]) {
-    this._tokens = this._tokens.concat(tokens)
-  }
-
-  /**
-   * @returns the expression tree, or null for an expression with no tokens
-   * @throws {JexlSyntaxError} if the tokens do not form exactly one expression
-   */
-  complete(): AstNode | null {
     if (this._tokens.length === 0) {
       return null
     }
