@@ -7,7 +7,7 @@ import Lexer from './Lexer.ts'
 import { compileAst } from './evaluator/compile.ts'
 import Parser from './parser/Parser.ts'
 
-import type { CompiledNode } from './evaluator/compile.ts'
+import type { CompiledNode } from './evaluator/context.ts'
 import type { Grammar } from './grammar.ts'
 import type { AstNode } from './types.ts'
 

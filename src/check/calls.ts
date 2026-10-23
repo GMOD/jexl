@@ -31,10 +31,7 @@ function lambdaParams(name: string, item: Type): Type[] {
   }
 }
 
-function argumentProblem(
-  param: ParamType,
-  type: Type
-): string | undefined {
+function argumentProblem(param: ParamType, type: Type): string | undefined {
   switch (param) {
     case 'any':
     case 'boolean':
