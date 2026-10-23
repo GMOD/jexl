@@ -2,6 +2,22 @@
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### BREAKING CHANGES
+
+- **An expression reads no function but a lambda.** 6.0 kept host functions
+  out of the collection functions, but a read still returned them, and
+  JavaScript calls a function it finds on an object: `{valueOf: h.run} + 1`
+  ran `h.run`, as did a `toJSON` in a template, and a registered function
+  could call any function it was handed. A prototype method such as `[].map`
+  is readable in every host. Now a read, a `getMember` or `variableReader`
+  result, an object literal's value and a function's argument are undefined
+  wherever they would be a function other than a lambda. `map(xs, f)` with a
+  context function `f` now maps as `map(xs)` does (6.0 threw), and a
+  host that passed a function through the context for a registered function
+  to call should register a function that closes over it.
+
 ## [v6.0.0]
 
 Jexl 6 closes a hole through which an expression could run JavaScript, and

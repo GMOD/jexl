@@ -344,6 +344,8 @@ for (const feature of features) {
 
 A name the expression assigns reads the assignment once it has run, and goes through `variableReader` before then.
 
+Jexl reads a function returned by either hook as undefined, unless it is a lambda, so the `subject[key]` fallback above can't hand an expression `''.constructor.constructor`.
+
 ### Analyzing Expressions
 
 `analyze` reports what an expression reads, without evaluating it or needing
