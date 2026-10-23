@@ -97,6 +97,12 @@ describe('Jexl', () => {
       expect(f).toBeDefined()
       expect(f()).toBe(2)
     })
+    it('lists the names an expression can call', () => {
+      inst.addFunction('ret2', () => 2)
+      expect(inst.functionNames()).toContain('ret2')
+      expect(inst.functionNames()).toContain('map')
+      expect(inst.functionNames()).not.toContain('toString')
+    })
     it('allows functions to be set in batch', () => {
       inst.addFunctions({
         add1: (val) => val + 1,

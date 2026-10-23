@@ -188,6 +188,11 @@ class Jexl {
     return this._grammar.functions[name]
   }
 
+  /** The names of every function an expression can call. */
+  functionNames() {
+    return Object.keys(this._grammar.functions)
+  }
+
   /**
    * Evaluates a Jexl string within an optional context.
    * @param {string} expression The Jexl expression to be evaluated

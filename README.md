@@ -295,6 +295,9 @@ jexl.addFunctions({
 jexl.eval('round(3.7)') // 4
 jexl.eval('lower(name)', { name: 'HELLO' }) // "hello"
 jexl.eval('sqrt(abs(-16))') // 4
+
+// The names an expression can call, built-in and added, e.g. for check()
+jexl.functionNames() // ['any', 'all', …, 'round', 'lower', 'abs', 'sqrt']
 ```
 
 ### Adding Custom Operators
