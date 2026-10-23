@@ -2,7 +2,10 @@
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased]
+## [v7.0.0]
+
+Jexl 7 stops an expression from getting a host function called. A host that
+puts no functions in the context upgrades without changes.
 
 ### BREAKING CHANGES
 
