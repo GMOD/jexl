@@ -129,6 +129,8 @@ const modulo = (left: JexlValue, right: JexlValue) =>
   (left as number) % (right as number)
 const power = (left: JexlValue, right: JexlValue) =>
   (left as number) ** (right as number)
+const bitwiseAnd = (left: JexlValue, right: JexlValue) =>
+  (left as number) & (right as number)
 const loose = (left: JexlValue, right: JexlValue) => left == right
 // a missing value orders against nothing, as bcftools skips one; JavaScript
 // alone would read null as 0, making [null, 0.2] < 0.05 true
@@ -230,6 +232,16 @@ export const getGrammar = (): Grammar => ({
       rightAssociative: true,
       eval: (left, right) =>
         isList(left, right) ? pairwise(power, left, right) : power(left, right)
+    },
+    // tighter than a comparison, unlike JavaScript's, so `flags & 2 == 2`
+    // tests the bit
+    '&': {
+      type: 'binaryOp',
+      precedence: 25,
+      eval: (left, right) =>
+        isList(left, right)
+          ? pairwise(bitwiseAnd, left, right)
+          : bitwiseAnd(left, right)
     },
     '==': {
       type: 'binaryOp',

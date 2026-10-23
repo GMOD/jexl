@@ -147,6 +147,6 @@ export const NUMBER: Type = { kind: 'number' }
 export const STRING: Type = { kind: 'string' }
 export const MAX_VALUES = 64
 
-export const ARITHMETIC = new Set(['-', '*', '/', '//', '%', '^'])
+export const ARITHMETIC = new Set(['-', '*', '/', '//', '%', '^', '&'])
 export const ORDER = new Set(['<', '<=', '>', '>='])
 export const EQUALITY = new Set(['==', '!='])

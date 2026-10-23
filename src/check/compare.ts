@@ -189,7 +189,7 @@ export function binary(c: Checker, node: BinaryExpression): Type {
           'string-numeric',
           'warning',
           node,
-          `${print(typeNode)} is text, so ${operator} converts it to a number, ${ORDER.has(operator) ? 'answering false' : 'giving NaN'} wherever it is not one`,
+          `${print(typeNode)} is text, so ${operator} converts it to a number, ${ORDER.has(operator) ? 'answering false' : operator === '&' ? 'giving 0' : 'giving NaN'} wherever it is not one`,
           c.functions?.parseFloat
             ? [
                 print(node).replace(

@@ -19,20 +19,20 @@ describe('Jexl', () => {
       expect(expr).toEqual(expect.any(Expression))
     })
     it('compiles the Expression', () => {
-      const willFail = () => inst.compile('2 & 2')
-      expect(willFail).toThrow('Invalid expression token: &')
+      const willFail = () => inst.compile('2 # 2')
+      expect(willFail).toThrow('Invalid expression token: #')
     })
     it('returns the same Expression for the same string', () => {
       expect(inst.compile('a + 1')).toBe(inst.compile('a + 1'))
     })
     it('recompiles once an operator is added or removed', () => {
-      expect(() => inst.eval('2 & 3')).toThrow()
+      expect(() => inst.eval('2 # 3')).toThrow()
       const before = inst.compile('1 + 2')
-      inst.addBinaryOp('&', 15, (a, b) => a & b)
-      expect(inst.eval('2 & 3')).toBe(2)
+      inst.addBinaryOp('#', 15, (a, b) => a & b)
+      expect(inst.eval('2 # 3')).toBe(2)
       expect(inst.compile('1 + 2')).not.toBe(before)
-      inst.removeOp('&')
-      expect(() => inst.eval('2 & 3')).toThrow()
+      inst.removeOp('#')
+      expect(() => inst.eval('2 # 3')).toThrow()
     })
     it('sees a function registered after compiling', () => {
       const expr = inst.compile('late(1)')

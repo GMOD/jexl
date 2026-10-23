@@ -95,6 +95,7 @@ jexl.eval('`Price: \\$100`')
 **Binary:**
 
 - Arithmetic: `+`, `-`, `*`, `/`, `//` (floor division), `%`, `^` (power)
+- Bitwise: `&` (`flags & 2` is 2 where the flag's bit is set)
 - Comparison: `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`
 - Regular expression match: `~`, `!~` (`name ~ '^BRCA'`; a leading `(?i)`
   ignores case)
@@ -117,6 +118,7 @@ From loosest to tightest:
 | `\|\|`, `??`                                      | left to right      |
 | `&&`                                              | left to right      |
 | `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`, `~`, `!~` | left to right      |
+| `&`                                               | left to right      |
 | `+`, `-`                                          | left to right      |
 | `*`, `/`, `//`                                    | left to right      |
 | `%`, `^`                                          | `^` from the right |

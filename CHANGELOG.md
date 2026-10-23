@@ -2,6 +2,17 @@
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [v7.2.0]
+
+### Added
+
+- **`&` is a built-in bitwise and**, so `feature.flags & 2` tests a SAM flag
+  without a host operator. It binds tighter than a comparison, unlike
+  JavaScript's, so `flags & 2 == 2` tests the bit rather than and-ing
+  `flags` with `true`, and looser than `+`. Lists pair as the other
+  arithmetic pairs them: `[3, 6] & 2` is `[2, 2]`. `print` and `check` know
+  it, and a host's own `&` still replaces it.
+
 ## [v7.1.0]
 
 ### Added

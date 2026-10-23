@@ -19,9 +19,9 @@ describe('Expression', () => {
       expect(expr).toBe(compiled)
     })
     it('compiles the Expression', () => {
-      const expr = inst.createExpression('2 & 2')
-      const willFail = () => expr.compile('2 & 2')
-      expect(willFail).toThrow('Invalid expression token: &')
+      const expr = inst.createExpression('2 # 2')
+      const willFail = () => expr.compile('2 # 2')
+      expect(willFail).toThrow('Invalid expression token: #')
     })
     it('compiles more than once if requested', () => {
       const expr = inst.createExpression('2*2')
