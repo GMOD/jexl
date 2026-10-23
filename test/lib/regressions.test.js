@@ -3,7 +3,7 @@
  * Copyright 2020 Tom Shawver
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import Lexer from '../../src/Lexer.ts'
 import { compileAst } from '../../src/evaluator/compile.ts'
@@ -185,12 +185,57 @@ describe('regressions', () => {
       expect({}.polluted).toBeUndefined()
     })
     it('calls only lambdas from a collection function', () => {
-      const context = { xs: [1, 2], f: (x) => x * 2, F: Function }
-      expect(() => inst.eval('map(xs, f)', context)).toThrow(/expects a lambda/)
-      expect(() => inst.eval("reduce(['x', 'return 1'], F)", context)).toThrow(
-        /expects a lambda/
-      )
+      const f = vi.fn((x) => x * 2)
+      const context = { xs: [1, 2], f, F: Function }
+      expect(inst.eval('map(xs, f)', context)).toEqual([1, 2])
+      expect(inst.eval("reduce(['x', 'return 1'], F)", context)).toBe('x')
+      expect(() => inst.eval('map(xs, 2)', context)).toThrow(/expects a lambda/)
       expect(inst.eval('map(xs, x => x * 2)', context)).toEqual([2, 4])
+      expect(f).not.toHaveBeenCalled()
+    })
+    it('reads a function other than a lambda as undefined', () => {
+      const host = { secret: vi.fn(() => 'ran') }
+      expect(inst.eval('[].map')).toBeUndefined()
+      expect(inst.eval("{}['__lookupGetter__']")).toBeUndefined()
+      expect(inst.eval('h.secret', { h: host })).toBeUndefined()
+      expect(inst.eval('s', { s: host.secret })).toBeUndefined()
+      expect(inst.eval('f = x => x + 1; map([1], f)')).toEqual([2])
+    })
+    it('lets no coercion call a host function', () => {
+      const secret = vi.fn(() => 41)
+      const context = { h: { secret }, fns: [secret] }
+      for (const exp of [
+        '{valueOf: h.secret} + 1',
+        "{toString: h.secret} + ''",
+        '`${ {toJSON: h.secret} }`',
+        '{valueOf: find(fns, f => true)} + 1',
+        '`${ {toJSON: find(fns, f => true)} }`'
+      ]) {
+        try {
+          inst.eval(exp, context)
+        } catch {}
+      }
+      expect(secret).not.toHaveBeenCalled()
+    })
+    it('hands a registered function no host function', () => {
+      const local = new Jexl()
+      local.addFunction('call', (fn, arg) =>
+        typeof fn === 'function' ? fn(arg) : 'no function'
+      )
+      const secret = vi.fn(() => 'ran')
+      const context = { fns: [secret] }
+      expect(local.eval('call(find(fns, f => true), 1)', context)).toBe(
+        'no function'
+      )
+      expect(local.eval('call({}.toString, 1)')).toBe('no function')
+      expect(local.eval('call(x => x + 1, 1)')).toBe(2)
+      expect(secret).not.toHaveBeenCalled()
+    })
+    it('filters what getMember returns', () => {
+      const local = new Jexl({ getMember: (subject, key) => subject[key] })
+      expect(local.eval("''.constructor.constructor")).toBeUndefined()
+      expect(local.eval("''['constructor']")).toBeUndefined()
+      expect(local.eval('o.a', { o: { a: 1 } })).toBe(1)
     })
   })
   describe('removeOp', () => {

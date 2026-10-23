@@ -7,8 +7,9 @@ import { LAMBDA } from '../collections.ts'
 import { unknownNode } from '../errors.ts'
 import { and, nullish, or } from '../grammar.ts'
 
+import type { Lambda } from '../collections.ts'
 import type { Grammar } from '../grammar.ts'
-import type { AstNode, JexlFunction, JexlValue } from '../types.ts'
+import type { AstNode, JexlValue } from '../types.ts'
 
 /** The variables an expression is evaluated against. */
 export type Context = Record<string, JexlValue>
@@ -44,10 +45,23 @@ function assignOwn(target: Context, key: string, value: JexlValue) {
 const isUnsafeKey = (key: string | number) =>
   key === 'constructor' || key === '__proto__'
 
+/**
+ * The value, unless it is a function other than a lambda. A read reaches host
+ * functions — `[].map`, `{}.__lookupGetter__`, a method of a context object —
+ * and JavaScript calls them on its own: `{valueOf: f} + 1` runs `f`, as does
+ * the `toJSON` a template renders, and a registered function may call what
+ * it is handed.
+ */
+function sandboxed(value: unknown): JexlValue {
+  return typeof value === 'function' && !(value as Lambda)[LAMBDA]
+    ? undefined
+    : (value as JexlValue)
+}
+
 function member(target: Context, key: string | number) {
   return isUnsafeKey(key) && !Object.hasOwn(target, key)
     ? undefined
-    : target[key]
+    : sandboxed(target[key])
 }
 
 /** The key `subject[index]` reads under, or undefined when it reads nothing. */
@@ -114,7 +128,7 @@ function literalTable(node: AstNode) {
   return Object.freeze(table)
 }
 
-function lambda(fn: JexlFunction & { [LAMBDA]?: true }) {
+function lambda(fn: Lambda) {
   fn[LAMBDA] = true
   return fn
 }
@@ -185,9 +199,10 @@ function compileName(
     }
     hops++
   }
-  const read =
-    (grammar.variableReader?.(name) as CompiledNode | undefined) ??
-    ((ctx) => ctx[name])
+  const reader = grammar.variableReader?.(name)
+  const read: CompiledNode = reader
+    ? (ctx) => sandboxed(reader(ctx))
+    : (ctx) => sandboxed(ctx[name])
   const fromContext: CompiledNode = scope.params
     ? (env) => read(asFrame(env).context)
     : read
@@ -365,9 +380,7 @@ function compileNode(
       if (getMember) {
         return (ctx) => {
           const target = from(ctx)
-          return target == null
-            ? undefined
-            : (getMember(target, name) as JexlValue)
+          return target == null ? undefined : sandboxed(getMember(target, name))
         }
       }
       if (isUnsafeKey(name)) {
@@ -378,7 +391,7 @@ function compileNode(
       }
       return (ctx) => {
         const target = from(ctx)
-        return target == null ? undefined : (target as Context)[name]
+        return target == null ? undefined : sandboxed((target as Context)[name])
       }
     }
 
@@ -455,7 +468,7 @@ function compileNode(
           const key = memberKey(index(ctx))
           return subjectVal == null || key === undefined
             ? undefined
-            : (getMember(subjectVal, key) as JexlValue)
+            : sandboxed(getMember(subjectVal, key))
         }
       }
       return (ctx) => {
@@ -489,7 +502,7 @@ function compileNode(
       return (ctx) => {
         const out: Record<string, JexlValue> = {}
         for (let i = 0; i < len; i++) {
-          store(out, keys[i]!, values[i]!(ctx))
+          store(out, keys[i]!, sandboxed(values[i]!(ctx)))
         }
         return out
       }
@@ -536,11 +549,11 @@ function compileNode(
         }
         case 1: {
           const [a0] = args as [CompiledNode]
-          return (ctx) => lookup()(a0(ctx))
+          return (ctx) => lookup()(sandboxed(a0(ctx)))
         }
         case 2: {
           const [a0, a1] = args as [CompiledNode, CompiledNode]
-          return (ctx) => lookup()(a0(ctx), a1(ctx))
+          return (ctx) => lookup()(sandboxed(a0(ctx)), sandboxed(a1(ctx)))
         }
         case 3: {
           const [a0, a1, a2] = args as [
@@ -548,14 +561,15 @@ function compileNode(
             CompiledNode,
             CompiledNode
           ]
-          return (ctx) => lookup()(a0(ctx), a1(ctx), a2(ctx))
+          return (ctx) =>
+            lookup()(sandboxed(a0(ctx)), sandboxed(a1(ctx)), sandboxed(a2(ctx)))
         }
         default: {
           const len = args.length
           return (ctx) => {
             const vals: JexlValue[] = new Array(len)
             for (let i = 0; i < len; i++) {
-              vals[i] = args[i]!(ctx)
+              vals[i] = sandboxed(args[i]!(ctx))
             }
             return lookup()(...vals)
           }

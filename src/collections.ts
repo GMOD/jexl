@@ -42,7 +42,7 @@ function isPlainObject(value: JexlValue): value is Record<string, JexlValue> {
  */
 export const LAMBDA = Symbol('lambda')
 
-type Lambda = JexlFunction & { [LAMBDA]?: true }
+export type Lambda = JexlFunction & { [LAMBDA]?: true }
 
 const identity = (value: JexlValue) => value
 
