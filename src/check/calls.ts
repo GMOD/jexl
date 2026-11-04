@@ -154,8 +154,10 @@ export function call(c: Checker, node: FunctionCall): Type {
       types.push(c.infer(arg))
       continue
     }
-    const accepted: readonly ParamType[] =
+    const declaredTypes: readonly ParamType[] =
       typeof declared === 'string' ? [declared] : declared
+    // what the argument may be, now that it is not a lambda
+    const accepted = declaredTypes.filter((param) => param !== 'lambda')
     if (arg.type === 'Lambda') {
       const item = lastCollection?.kind === 'list' ? lastCollection.of : UNKNOWN
       types.push(lambda(c, arg, lambdaParams(name, item)))
@@ -163,7 +165,7 @@ export function call(c: Checker, node: FunctionCall): Type {
     }
     const type = c.infer(arg)
     types.push(type)
-    if (accepted.includes('lambda')) {
+    if (accepted.length === 0) {
       c.report(
         'argument-type',
         'error',

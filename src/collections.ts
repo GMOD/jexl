@@ -3,6 +3,7 @@
  * Copyright 2020 Tom Shawver
  */
 
+import type { Signature, Type } from './check/types.ts'
 import type { GrammarFn } from './grammar.ts'
 import type { JexlFunction, JexlValue } from './types.ts'
 
@@ -154,5 +155,74 @@ export const collectionFunctions: Record<string, GrammarFn> = {
       acc = step(acc, items[i])
     }
     return acc
+  }
+}
+
+const unknown: Type = { kind: 'unknown' }
+
+const itemOf = (list: Type | undefined) =>
+  list?.kind === 'list' ? list.of : unknown
+
+const listOf = (of: Type, like?: Type): Type => ({
+  kind: 'list',
+  of,
+  cardinality: like?.kind === 'list' ? like.cardinality : 'many'
+})
+
+const lambdaReturns = (fn: Type | undefined) =>
+  fn?.kind === 'lambda' ? fn.returns : unknown
+
+const test: Signature = {
+  params: ['list', 'lambda'],
+  optional: 1,
+  returns: 'boolean'
+}
+
+const aggregate: Signature = {
+  params: ['list', 'lambda'],
+  optional: 1,
+  returns: 'number'
+}
+
+const extreme: Signature = {
+  params: [
+    ['number', 'list'],
+    ['number', 'list', 'lambda']
+  ],
+  variadic: true,
+  returns: 'number'
+}
+
+/** How {@link check} reads a call of each of {@link collectionFunctions}. */
+export const collectionSignatures: Record<string, Signature> = {
+  any: test,
+  all: test,
+  count: aggregate,
+  map: {
+    params: ['list', 'lambda'],
+    returns: ([list, fn]) => listOf(lambdaReturns(fn), list)
+  },
+  filter: {
+    params: ['list', 'lambda'],
+    returns: ([list]) => listOf(itemOf(list))
+  },
+  find: {
+    params: ['list', 'lambda'],
+    returns: ([list]) => itemOf(list)
+  },
+  sort: {
+    params: ['list', 'lambda'],
+    optional: 1,
+    returns: ([list]) => listOf(itemOf(list), list)
+  },
+  sum: aggregate,
+  mean: aggregate,
+  median: aggregate,
+  min: extreme,
+  max: extreme,
+  reduce: {
+    params: ['list', 'lambda', 'any'],
+    optional: 1,
+    returns: ([, fn]) => lambdaReturns(fn)
   }
 }

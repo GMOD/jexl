@@ -5,7 +5,7 @@
 
 /* eslint eqeqeq:0 */
 
-import { collectionFunctions } from './collections.ts'
+import { collectionFunctions, collectionSignatures } from './collections.ts'
 import {
   addsPairwise,
   anyPair,
@@ -15,6 +15,7 @@ import {
   pairwise
 } from './operators.ts'
 
+import type { Signature } from './check/types.ts'
 import type { JexlValue } from './types.ts'
 
 /** The operators `a < b < c` chains, as Python chains them. */
@@ -125,6 +126,8 @@ export type VariableReader = (
 export interface Grammar {
   elements: Record<string, GrammarElement>
   functions: Record<string, GrammarFn>
+  /** What {@link check} knows of each function that declared it. */
+  signatures: Record<string, Signature>
   getMember?: GetMember
   variableReader?: VariableReader
 }
@@ -356,5 +359,6 @@ export const getGrammar = (): Grammar => ({
    * than throw. An error is only appropriate when the function would normally
    * return a value, but cannot due to some other failure.
    */
-  functions: { ...collectionFunctions }
+  functions: { ...collectionFunctions },
+  signatures: { ...collectionSignatures }
 })

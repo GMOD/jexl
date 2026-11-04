@@ -7,6 +7,7 @@ import Expression from './Expression.ts'
 import Lexer from './Lexer.ts'
 import { getGrammar } from './grammar.ts'
 
+import type { Signature } from './check/types.ts'
 import type {
   BinaryOpEval,
   BinaryOpEvalOnDemand,
@@ -32,6 +33,12 @@ export interface JexlOptions {
 }
 
 const MAX_COMPILED = 10_000
+
+const ANY_ARGUMENTS: Signature = {
+  params: ['any'],
+  optional: 1,
+  variadic: true
+}
 
 /**
  * Jexl is the Javascript Expression Language, capable of parsing and
@@ -114,11 +121,19 @@ class Jexl {
    * @param {function} fn The javascript function to be executed when this
    *      expression function is invoked. It will be provided with each argument
    *      supplied in the expression, in the same order.
+   * @param signature What the function takes and returns, for {@link check}
+   *      to read from {@link signatures}. A replacement without one drops the
+   *      signature of the function it replaces.
    */
-  addFunction(name: string, fn: UncheckedFn) {
+  addFunction(name: string, fn: UncheckedFn, signature?: Signature) {
     // jexl hands the function whatever the operands evaluated to, which it
     // cannot reconcile with the caller's parameter types — see UncheckedFn
     this._grammar.functions[name] = fn as unknown as GrammarFn
+    if (signature) {
+      this._grammar.signatures[name] = signature
+    } else {
+      Reflect.deleteProperty(this._grammar.signatures, name)
+    }
   }
 
   /**
@@ -128,7 +143,9 @@ class Jexl {
    * @param {{}} map A map of expression function names to javascript functions
    */
   addFunctions(map: Record<string, UncheckedFn>) {
-    Object.assign(this._grammar.functions, map)
+    for (const [name, fn] of Object.entries(map)) {
+      this.addFunction(name, fn)
+    }
   }
 
   /**
@@ -191,6 +208,21 @@ class Jexl {
   /** The names of every function an expression can call. */
   functionNames() {
     return Object.keys(this._grammar.functions)
+  }
+
+  /**
+   * A signature for every function an expression can call, as {@link check}
+   * takes them: the one it was registered with, or, for one registered
+   * without, any arguments at all, so that check reports only a misspelt name.
+   */
+  signatures() {
+    const { signatures } = this._grammar
+    return Object.fromEntries(
+      this.functionNames().map((name): [string, Signature] => [
+        name,
+        Object.hasOwn(signatures, name) ? signatures[name]! : ANY_ARGUMENTS
+      ])
+    )
   }
 
   /**

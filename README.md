@@ -320,8 +320,25 @@ jexl.eval('round(3.7)') // 4
 jexl.eval('lower(name)', { name: 'HELLO' }) // "hello"
 jexl.eval('sqrt(abs(-16))') // 4
 
-// The names an expression can call, built-in and added, e.g. for check()
+// The names an expression can call, built-in and added
 jexl.functionNames() // ['any', 'all', …, 'round', 'lower', 'abs', 'sqrt']
+```
+
+A function can declare what it takes and returns, for `check()` to verify
+calls against. `jexl.signatures()` gives one for every function: the built-in
+ones declare theirs, and one added without a signature takes any arguments, so
+`check()` reports only a misspelt name:
+
+```javascript
+import { check } from '@jbrowse/jexl'
+
+jexl.addFunction('lower', (str) => str.toLowerCase(), {
+  params: ['string'],
+  returns: 'string'
+})
+
+check(jexl.parse('lower(name, 1)'), { functions: jexl.signatures() })
+// diagnostics: lower takes 1 argument, not 2
 ```
 
 ### Adding Custom Operators

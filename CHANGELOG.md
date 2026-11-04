@@ -4,14 +4,6 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
-### Added
-
-- **`!in` is the negation of `in`**, as `!~` is of `~`: `type !in ['gene',
-'mRNA']` and `'DB' !in feature.INFO`. `conditions()` reads it as an `!in`
-  or `!has` row, and `printCondition` now writes those rows with it rather
-  than as `!(… in …)`, which it still reads. `!inStock` is still `!` and a
-  name.
-
 ### BREAKING CHANGES
 
 - **Arithmetic on a missing value is missing.** 6.0 made `<`, `>`, `<=` and
@@ -38,6 +30,27 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - **`%` binds with `*`, `/` and `//`**, as in JavaScript and Python. It shared
   `^`'s precedence, above `*`, so `10 * 3 % 7` was `10 * (3 % 7)`, 30, where
   it is now 2, and `2 % 3 ^ 2` was `(2 % 3) ^ 2`.
+
+### Added
+
+- **`!in` is the negation of `in`**, as `!~` is of `~`:
+  `type !in ['gene', 'mRNA']` and `'DB' !in feature.INFO`. `conditions()`
+  reads it as an `!in` or `!has` row, and `printCondition` now writes those
+  rows with it rather than as `!(… in …)`, which it still reads. `!inStock` is
+  still `!` and a name.
+- **A function can declare its signature**, as the third argument to
+  `addFunction`, and `jexl.signatures()` hands `check()` one for every
+  function. The built-in `any`, `map`, `sum` and the rest declare theirs, so
+  `check()` knows `map(xs, x => x > 1)` is a list of booleans and that
+  `filter(xs, 0.05)` passes no lambda. A function added without one takes any
+  arguments, as a host had to declare for every function by hand. Replacing a
+  function, by `addFunction` without a signature or by `addFunctions`, drops
+  the old one's.
+
+### Fixed
+
+- **`check()` reads a param that takes a value or a lambda**, as `min` and
+  `max` do. Any argument that was not a lambda was reported as one missing.
 
 ## [v7.2.0]
 
