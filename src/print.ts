@@ -76,12 +76,26 @@ function within(node: AstNode, least: number) {
   return precedenceOf(node) < least ? `(${text})` : text
 }
 
+function isSigned(node: AstNode) {
+  return (
+    node.type === 'UnaryExpression' ||
+    (node.type === 'Literal' &&
+      typeof node.value === 'number' &&
+      (node.value < 0 || Object.is(node.value, -0)))
+  )
+}
+
 function binaryOperand(
   parent: BinaryExpression,
   child: AstNode,
   left: boolean
 ) {
   const op = builtIn(parent.operator)
+  // a prefix operator's operand runs on through `^`, and through a host's
+  // operator, which may group from the right too
+  if (left && (!op || op.rightAssociative) && isSigned(child)) {
+    return `(${print(child)})`
+  }
   if (!op) {
     return within(child, UNARY)
   }

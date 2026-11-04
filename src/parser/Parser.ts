@@ -223,17 +223,71 @@ class Parser {
     )
   }
 
+  /**
+   * A prefix operator's operand runs on through a right-associative operator
+   * such as `^`, so `-x ^ 2` is `-(x ^ 2)`, as in mathematics and Python.
+   */
   _unary(): AstNode {
     const token = this._peek()
-    if (token?.type !== 'unaryOp') {
-      return this._postfix(this._primary())
+    if (token?.type === 'unaryOp') {
+      this._pos++
+      return {
+        type: 'UnaryExpression',
+        operator: token.value as string,
+        right: this._raised(this._unary())
+      }
     }
-    this._pos++
-    return {
-      type: 'UnaryExpression',
-      operator: token.value as string,
-      right: this._unary()
+    if (
+      token &&
+      this._isSignedNumber(token) &&
+      this._raisingOp(this._pos + 1)
+    ) {
+      // the Lexer folded the minus into the number, but `-3 ^ 2` is -9
+      this._pos++
+      return {
+        type: 'UnaryExpression',
+        operator: '-',
+        right: this._raised({
+          type: 'Literal',
+          value: -(token.value as number)
+        })
+      }
     }
+    return this._postfix(this._primary())
+  }
+
+  _isSignedNumber(token: Token) {
+    return (
+      token.type === 'literal' &&
+      typeof token.value === 'number' &&
+      token.raw.startsWith('-')
+    )
+  }
+
+  _raisingOp(index: number) {
+    const token = this._tokens[index]
+    const op =
+      token?.type === 'binaryOp'
+        ? this._grammar.elements[token.value as string]
+        : undefined
+    return op?.type === 'binaryOp' && op.rightAssociative ? op : undefined
+  }
+
+  _raised(base: AstNode): AstNode {
+    let node = base
+    for (
+      let op = this._raisingOp(this._pos);
+      op;
+      op = this._raisingOp(this._pos)
+    ) {
+      node = {
+        type: 'BinaryExpression',
+        operator: this._next().value as string,
+        left: node,
+        right: this._binary(op.precedence, true)
+      }
+    }
+    return node
   }
 
   _postfix(subject: AstNode): AstNode {

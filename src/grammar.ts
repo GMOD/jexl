@@ -226,7 +226,7 @@ export const getGrammar = (): Grammar => ({
     },
     '%': {
       type: 'binaryOp',
-      precedence: 50,
+      precedence: 40,
       eval: (left, right) =>
         isList(left, right)
           ? pairwise(modulo, left, right)

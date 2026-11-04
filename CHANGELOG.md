@@ -13,6 +13,15 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   `-`, `*`, `/`, `//`, `%`, `^`, `&` and prefix `-` give `undefined` when an
   operand is `null` or `undefined`, value by value in a list, and so does `+`
   unless one side is text, which still joins as JavaScript joins it.
+- **`-x ^ 2` is `-(x ^ 2)`**, as in mathematics and Python, and so is
+  `-2 ^ 2`, which is now -4. Both were 4: the Lexer folds the sign into a
+  number, and a prefix operator bound tighter than every binary one. A prefix
+  operator's operand now runs on through `^`, or through any right-associative
+  operator a host registers, so `!x ^ 2` is `!(x ^ 2)`; `2 ^ -1` is unchanged.
+  `print` parenthesizes `(-x) ^ 2` to keep it.
+- **`%` binds with `*`, `/` and `//`**, as in JavaScript and Python. It shared
+  `^`'s precedence, above `*`, so `10 * 3 % 7` was `10 * (3 % 7)`, 30, where
+  it is now 2, and `2 % 3 ^ 2` was `(2 % 3) ^ 2`.
 
 ## [v7.2.0]
 

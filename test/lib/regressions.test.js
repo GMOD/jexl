@@ -420,13 +420,19 @@ describe('regressions', () => {
     })
   })
   describe('unary minus precedence', () => {
-    it('binds tighter than any binary operator', () => {
-      // `-2 ^ 2` is 4, because the Lexer folds that sign into the literal.
-      // `-x ^ 2` went through the unary operator, whose precedence was read
-      // off `-`'s binary entry, and grouped as `-(x ^ 2)` for -4 instead
-      expect(inst.eval('-2 ^ 2')).toBe(4)
-      expect(inst.eval('-x ^ 2', { x: 2 })).toBe(4)
+    it('binds looser than ^ on its left, as in mathematics and Python', () => {
+      // both read as (-2) ^ 2 = 4: the Lexer folds the sign into a literal,
+      // and a prefix operator outranked every binary one
+      expect(inst.eval('-2 ^ 2')).toBe(-4)
+      expect(inst.eval('-x ^ 2', { x: 2 })).toBe(-4)
+      expect(inst.eval('(-2) ^ 2')).toBe(4)
+      expect(inst.eval('(-x) ^ 2', { x: 2 })).toBe(4)
+      expect(inst.eval('!x ^ 2', { x: 0 })).toBe(true)
+    })
+    it('binds tighter than ^ on its right', () => {
       expect(inst.eval('2 ^ -x', { x: 2 })).toBe(0.25)
+      expect(inst.eval('2 ^ -1')).toBe(0.5)
+      expect(inst.eval('2 ^ -2 ^ 2')).toBe(2 ** -4)
     })
     it('still groups the looser operators around it', () => {
       expect(inst.eval('-x + 3', { x: 2 })).toBe(1)
@@ -502,10 +508,13 @@ describe('regressions', () => {
     it('groups a chain of ^ from the right', () => {
       expect(inst.eval('2 ^ 3 ^ 2')).toBe(512)
       expect(inst.eval('(2 ^ 3) ^ 2')).toBe(64)
-      expect(inst.eval('-x ^ 2 ^ 1', { x: 2 })).toBe(4)
+      expect(inst.eval('-x ^ 2 ^ 1', { x: 2 })).toBe(-4)
     })
-    it('still groups ^ and % left to right, as they share a precedence', () => {
-      expect(inst.eval('2 % 3 ^ 2')).toBe(4)
+    it('binds % with * and /, as JS and Python do, and ^ tighter', () => {
+      // % shared ^'s precedence, above *, so 10 * 3 % 7 was 10 * (3 % 7)
+      expect(inst.eval('10 * 3 % 7')).toBe(2)
+      expect(inst.eval('10 % 4 * 2')).toBe(4)
+      expect(inst.eval('2 % 3 ^ 2')).toBe(2)
       expect(inst.eval('2 ^ 3 % 3')).toBe(2)
     })
     it('still binds a host operator at 15 tighter than both', () => {

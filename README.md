@@ -110,20 +110,23 @@ jexl.eval('`Price: \\$100`')
 
 From loosest to tightest:
 
-| Operators                                         | Groups             |
-| ------------------------------------------------- | ------------------ |
-| `;`                                               |                    |
-| `=`, lambdas                                      | right to left      |
-| `? :`                                             | right to left      |
-| `\|\|`, `??`                                      | left to right      |
-| `&&`                                              | left to right      |
-| `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`, `~`, `!~` | left to right      |
-| `&`                                               | left to right      |
-| `+`, `-`                                          | left to right      |
-| `*`, `/`, `//`                                    | left to right      |
-| `%`, `^`                                          | `^` from the right |
-| prefix `!`, `-`                                   |                    |
-| `.`, `[]`, calls                                  | left to right      |
+| Operators                                         | Groups        |
+| ------------------------------------------------- | ------------- |
+| `;`                                               |               |
+| `=`, lambdas                                      | right to left |
+| `? :`                                             | right to left |
+| `\|\|`, `??`                                      | left to right |
+| `&&`                                              | left to right |
+| `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`, `~`, `!~` | left to right |
+| `&`                                               | left to right |
+| `+`, `-`                                          | left to right |
+| `*`, `/`, `//`, `%`                               | left to right |
+| prefix `!`, `-`                                   |               |
+| `^`                                               | right to left |
+| `.`, `[]`, calls                                  | left to right |
+
+As in mathematics and Python, `^` binds tighter than a prefix operator on its
+left, so `-x ^ 2` and `-2 ^ 2` are `-(x ^ 2)` and `-4`, while `2 ^ -1` is 0.5.
 
 As in JavaScript, `??` does not mix with `&&` or `||` without parentheses:
 `a ?? b || c` is a syntax error, `(a ?? b) || c` is not.
