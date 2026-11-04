@@ -110,30 +110,41 @@ jexl.eval('`Price: \\$100`')
 
 From loosest to tightest:
 
-| Operators                                                | Groups              |
-| -------------------------------------------------------- | ------------------- |
-| `;`                                                      |                     |
-| `=`, lambdas                                             | right to left       |
-| `? :`                                                    | right to left       |
-| `\|\|`, `??`                                             | left to right       |
-| `&&`                                                     | left to right       |
-| `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`, `!in`, `~`, `!~` | ordering ones chain |
-| `&`                                                      | left to right       |
-| `+`, `-`                                                 | left to right       |
-| `*`, `/`, `//`, `%`                                      | left to right       |
-| prefix `!`, `-`                                          |                     |
-| `^`                                                      | right to left       |
-| `.`, `[]`, calls                                         | left to right       |
+| Operators                                                | Groups        |
+| -------------------------------------------------------- | ------------- |
+| `;`                                                      |               |
+| `=`, lambdas                                             | right to left |
+| `? :`                                                    | right to left |
+| `\|\|`, `??`                                             | left to right |
+| `&&`                                                     | left to right |
+| `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`, `!in`, `~`, `!~` | do not chain  |
+| `&`                                                      | left to right |
+| `+`, `-`                                                 | left to right |
+| `*`, `/`, `//`, `%`                                      | left to right |
+| prefix `!`, `-`                                          |               |
+| `^`                                                      | right to left |
+| `.`, `[]`, calls                                         | left to right |
 
-As in mathematics and Python, `^` binds tighter than a prefix operator on its
-left, so `-x ^ 2` and `-2 ^ 2` are `-(x ^ 2)` and `-4`, while `2 ^ -1` is 0.5.
+An expression that parses in both jexl and JavaScript groups the same way in
+both, apart from `^` and `&` below. Where a reader could guess either grouping, jexl, like
+JavaScript, refuses to guess and asks for parentheses:
 
-As in JavaScript, `??` does not mix with `&&` or `||` without parentheses:
-`a ?? b || c` is a syntax error, `(a ?? b) || c` is not.
+- `a ?? b || c`: write `(a ?? b) || c` or `a ?? (b || c)`.
+- `-x ^ 2`, as JavaScript refuses `-x ** 2`: write `-(x ^ 2)` or `(-x) ^ 2`.
+  `2 ^ -1` needs none.
+- `a < b < c` and any other comparison of a comparison, which JavaScript
+  accepts and evaluates as `(a < b) < c`, a boolean compared with `c`: write
+  `between(b, a, c)` for a range, or `(a == b) == c` to compare the boolean.
 
-As in Python, `<`, `<=`, `>` and `>=` chain, so `0.1 < AF < 0.5` tests a range,
-evaluating `AF` once. Any other comparison of a comparison, such as
-`a == b == c`, is a syntax error unless parenthesized: `(a == b) == c`.
+What differs from JavaScript:
+
+- `^` is power, JavaScript's `**`, not exclusive or.
+- `&` binds tighter than a comparison, so `flags & 2 == 2` tests the bit, where
+  JavaScript reads `flags & (2 == 2)`.
+- `//` is floor division, not a comment.
+- `==` is JavaScript's loose `==`; there is no `===`.
+- Arithmetic on a missing value is missing (see Lists), where JavaScript reads
+  `null` as 0.
 
 ### Lists
 
@@ -164,18 +175,24 @@ jexl.eval('DP + 1', { DP: [25] }) // [26]
 ```
 
 A missing value, `null` or `undefined`, stays missing through arithmetic, and
-orders against nothing, so a sample with no `DV` neither passes nor fails
-`DV / DP < 0.1`. `+` with text on either side joins as JavaScript joins it:
+orders against nothing, so `DV / DP < 0.1` is false for a sample with no `DV`
+rather than reading its `DV` as 0. `+` with text on either side joins as
+JavaScript joins it:
 
 ```javascript
 jexl.eval('DV / DP', { DV: [null, 5], DP: [10, 10] }) // [undefined, 0.5]
 jexl.eval('min(DV / DP)', { DV: [null, 5], DP: [10, 10] }) // 0.5
 ```
 
-A chain holds for a list when one value satisfies every link, so
-`0.1 < AF < 0.5` asks whether one frequency lies between, where
-`0.1 < AF && AF < 0.5` also holds for `[0.01, 0.9]`, each test passing on a
+`between(x, lo, hi)` tests a range, including both ends as SQL's `BETWEEN`
+does, and holds for a list when one value lies in it. `AF >= 0.1 && AF <= 0.5`
+is not the same test: it holds for `[0.01, 0.9]`, each comparison passing on a
 different value.
+
+```javascript
+jexl.eval('between(AF, 0.1, 0.5)', { AF: [0.01, 0.9] }) // false
+jexl.eval('AF.between(0.1, 0.5)', { AF: [0.01, 0.2] }) // true
+```
 
 `in` finds a substring of a string, a member of a list or Set, or a key of an
 object or Map, so a host can hand an expression a gene list loaded from a file
@@ -250,7 +267,8 @@ A parameter shadows the context variable of the same name; any other name reads
 the context. A lambda body cannot assign.
 
 Jexl registers `any`, `all`, `count`, `map`, `filter`, `find`, `sort` and
-`reduce`, each taking a list and a lambda, and the aggregates above. A lone value counts as a list of one
+`reduce`, each taking a list and a lambda, the aggregates above, and
+`between`. A lone value counts as a list of one
 and a missing value as an empty list, which suits VCF INFO fields:
 
 ```javascript

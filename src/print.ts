@@ -26,7 +26,6 @@ const ASSIGNMENT = 1
 const CONDITIONAL = 2
 const CUSTOM_BINARY = 3
 const UNARY = 100
-const COMPARISON = builtIn('<')!.precedence
 
 const WORDS = new Set([
   'true',
@@ -62,9 +61,6 @@ function precedenceOf(node: AstNode) {
     }
     case 'BinaryExpression': {
       return builtIn(node.operator)?.precedence ?? CUSTOM_BINARY
-    }
-    case 'ComparisonChain': {
-      return COMPARISON
     }
     case 'UnaryExpression': {
       return UNARY
@@ -113,7 +109,7 @@ function binaryOperand(
     child.type === 'BinaryExpression' &&
     ((parent.operator === '??' && LOGICAL.has(child.operator)) ||
       (child.operator === '??' && LOGICAL.has(parent.operator)))
-  // `(a < b) < c` would print as a chain, which is a range test
+  // the parser refuses `a < b < c`, so `(a < b) < c` keeps its parentheses
   const comparesComparison = theirs === own && COMPARISONS.has(parent.operator)
   const text = print(child)
   return theirs < own ||
@@ -154,14 +150,6 @@ export function print(node: AstNode): string {
     }
     case 'BinaryExpression': {
       return `${binaryOperand(node, node.left, true)} ${node.operator} ${binaryOperand(node, node.right, false)}`
-    }
-    case 'ComparisonChain': {
-      return node.operands
-        .map((operand, i) => {
-          const text = within(operand, COMPARISON + 1)
-          return i === 0 ? text : ` ${node.operators[i - 1]} ${text}`
-        })
-        .join('')
     }
     case 'UnaryExpression': {
       const { operator } = node

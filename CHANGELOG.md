@@ -4,10 +4,11 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [v8.0.0]
 
-Jexl 8 makes a filter mean what it reads as: a missing value stays missing
-through arithmetic, `lo < x < hi` tests a range, and `-x ^ 2` and `%` bind as
-in mathematics and Python. An expression that does none of these upgrades
-without changes, and `a == b == c`, which is now a syntax error, says so.
+Jexl 8 makes a filter mean what it reads as, and reads as JavaScript does:
+a missing value stays missing through arithmetic, `%` binds as in
+JavaScript, and an expression whose grouping a reader would have to guess,
+`a < b < c` or `-x ^ 2`, is a syntax error asking for parentheses, as
+JavaScript refuses `-x ** 2`. A range is `between(x, lo, hi)`.
 
 ### BREAKING CHANGES
 
@@ -18,26 +19,27 @@ without changes, and `a == b == c`, which is now a syntax error, says so.
   `-`, `*`, `/`, `//`, `%`, `^`, `&` and prefix `-` give `undefined` when an
   operand is `null` or `undefined`, value by value in a list, and so does `+`
   unless one side is text, which still joins as JavaScript joins it.
-- **`-x ^ 2` is `-(x ^ 2)`**, as in mathematics and Python, and so is
-  `-2 ^ 2`, which is now -4. Both were 4: the Lexer folds the sign into a
-  number, and a prefix operator bound tighter than every binary one. A prefix
-  operator's operand now runs on through `^`, or through any right-associative
-  operator a host registers, so `!x ^ 2` is `!(x ^ 2)`; `2 ^ -1` is unchanged.
-  `print` parenthesizes `(-x) ^ 2` to keep it.
-- **`lo < x < hi` tests a range**, as in Python, and evaluates `x` once. It
-  compared the boolean `lo < x` with `hi`, so `0.1 < AF < 0.5` was false for
-  any `AF`. Over a list, the chain holds where one value satisfies every link,
-  unlike `0.1 < AF && AF < 0.5`, which `[0.01, 0.9]` passes on two different
-  values. Only `<`, `<=`, `>` and `>=` chain; any other comparison of a
-  comparison, such as `a == b == c`, is now a syntax error unless
-  parenthesized. The tree holds a chain as a new `ComparisonChain` node, which
-  `analyze`, `check` and `print` read, and `conditions()` leaves as text.
+- **A comparison of a comparison is a syntax error unless parenthesized.**
+  `0.1 < AF < 0.5` compared the boolean `0.1 < AF` with 0.5, so it was false
+  for any `AF`, and `a == b == c` compared a boolean with `c`. Write
+  `between(AF, 0.1, 0.5)` for a range, or `(a == b) == c` to compare the
+  boolean; `print` parenthesizes such a tree to match.
+- **`-x ^ 2` is a syntax error**, as JavaScript refuses `-x ** 2`: write
+  `-(x ^ 2)` or `(-x) ^ 2`. `-2 ^ 2` and `-x ^ 2` were both `(-x) ^ 2`, where
+  mathematics reads `-(x ^ 2)`, and the same goes for `!` and for any
+  right-associative operator a host registers. `2 ^ -1` is unchanged, and
+  `print` parenthesizes a negated base.
 - **`%` binds with `*`, `/` and `//`**, as in JavaScript and Python. It shared
   `^`'s precedence, above `*`, so `10 * 3 % 7` was `10 * (3 % 7)`, 30, where
   it is now 2, and `2 % 3 ^ 2` was `(2 % 3) ^ 2`.
 
 ### Added
 
+- **`between(x, lo, hi)` tests a range**, including both ends as SQL's
+  `BETWEEN` does. A list is in range where one of its values is, so
+  `between(AF, 0.1, 0.5)` is false for `[0.01, 0.9]`, which
+  `AF >= 0.1 && AF <= 0.5` passes on two different values. A missing value or
+  bound is in no range. `AF.between(0.1, 0.5)` reads the same.
 - **`!in` is the negation of `in`**, as `!~` is of `~`:
   `type !in ['gene', 'mRNA']` and `'DB' !in feature.INFO`. `conditions()`
   reads it as an `!in` or `!has` row, and `printCondition` now writes those

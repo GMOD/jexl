@@ -109,8 +109,26 @@ function ascending(a: JexlValue, b: JexlValue) {
       : 0
 }
 
+/**
+ * Whether a value, or any value of a list, lies from `lo` to `hi`, both
+ * included, as SQL's BETWEEN. A missing value lies in no range.
+ */
+function between(value: JexlValue, lo: JexlValue, hi: JexlValue) {
+  return (
+    lo != null &&
+    hi != null &&
+    toList(value).some(
+      (v) =>
+        v != null &&
+        (v as number) >= (lo as number) &&
+        (v as number) <= (hi as number)
+    )
+  )
+}
+
 /** The functions every Jexl instance starts with. A host may replace any. */
 export const collectionFunctions: Record<string, GrammarFn> = {
+  between,
   any: (list, fn) => toList(list).some(callback('any', fn)),
   all: (list, fn) => toList(list).every(callback('all', fn)),
   count: (list, fn) =>
@@ -195,6 +213,10 @@ const extreme: Signature = {
 
 /** How {@link check} reads a call of each of {@link collectionFunctions}. */
 export const collectionSignatures: Record<string, Signature> = {
+  between: {
+    params: [['number', 'list'], 'number', 'number'],
+    returns: 'boolean'
+  },
   any: test,
   all: test,
   count: aggregate,

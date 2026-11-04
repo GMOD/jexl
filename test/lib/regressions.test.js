@@ -420,19 +420,25 @@ describe('regressions', () => {
     })
   })
   describe('unary minus precedence', () => {
-    it('binds looser than ^ on its left, as in mathematics and Python', () => {
-      // both read as (-2) ^ 2 = 4: the Lexer folds the sign into a literal,
-      // and a prefix operator outranked every binary one
-      expect(inst.eval('-2 ^ 2')).toBe(-4)
-      expect(inst.eval('-x ^ 2', { x: 2 })).toBe(-4)
+    it.each(['-2 ^ 2', '-x ^ 2', '!x ^ 2', '2 ^ -x ^ 2', 'y * -2 ^ 2'])(
+      'must be parenthesized as the base of ^ in %s, as JS refuses -x ** 2',
+      (expr) => {
+        // both read as (-2) ^ 2 = 4, where mathematics reads -(2 ^ 2)
+        expect(() => inst.compile(expr)).toThrow(
+          /Parenthesize [-!]x \^ y as \([-!]x\) \^ y or [-!]\(x \^ y\)/
+        )
+      }
+    )
+    it('groups as parenthesized', () => {
       expect(inst.eval('(-2) ^ 2')).toBe(4)
+      expect(inst.eval('-(2 ^ 2)')).toBe(-4)
       expect(inst.eval('(-x) ^ 2', { x: 2 })).toBe(4)
-      expect(inst.eval('!x ^ 2', { x: 0 })).toBe(true)
+      expect(inst.eval('-(x ^ 2)', { x: 2 })).toBe(-4)
     })
-    it('binds tighter than ^ on its right', () => {
+    it('may be the exponent', () => {
       expect(inst.eval('2 ^ -x', { x: 2 })).toBe(0.25)
       expect(inst.eval('2 ^ -1')).toBe(0.5)
-      expect(inst.eval('2 ^ -2 ^ 2')).toBe(2 ** -4)
+      expect(inst.eval('2 ^ -(2 ^ 2)')).toBe(2 ** -4)
     })
     it('still groups the looser operators around it', () => {
       expect(inst.eval('-x + 3', { x: 2 })).toBe(1)
@@ -508,7 +514,7 @@ describe('regressions', () => {
     it('groups a chain of ^ from the right', () => {
       expect(inst.eval('2 ^ 3 ^ 2')).toBe(512)
       expect(inst.eval('(2 ^ 3) ^ 2')).toBe(64)
-      expect(inst.eval('-x ^ 2 ^ 1', { x: 2 })).toBe(-4)
+      expect(inst.eval('(-x) ^ 2 ^ 1', { x: 2 })).toBe(4)
     })
     it('binds % with * and /, as JS and Python do, and ^ tighter', () => {
       // % shared ^'s precedence, above *, so 10 * 3 % 7 was 10 * (3 % 7)

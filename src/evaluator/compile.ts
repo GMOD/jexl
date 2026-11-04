@@ -87,42 +87,6 @@ function stringify(value: JexlValue) {
   return JSON.stringify(value)
 }
 
-type Test = (left: JexlValue, right: JexlValue) => JexlValue
-
-function test(grammar: Grammar, operator: string): Test {
-  const op = grammar.elements[operator]
-  const fn = op?.type === 'binaryOp' ? op.eval : undefined
-  const onDemand = op?.type === 'binaryOp' ? op.evalOnDemand : undefined
-  if (fn) {
-    return fn
-  }
-  if (onDemand) {
-    return (left, right) =>
-      onDemand({ eval: () => left }, { eval: () => right })
-  }
-  throw new Error(`Unknown binary operator '${operator}'`)
-}
-
-const valuesOf = (value: JexlValue) => (Array.isArray(value) ? value : [value])
-
-/**
- * Whether a chain such as `lo < x < hi` holds. Each operand is evaluated once,
- * and only when the links before it hold. A list holds where one of its values
- * satisfies the links on both sides of it, so `0.1 < AF < 0.5` asks whether
- * one frequency lies between, where `0.1 < AF && AF < 0.5` holds for
- * `[0.01, 0.9]`.
- */
-function chainHolds(tests: Test[], operands: CompiledNode[], ctx: Context) {
-  const values: JexlValue[][] = []
-  const candidates = (i: number) => (values[i] ??= valuesOf(operands[i]!(ctx)))
-  const holdsFrom = (i: number, value: JexlValue): boolean =>
-    i === tests.length ||
-    candidates(i + 1).some(
-      (next) => !!tests[i]!(value, next) && holdsFrom(i + 1, next)
-    )
-  return candidates(0).some((value) => holdsFrom(0, value))
-}
-
 function compileNode(
   node: AstNode,
   grammar: Grammar,
@@ -191,12 +155,6 @@ function compileNode(
         throw new Error(`Unknown binary operator '${node.operator}'`)
       }
       return (ctx) => fn(left(ctx), right(ctx))
-    }
-
-    case 'ComparisonChain': {
-      const operands = node.operands.map(compile)
-      const tests = node.operators.map((operator) => test(grammar, operator))
-      return (ctx) => chainHolds(tests, operands, ctx)
     }
 
     case 'UnaryExpression': {

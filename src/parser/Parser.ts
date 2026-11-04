@@ -4,13 +4,12 @@
  */
 
 import { JexlSyntaxError } from '../errors.ts'
-import { COMPARISONS, ORDERINGS } from '../grammar.ts'
+import { COMPARISONS } from '../grammar.ts'
 
 import type Lexer from '../Lexer.ts'
 import type { Grammar } from '../grammar.ts'
 import type {
   AstNode,
-  ComparisonChain,
   ConditionalExpression,
   Lambda,
   Literal,
@@ -205,51 +204,50 @@ class Parser {
         return left
       }
       const at = this._pos++
+      const prefix = op.rightAssociative ? this._prefixOf(left) : undefined
+      if (prefix) {
+        throw this._error(
+          `Parenthesize ${prefix}x ${operator} y as (${prefix}x) ${operator} y or ${prefix}(x ${operator} y)`,
+          at
+        )
+      }
+      if (this._comparesComparison(operator, op.precedence, left)) {
+        throw this._error(
+          'Comparisons do not chain: parenthesize the inner one, or test a range with between(x, lo, hi)',
+          at
+        )
+      }
       const right = this._binary(op.precedence, op.rightAssociative)
       if (this._mixesNullish(operator, left, right)) {
         throw this._error('Parenthesize ?? when mixing it with && or ||', at)
       }
-      left = this._join(operator, op.precedence, left, right, at)
+      left = { type: 'BinaryExpression', operator, left, right }
     }
   }
 
   /**
-   * `lo < x < hi` tests a range, as in Python, rather than comparing the
-   * boolean `lo < x` with `hi`. Any other comparison of a comparison has no
-   * reading a filter's author would mean, so it must be parenthesized.
+   * The prefix operator `left` is written with, which leaves `-x ^ 2` with no
+   * grouping a reader can guess: mathematics reads `-(x ^ 2)`, many
+   * calculators `(-x) ^ 2`. JS refuses `-x ** 2` too. A minus the Lexer
+   * folded into a number counts, so `-2 ^ 2` is refused with it.
    */
-  _join(
-    operator: string,
-    precedence: number,
-    left: AstNode,
-    right: AstNode,
-    at: number
-  ): AstNode {
-    const inner = this._innerComparison(operator, precedence, left)
-    if (
-      inner &&
-      ![operator, ...inner.operators].every((op) => ORDERINGS.has(op))
-    ) {
-      throw this._error(
-        'Only <, <=, > and >= chain; parenthesize a comparison inside another',
-        at
-      )
-    }
-    return inner
-      ? {
-          type: 'ComparisonChain',
-          operators: [...inner.operators, operator],
-          operands: [...inner.operands, right]
-        }
-      : { type: 'BinaryExpression', operator, left, right }
+  _prefixOf(left: AstNode) {
+    return this._grouped?.has(left)
+      ? undefined
+      : left.type === 'UnaryExpression'
+        ? left.operator
+        : left.type === 'Literal' &&
+            typeof left.value === 'number' &&
+            (left.value < 0 || Object.is(left.value, -0))
+          ? '-'
+          : undefined
   }
 
-  /** The comparison `left` is, as a chain, where `operator` compares it. */
-  _innerComparison(
-    operator: string,
-    precedence: number,
-    left: AstNode
-  ): ComparisonChain | undefined {
+  /**
+   * `a < b < c` compares the boolean `a < b` with `c`, which no filter's
+   * author means, so a comparison inside another must be parenthesized.
+   */
+  _comparesComparison(operator: string, precedence: number, left: AstNode) {
     const comparesAt = (op: string) => {
       const element = this._grammar.elements[op]
       return (
@@ -258,17 +256,12 @@ class Parser {
         element.precedence === precedence
       )
     }
-    return !comparesAt(operator) || this._grouped?.has(left)
-      ? undefined
-      : left.type === 'ComparisonChain' && comparesAt(left.operators[0]!)
-        ? left
-        : left.type === 'BinaryExpression' && comparesAt(left.operator)
-          ? {
-              type: 'ComparisonChain',
-              operators: [left.operator],
-              operands: [left.left, left.right]
-            }
-          : undefined
+    return (
+      comparesAt(operator) &&
+      left.type === 'BinaryExpression' &&
+      comparesAt(left.operator) &&
+      !this._grouped?.has(left)
+    )
   }
 
   /** `a ?? b || c` has no grouping a reader can guess; JS refuses it too. */
@@ -283,71 +276,17 @@ class Parser {
     )
   }
 
-  /**
-   * A prefix operator's operand runs on through a right-associative operator
-   * such as `^`, so `-x ^ 2` is `-(x ^ 2)`, as in mathematics and Python.
-   */
   _unary(): AstNode {
     const token = this._peek()
-    if (token?.type === 'unaryOp') {
-      this._pos++
-      return {
-        type: 'UnaryExpression',
-        operator: token.value as string,
-        right: this._raised(this._unary())
-      }
+    if (token?.type !== 'unaryOp') {
+      return this._postfix(this._primary())
     }
-    if (
-      token &&
-      this._isSignedNumber(token) &&
-      this._raisingOp(this._pos + 1)
-    ) {
-      // the Lexer folded the minus into the number, but `-3 ^ 2` is -9
-      this._pos++
-      return {
-        type: 'UnaryExpression',
-        operator: '-',
-        right: this._raised({
-          type: 'Literal',
-          value: -(token.value as number)
-        })
-      }
+    this._pos++
+    return {
+      type: 'UnaryExpression',
+      operator: token.value as string,
+      right: this._unary()
     }
-    return this._postfix(this._primary())
-  }
-
-  _isSignedNumber(token: Token) {
-    return (
-      token.type === 'literal' &&
-      typeof token.value === 'number' &&
-      token.raw.startsWith('-')
-    )
-  }
-
-  _raisingOp(index: number) {
-    const token = this._tokens[index]
-    const op =
-      token?.type === 'binaryOp'
-        ? this._grammar.elements[token.value as string]
-        : undefined
-    return op?.type === 'binaryOp' && op.rightAssociative ? op : undefined
-  }
-
-  _raised(base: AstNode): AstNode {
-    let node = base
-    for (
-      let op = this._raisingOp(this._pos);
-      op;
-      op = this._raisingOp(this._pos)
-    ) {
-      node = {
-        type: 'BinaryExpression',
-        operator: this._next().value as string,
-        left: node,
-        right: this._binary(op.precedence, true)
-      }
-    }
-    return node
   }
 
   _postfix(subject: AstNode): AstNode {
