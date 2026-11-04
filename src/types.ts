@@ -45,6 +45,16 @@ export interface BinaryExpression {
   right: AstNode
 }
 
+/**
+ * `a < b < c`, which holds where `a < b` and `b < c` both do, each operand
+ * evaluated once. Only the ordering operators chain.
+ */
+export interface ComparisonChain {
+  type: 'ComparisonChain'
+  operators: string[]
+  operands: AstNode[]
+}
+
 export interface UnaryExpression {
   type: 'UnaryExpression'
   operator: string
@@ -111,6 +121,7 @@ export type AstNode =
   | Literal
   | Identifier
   | BinaryExpression
+  | ComparisonChain
   | UnaryExpression
   | ArrayLiteral
   | ObjectLiteral

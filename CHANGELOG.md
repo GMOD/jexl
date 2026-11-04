@@ -19,6 +19,14 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   operator's operand now runs on through `^`, or through any right-associative
   operator a host registers, so `!x ^ 2` is `!(x ^ 2)`; `2 ^ -1` is unchanged.
   `print` parenthesizes `(-x) ^ 2` to keep it.
+- **`lo < x < hi` tests a range**, as in Python, and evaluates `x` once. It
+  compared the boolean `lo < x` with `hi`, so `0.1 < AF < 0.5` was false for
+  any `AF`. Over a list, the chain holds where one value satisfies every link,
+  unlike `0.1 < AF && AF < 0.5`, which `[0.01, 0.9]` passes on two different
+  values. Only `<`, `<=`, `>` and `>=` chain; any other comparison of a
+  comparison, such as `a == b == c`, is now a syntax error unless
+  parenthesized. The tree holds a chain as a new `ComparisonChain` node, which
+  `analyze`, `check` and `print` read, and `conditions()` leaves as text.
 - **`%` binds with `*`, `/` and `//`**, as in JavaScript and Python. It shared
   `^`'s precedence, above `*`, so `10 * 3 % 7` was `10 * (3 % 7)`, 30, where
   it is now 2, and `2 % 3 ^ 2` was `(2 % 3) ^ 2`.

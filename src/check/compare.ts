@@ -24,7 +24,7 @@ import {
   paramName
 } from './words.ts'
 
-import type { AstNode, BinaryExpression } from '../types.ts'
+import type { AstNode, BinaryExpression, ComparisonChain } from '../types.ts'
 import type { Checker } from './context.ts'
 import type { OfKind, Type } from './types.ts'
 
@@ -112,6 +112,60 @@ export function compareLiteral(
   }
 }
 
+type Operand = readonly [Type, AstNode]
+
+/** Reports a text field that `operator` reads as a number. */
+function numericOperands(
+  c: Checker,
+  node: AstNode,
+  operator: string,
+  left: Operand,
+  right: Operand,
+  reported = new Set<AstNode>()
+) {
+  for (const [[type, typeNode], [other]] of [
+    [left, right],
+    [right, left]
+  ] as const) {
+    const numericOther = ARITHMETIC.has(operator) || isNumberish(other)
+    if (
+      type.kind === 'string' &&
+      type.field &&
+      numericOther &&
+      !reported.has(typeNode)
+    ) {
+      reported.add(typeNode)
+      c.report(
+        'string-numeric',
+        'warning',
+        node,
+        `${print(typeNode)} is text, so ${operator} converts it to a number, ${ORDER.has(operator) ? 'answering false' : operator === '&' ? 'giving 0' : 'giving NaN'} wherever it is not one`,
+        c.functions?.parseFloat
+          ? [
+              print(node).replace(
+                print(typeNode),
+                `parseFloat(${print(typeNode)})`
+              )
+            ]
+          : []
+      )
+    }
+  }
+}
+
+/** Checks each link of `lo < x < hi` as the comparison it makes. */
+export function chain(c: Checker, node: ComparisonChain): Type {
+  const operands = node.operands.map((operand): Operand => {
+    const type = c.infer(operand)
+    return [type.kind === 'list' ? type.of : type, operand]
+  })
+  const reported = new Set<AstNode>()
+  node.operators.forEach((operator, i) => {
+    numericOperands(c, node, operator, operands[i]!, operands[i + 1]!, reported)
+  })
+  return BOOLEAN
+}
+
 export function binary(c: Checker, node: BinaryExpression): Type {
   const { operator } = node
   const rightNode = node.right
@@ -179,28 +233,13 @@ export function binary(c: Checker, node: BinaryExpression): Type {
   }
 
   if (ARITHMETIC.has(operator) || ORDER.has(operator)) {
-    for (const [type, typeNode, other] of [
-      [leftItem, node.left, rightItem],
-      [rightItem, rightNode, leftItem]
-    ] as const) {
-      const numericOther = ARITHMETIC.has(operator) || isNumberish(other)
-      if (type.kind === 'string' && type.field && numericOther) {
-        c.report(
-          'string-numeric',
-          'warning',
-          node,
-          `${print(typeNode)} is text, so ${operator} converts it to a number, ${ORDER.has(operator) ? 'answering false' : operator === '&' ? 'giving 0' : 'giving NaN'} wherever it is not one`,
-          c.functions?.parseFloat
-            ? [
-                print(node).replace(
-                  print(typeNode),
-                  `parseFloat(${print(typeNode)})`
-                )
-              ]
-            : []
-        )
-      }
-    }
+    numericOperands(
+      c,
+      node,
+      operator,
+      [leftItem, node.left],
+      [rightItem, rightNode]
+    )
     return ORDER.has(operator)
       ? BOOLEAN
       : eachOf(arithmetic(operator, leftItem, rightItem))

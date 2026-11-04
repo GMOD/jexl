@@ -4,11 +4,13 @@
  */
 
 import { JexlSyntaxError } from '../errors.ts'
+import { COMPARISONS, ORDERINGS } from '../grammar.ts'
 
 import type Lexer from '../Lexer.ts'
 import type { Grammar } from '../grammar.ts'
 import type {
   AstNode,
+  ComparisonChain,
   ConditionalExpression,
   Lambda,
   Literal,
@@ -207,8 +209,66 @@ class Parser {
       if (this._mixesNullish(operator, left, right)) {
         throw this._error('Parenthesize ?? when mixing it with && or ||', at)
       }
-      left = { type: 'BinaryExpression', operator, left, right }
+      left = this._join(operator, op.precedence, left, right, at)
     }
+  }
+
+  /**
+   * `lo < x < hi` tests a range, as in Python, rather than comparing the
+   * boolean `lo < x` with `hi`. Any other comparison of a comparison has no
+   * reading a filter's author would mean, so it must be parenthesized.
+   */
+  _join(
+    operator: string,
+    precedence: number,
+    left: AstNode,
+    right: AstNode,
+    at: number
+  ): AstNode {
+    const inner = this._innerComparison(operator, precedence, left)
+    if (
+      inner &&
+      ![operator, ...inner.operators].every((op) => ORDERINGS.has(op))
+    ) {
+      throw this._error(
+        'Only <, <=, > and >= chain; parenthesize a comparison inside another',
+        at
+      )
+    }
+    return inner
+      ? {
+          type: 'ComparisonChain',
+          operators: [...inner.operators, operator],
+          operands: [...inner.operands, right]
+        }
+      : { type: 'BinaryExpression', operator, left, right }
+  }
+
+  /** The comparison `left` is, as a chain, where `operator` compares it. */
+  _innerComparison(
+    operator: string,
+    precedence: number,
+    left: AstNode
+  ): ComparisonChain | undefined {
+    const comparesAt = (op: string) => {
+      const element = this._grammar.elements[op]
+      return (
+        COMPARISONS.has(op) &&
+        element?.type === 'binaryOp' &&
+        element.precedence === precedence
+      )
+    }
+    return !comparesAt(operator) || this._grouped?.has(left)
+      ? undefined
+      : left.type === 'ComparisonChain' && comparesAt(left.operators[0]!)
+        ? left
+        : left.type === 'BinaryExpression' && comparesAt(left.operator)
+          ? {
+              type: 'ComparisonChain',
+              operators: [left.operator],
+              operands: [left.left, left.right]
+            }
+          : undefined
   }
 
   /** `a ?? b || c` has no grouping a reader can guess; JS refuses it too. */

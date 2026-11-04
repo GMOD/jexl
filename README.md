@@ -131,6 +131,10 @@ left, so `-x ^ 2` and `-2 ^ 2` are `-(x ^ 2)` and `-4`, while `2 ^ -1` is 0.5.
 As in JavaScript, `??` does not mix with `&&` or `||` without parentheses:
 `a ?? b || c` is a syntax error, `(a ?? b) || c` is not.
 
+As in Python, `<`, `<=`, `>` and `>=` chain, so `0.1 < AF < 0.5` tests a range,
+evaluating `AF` once. Any other comparison of a comparison, such as
+`a == b == c`, is a syntax error unless parenthesized: `(a == b) == c`.
+
 ### Lists
 
 Operators read a list the way bcftools reads a multi-valued VCF tag.
@@ -167,6 +171,11 @@ orders against nothing, so a sample with no `DV` neither passes nor fails
 jexl.eval('DV / DP', { DV: [null, 5], DP: [10, 10] }) // [undefined, 0.5]
 jexl.eval('min(DV / DP)', { DV: [null, 5], DP: [10, 10] }) // 0.5
 ```
+
+A chain holds for a list when one value satisfies every link, so
+`0.1 < AF < 0.5` asks whether one frequency lies between, where
+`0.1 < AF && AF < 0.5` also holds for `[0.01, 0.9]`, each test passing on a
+different value.
 
 `in` finds a substring of a string, a member of a list or Set, or a key of an
 object or Map, so a host can hand an expression a gene list loaded from a file

@@ -7,7 +7,7 @@ import { literalValue } from '../analyze.ts'
 import { unknownNode } from '../errors.ts'
 import { print, quote } from '../print.ts'
 import { call, lambda } from './calls.ts'
-import { binary } from './compare.ts'
+import { binary, chain } from './compare.ts'
 import { dottedKey, field, index, variable } from './fields.ts'
 import {
   isMulti,
@@ -80,6 +80,9 @@ export function infer(c: Checker, node: AstNode): Type {
     }
     case 'BinaryExpression': {
       return binary(c, node)
+    }
+    case 'ComparisonChain': {
+      return chain(c, node)
     }
     case 'UnaryExpression': {
       const right = c.infer(node.right)

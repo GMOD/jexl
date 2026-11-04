@@ -139,6 +139,12 @@ export function assignedNames(
       assignedNames(node.right, names)
       break
     }
+    case 'ComparisonChain': {
+      for (const operand of node.operands) {
+        assignedNames(operand, names)
+      }
+      break
+    }
     case 'ConditionalExpression': {
       assignedNames(node.test, names)
       assignedNames(node.consequent, names)

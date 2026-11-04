@@ -17,6 +17,19 @@ import {
 
 import type { JexlValue } from './types.ts'
 
+/** The operators `a < b < c` chains, as Python chains them. */
+export const ORDERINGS: ReadonlySet<string> = new Set(['<', '<=', '>', '>='])
+
+/** The comparisons that may not sit unparenthesized inside one another. */
+export const COMPARISONS: ReadonlySet<string> = new Set([
+  ...ORDERINGS,
+  '==',
+  '!=',
+  'in',
+  '~',
+  '!~'
+])
+
 export type BinaryOpEval = (left: JexlValue, right: JexlValue) => JexlValue
 
 /**

@@ -288,6 +288,15 @@ export function analyze(
         return []
       }
 
+      case 'ComparisonChain': {
+        const [first, ...rest] = node.operands
+        use(first!, scope)
+        for (const operand of rest) {
+          consume(branch(operand, scope))
+        }
+        return []
+      }
+
       case 'UnaryExpression': {
         use(node.right, scope)
         return []
