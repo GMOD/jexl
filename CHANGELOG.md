@@ -2,7 +2,12 @@
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased]
+## [v8.0.0]
+
+Jexl 8 makes a filter mean what it reads as: a missing value stays missing
+through arithmetic, `lo < x < hi` tests a range, and `-x ^ 2` and `%` bind as
+in mathematics and Python. An expression that does none of these upgrades
+without changes, and `a == b == c`, which is now a syntax error, says so.
 
 ### BREAKING CHANGES
 
