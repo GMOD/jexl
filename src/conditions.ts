@@ -132,16 +132,19 @@ function condition(
       ? { subject, op: operator, value }
       : undefined
   }
-  if (operator === 'in') {
+  if (operator === 'in' || operator === '!in') {
+    const negated = operator === '!in'
     const subject = subjectOf(left, opts)
     if (subject && right.type === 'ArrayLiteral') {
       const values = scalars(right.value)
-      return values?.length ? { subject, op: 'in', value: values } : undefined
+      return values?.length
+        ? { subject, op: negated ? '!in' : 'in', value: values }
+        : undefined
     }
     const key = literalValue(left)
     const container = subjectOf(right, opts)
     return container && typeof key === 'string'
-      ? { subject: container, op: 'has', value: key }
+      ? { subject: container, op: negated ? '!has' : 'has', value: key }
       : undefined
   }
   return undefined
@@ -219,13 +222,13 @@ export function printCondition(c: Condition) {
       return `${literal(c.value)} in ${subject}`
     }
     case '!has': {
-      return `!(${literal(c.value)} in ${subject})`
+      return `${literal(c.value)} !in ${subject}`
     }
     case 'in': {
       return `${subject} in [${c.value.map(literal).join(', ')}]`
     }
     case '!in': {
-      return `!(${subject} in [${c.value.map(literal).join(', ')}])`
+      return `${subject} !in [${c.value.map(literal).join(', ')}]`
     }
     default: {
       return `${subject} ${c.op} ${literal(c.value)}`

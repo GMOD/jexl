@@ -100,6 +100,40 @@ describe('list operands', () => {
     })
   })
 
+  describe('!in', () => {
+    it('holds where in does not', () => {
+      const context = {
+        genes: new Set(['TP53']),
+        INFO: { DP: 3 },
+        FILTER: ['PASS', 'q10']
+      }
+      for (const [expr, expected] of [
+        ["'x' !in ['a', 'b']", true],
+        ["'a' !in ['a', 'b']", false],
+        ['"a" !in "cat"', false],
+        ['missing !in "abc"', true],
+        ['missing !in [1]', true],
+        ["'TP53' !in genes", false],
+        ["'AF' !in INFO", true],
+        ["FILTER !in ['q10']", false],
+        ["['DUP'] !in ['DEL', 'INS']", true]
+      ]) {
+        expect(inst.eval(expr, context), expr).toBe(expected)
+        const negated = expr.replace(' !in ', ' in ')
+        expect(inst.eval(`!(${negated})`, context), expr).toBe(expected)
+      }
+    })
+    it('binds as a comparison', () => {
+      expect(
+        inst.eval("type !in ['gene'] && score > 1", { type: 'mRNA', score: 2 })
+      ).toBe(true)
+      expect(() => inst.compile('a !in b == c')).toThrow(/parenthesize/)
+    })
+    it('leaves !inStock a negated name', () => {
+      expect(inst.eval('!inStock', { inStock: false })).toBe(true)
+    })
+  })
+
   describe('~ and !~ match a regular expression', () => {
     const csq = [
       'T|missense_variant|MODERATE|BRCA1',

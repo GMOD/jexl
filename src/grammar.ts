@@ -26,6 +26,7 @@ export const COMPARISONS: ReadonlySet<string> = new Set([
   '==',
   '!=',
   'in',
+  '!in',
   '~',
   '!~'
 ])
@@ -329,6 +330,11 @@ export const getGrammar = (): Grammar => ({
       type: 'binaryOp',
       precedence: 20,
       eval: isIn
+    },
+    '!in': {
+      type: 'binaryOp',
+      precedence: 20,
+      eval: (left, right) => !isIn(left, right)
     },
     '!': {
       type: 'unaryOp',

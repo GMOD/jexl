@@ -104,6 +104,8 @@ describe('conditions', () => {
     ["feature.INFO.SVTYPE != 'DEL'", ['INFO.SVTYPE != "DEL"']],
     ["feature.INFO.SVTYPE in ['DEL', 'DUP']", ['INFO.SVTYPE in ["DEL","DUP"]']],
     ["!(feature.INFO.SVTYPE in ['DEL'])", ['INFO.SVTYPE !in ["DEL"]']],
+    ["feature.INFO.SVTYPE !in ['DEL']", ['INFO.SVTYPE !in ["DEL"]']],
+    ["'DB' !in feature.INFO", ['INFO !has "DB"']],
     [
       "feature.INFO.CSQ ~ 'missense_variant'",
       ['INFO.CSQ ~ "missense_variant"']
@@ -151,6 +153,8 @@ describe('conditions', () => {
       "!(feature.INFO.SVTYPE in ['DEL'])",
       "feature.INFO.CSQ ~ 'missense_variant'",
       "!('DB' in feature.INFO)",
+      "feature.INFO.SVTYPE !in ['DEL', 'DUP']",
+      "'DB' !in feature.INFO",
       '!feature.INFO.DB',
       "feature.INFO['AF.EAS'] > 0.01",
       "get(feature,'score') >= 400",
@@ -170,6 +174,15 @@ describe('conditions', () => {
         )
       }
     })
+  })
+
+  it('writes a negated membership with !in', () => {
+    expect(fromConditions(read("!(feature.INFO.SVTYPE in ['DEL'])")!)).toBe(
+      "feature.INFO.SVTYPE !in ['DEL']"
+    )
+    expect(fromConditions(read("!('DB' in feature.INFO)")!)).toBe(
+      "'DB' !in feature.INFO"
+    )
   })
 
   it('builds subjects a picker chose', () => {

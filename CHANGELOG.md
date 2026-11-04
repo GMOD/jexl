@@ -4,6 +4,14 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`!in` is the negation of `in`**, as `!~` is of `~`: `type !in ['gene',
+'mRNA']` and `'DB' !in feature.INFO`. `conditions()` reads it as an `!in`
+  or `!has` row, and `printCondition` now writes those rows with it rather
+  than as `!(… in …)`, which it still reads. `!inStock` is still `!` and a
+  name.
+
 ### BREAKING CHANGES
 
 - **Arithmetic on a missing value is missing.** 6.0 made `<`, `>`, `<=` and

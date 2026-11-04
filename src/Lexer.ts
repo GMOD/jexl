@@ -17,9 +17,15 @@ import type { TemplatePart, Token } from './types.ts'
 const identChars = String.raw`\p{L}_$`
 const identPart = String.raw`[${identChars}\p{M}0-9]`
 const identPattern = `[${identChars}]${identPart}*`
-// a word operator such as `in`, but not part of a longer name. \b would do only
-// for ASCII names, and split `in$` or `inà` into the operator and a remainder
-const wholeWord = (word: string) => `(?<!${identPart})${word}(?!${identPart})`
+// a word operator such as `in` or `!in`, but not part of a longer name, so
+// `!inStock` is `!` and a name. \b would do only for ASCII names, and split
+// `in$` or `inà` into the operator and a remainder
+const startsWord = new RegExp(`^${identPart}`, 'u')
+const endsWord = new RegExp(`${identPart}$`, 'u')
+const wordEdges = (element: string, escaped: string) =>
+  (startsWord.test(element) ? `(?<!${identPart})` : '') +
+  escaped +
+  (endsWord.test(element) ? `(?!${identPart})` : '')
 // unsigned: whether a leading '-' negates is decided separately, in getTokens
 const numberPattern = String.raw`(?:(?:[0-9]*\.[0-9]+)|[0-9]+)(?:[eE][+-]?[0-9]+)?`
 
@@ -191,8 +197,10 @@ class Lexer {
   /** A grammar element's text as a regex. A word such as `in` also stops
    * matching inside a longer name. */
   _escapeRegExp(str: string) {
-    const escaped = str.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
-    return identRegex.test(str) ? wholeWord(escaped) : escaped
+    return wordEdges(
+      str,
+      str.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
+    )
   }
 
   _getSplitRegex() {

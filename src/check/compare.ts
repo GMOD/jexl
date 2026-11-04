@@ -256,7 +256,7 @@ export function binary(c: Checker, node: BinaryExpression): Type {
     return BOOLEAN
   }
 
-  if (operator === 'in') {
+  if (operator === 'in' || operator === '!in') {
     if (right.kind === 'list') {
       memberFor(c, right.of, leftItem, node.left, rightNode, node)
     } else if (right.kind === 'number' || right.kind === 'boolean') {
@@ -264,7 +264,7 @@ export function binary(c: Checker, node: BinaryExpression): Type {
         'never-equal',
         'warning',
         node,
-        `in tests a list, text, a Set, a Map or an object's keys, and ${print(rightNode)} is ${describe(right)}`
+        `${operator} tests a list, text, a Set, a Map or an object's keys, and ${print(rightNode)} is ${describe(right)}`
       )
     }
     return BOOLEAN

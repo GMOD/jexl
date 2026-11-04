@@ -96,7 +96,7 @@ jexl.eval('`Price: \\$100`')
 
 - Arithmetic: `+`, `-`, `*`, `/`, `//` (floor division), `%`, `^` (power)
 - Bitwise: `&` (`flags & 2` is 2 where the flag's bit is set)
-- Comparison: `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`
+- Comparison: `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`, `!in`
 - Regular expression match: `~`, `!~` (`name ~ '^BRCA'`; a leading `(?i)`
   ignores case)
 - Logical: `&&`, `||`, `??` (`a ?? b` is `b` only when `a` is `null` or
@@ -110,20 +110,20 @@ jexl.eval('`Price: \\$100`')
 
 From loosest to tightest:
 
-| Operators                                         | Groups        |
-| ------------------------------------------------- | ------------- |
-| `;`                                               |               |
-| `=`, lambdas                                      | right to left |
-| `? :`                                             | right to left |
-| `\|\|`, `??`                                      | left to right |
-| `&&`                                              | left to right |
-| `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`, `~`, `!~` | left to right |
-| `&`                                               | left to right |
-| `+`, `-`                                          | left to right |
-| `*`, `/`, `//`, `%`                               | left to right |
-| prefix `!`, `-`                                   |               |
-| `^`                                               | right to left |
-| `.`, `[]`, calls                                  | left to right |
+| Operators                                                | Groups              |
+| -------------------------------------------------------- | ------------------- |
+| `;`                                                      |                     |
+| `=`, lambdas                                             | right to left       |
+| `? :`                                                    | right to left       |
+| `\|\|`, `??`                                             | left to right       |
+| `&&`                                                     | left to right       |
+| `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`, `!in`, `~`, `!~` | ordering ones chain |
+| `&`                                                      | left to right       |
+| `+`, `-`                                                 | left to right       |
+| `*`, `/`, `//`, `%`                                      | left to right       |
+| prefix `!`, `-`                                          |                     |
+| `^`                                                      | right to left       |
+| `.`, `[]`, calls                                         | left to right       |
 
 As in mathematics and Python, `^` binds tighter than a prefix operator on its
 left, so `-x ^ 2` and `-2 ^ 2` are `-(x ^ 2)` and `-4`, while `2 ^ -1` is 0.5.
@@ -179,7 +179,8 @@ different value.
 
 `in` finds a substring of a string, a member of a list or Set, or a key of an
 object or Map, so a host can hand an expression a gene list loaded from a file
-as a Set: `name in genes`.
+as a Set: `name in genes`. `!in` is its negation, `name !in genes`, as `!~` is
+the negation of `~`.
 
 `sum`, `mean`, `median`, `min` and `max` aggregate a list, reading each value
 through an optional lambda. They skip missing values, and count a boolean as 1

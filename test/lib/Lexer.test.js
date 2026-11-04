@@ -103,6 +103,13 @@ describe('Lexer', () => {
         expect(inst.tokenize(str)[0].type, str).toBe('identifier')
       }
     })
+    it('lexes !in as an operator only where no name goes on after it', () => {
+      expect(inst.getElements('a !in b')).toEqual(['a', ' ', '!in', ' ', 'b'])
+      expect(inst.getElements('a!in[b]')).toEqual(['a', '!in', '[', 'b', ']'])
+      expect(inst.getElements('!inStock')).toEqual(['!', 'inStock'])
+      expect(inst.getElements('!inà')).toEqual(['!', 'inà'])
+      expect(inst.tokenize('a !in b')[1].type).toBe('binaryOp')
+    })
     it('still splits a keyword off punctuation and whitespace', () => {
       expect(inst.getElements('a in[b]')).toEqual([
         'a',
