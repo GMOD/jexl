@@ -2,6 +2,18 @@
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### BREAKING CHANGES
+
+- **Arithmetic on a missing value is missing.** 6.0 made `<`, `>`, `<=` and
+  `>=` false against `null`, as bcftools skips a missing value, but arithmetic
+  still read `null` as 0: `DV / DP < 0.1` held for a sample whose `DV` was
+  missing, and `min(DV / DP)` was 0 where bcftools' `MIN(DV/DP)` skips it. Now
+  `-`, `*`, `/`, `//`, `%`, `^`, `&` and prefix `-` give `undefined` when an
+  operand is `null` or `undefined`, value by value in a list, and so does `+`
+  unless one side is text, which still joins as JavaScript joins it.
+
 ## [v7.2.0]
 
 ### Added

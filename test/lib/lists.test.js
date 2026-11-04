@@ -162,6 +162,28 @@ describe('list operands', () => {
       expect(inst.eval('null < 1')).toBe(false)
       expect(inst.eval('missing >= 0')).toBe(false)
     })
+    it('make arithmetic on them missing rather than read as 0', () => {
+      const context = { DV: null, DP: 10 }
+      expect(inst.eval('DV / DP', context)).toBeUndefined()
+      expect(inst.eval('DV / DP < 0.1', context)).toBe(false)
+      expect(inst.eval('DP - missing')).toBeUndefined()
+      for (const op of ['+', '-', '*', '/', '//', '%', '^', '&']) {
+        expect(inst.eval(`null ${op} 2`)).toBeUndefined()
+        expect(inst.eval(`2 ${op} null`)).toBeUndefined()
+      }
+      expect(inst.eval('-null')).toBeUndefined()
+      expect(inst.eval('(missing & 4) == 0')).toBe(false)
+    })
+    it('stay missing value by value in a list', () => {
+      const context = { DV: [null, 5], DP: [10, 10] }
+      expect(inst.eval('DV / DP', context)).toEqual([undefined, 0.5])
+      expect(inst.eval('-DV', context)).toEqual([undefined, -5])
+      expect(inst.eval('min(DV / DP)', context)).toBe(0.5)
+    })
+    it('still join text as JavaScript does', () => {
+      expect(inst.eval("'CN ' + missing")).toBe('CN undefined')
+      expect(inst.eval("null + 'x'")).toBe('nullx')
+    })
   })
 
   describe('arithmetic applies value by value', () => {

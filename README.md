@@ -156,6 +156,15 @@ jexl.eval('AC / AN', { AC: [2, 4], AN: [10] }) // [0.2, 0.4]
 jexl.eval('DP + 1', { DP: [25] }) // [26]
 ```
 
+A missing value, `null` or `undefined`, stays missing through arithmetic, and
+orders against nothing, so a sample with no `DV` neither passes nor fails
+`DV / DP < 0.1`. `+` with text on either side joins as JavaScript joins it:
+
+```javascript
+jexl.eval('DV / DP', { DV: [null, 5], DP: [10, 10] }) // [undefined, 0.5]
+jexl.eval('min(DV / DP)', { DV: [null, 5], DP: [10, 10] }) // 0.5
+```
+
 `in` finds a substring of a string, a member of a list or Set, or a key of an
 object or Map, so a host can hand an expression a gene list loaded from a file
 as a Set: `name in genes`.

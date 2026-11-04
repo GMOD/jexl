@@ -115,22 +115,30 @@ export interface Grammar {
   variableReader?: VariableReader
 }
 
+// a missing operand makes the result missing, as bcftools skips one; JavaScript
+// alone would read null as 0, making `DV / DP` 0 where DV is missing
+const arithmetic =
+  (fn: (left: number, right: number) => number) =>
+  (left: JexlValue, right: JexlValue) =>
+    left == null || right == null
+      ? undefined
+      : fn(left as number, right as number)
+// text joins as JavaScript joins it, so a label built with `+` still reads
 const plus = (left: JexlValue, right: JexlValue) =>
-  (left as number) + (right as number)
-const minus = (left: JexlValue, right: JexlValue) =>
-  (left as number) - (right as number)
-const times = (left: JexlValue, right: JexlValue) =>
-  (left as number) * (right as number)
-const divide = (left: JexlValue, right: JexlValue) =>
-  (left as number) / (right as number)
-const floorDivide = (left: JexlValue, right: JexlValue) =>
-  Math.floor((left as number) / (right as number))
-const modulo = (left: JexlValue, right: JexlValue) =>
-  (left as number) % (right as number)
-const power = (left: JexlValue, right: JexlValue) =>
-  (left as number) ** (right as number)
-const bitwiseAnd = (left: JexlValue, right: JexlValue) =>
-  (left as number) & (right as number)
+  typeof left === 'string' || typeof right === 'string'
+    ? (left as string) + (right as string)
+    : left == null || right == null
+      ? undefined
+      : (left as number) + (right as number)
+const minus = arithmetic((left, right) => left - right)
+const times = arithmetic((left, right) => left * right)
+const divide = arithmetic((left, right) => left / right)
+const floorDivide = arithmetic((left, right) => Math.floor(left / right))
+const modulo = arithmetic((left, right) => left % right)
+const power = arithmetic((left, right) => left ** right)
+const bitwiseAnd = arithmetic((left, right) => left & right)
+const negative = (right: JexlValue) =>
+  right == null ? undefined : -(right as number)
 const loose = (left: JexlValue, right: JexlValue) => left == right
 // a missing value orders against nothing, as bcftools skips one; JavaScript
 // alone would read null as 0, making [null, 0.2] < 0.05 true
@@ -192,9 +200,7 @@ export const getGrammar = (): Grammar => ({
       eval: (left, right) =>
         isList(left, right) ? pairwise(minus, left, right) : minus(left, right),
       unaryEval: (right) =>
-        Array.isArray(right)
-          ? right.map((value) => -(value as number))
-          : -(right as number)
+        Array.isArray(right) ? right.map(negative) : negative(right)
     },
     '*': {
       type: 'binaryOp',
