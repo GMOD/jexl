@@ -1,7 +1,3 @@
-# Jexl Change Log
-
-This project adheres to [Semantic Versioning](http://semver.org/).
-
 ## [v8.0.0]
 
 Jexl 8 makes a filter mean what it reads as, and reads as JavaScript does:

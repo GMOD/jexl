@@ -5,9 +5,9 @@
 
 import { LAMBDA } from '../collections.ts'
 
-import type { Context } from './context.ts'
 import type { Lambda } from '../collections.ts'
 import type { AstNode, JexlValue } from '../types.ts'
+import type { Context } from './context.ts'
 
 /**
  * Writes a key that a plain assignment would mishandle. Storing to

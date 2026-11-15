@@ -111,7 +111,7 @@ export type GrammarFn = (...args: JexlValue[]) => JexlValue
  * jexl has no type for, so the subject is only promised not to be nullish.
  */
 export type GetMember = (
-  subject: NonNullable<unknown>,
+  subject: object | string | number | boolean | bigint | symbol,
   key: string | number
 ) => unknown
 

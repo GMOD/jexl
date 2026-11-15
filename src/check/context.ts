@@ -3,6 +3,7 @@
  * Copyright 2020 Tom Shawver
  */
 
+import type { AstNode } from '../types.ts'
 import type {
   CheckOptions,
   Diagnostic,
@@ -10,7 +11,6 @@ import type {
   Severity,
   Type
 } from './types.ts'
-import type { AstNode } from '../types.ts'
 
 /** One check in progress: what it reads from and reports into. */
 export interface Checker {

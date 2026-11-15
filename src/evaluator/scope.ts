@@ -6,10 +6,10 @@
 import { LAMBDA } from '../collections.ts'
 import { sandboxed } from './members.ts'
 
-import type { CompiledNode, Context } from './context.ts'
 import type { Lambda } from '../collections.ts'
 import type { Grammar } from '../grammar.ts'
 import type { AstNode, JexlValue } from '../types.ts'
+import type { CompiledNode, Context } from './context.ts'
 
 export function lambda(fn: Lambda) {
   fn[LAMBDA] = true

@@ -4,6 +4,7 @@
   "compilerOptions": {
     // this config only ever runs with --noEmit, so the inherited rootDir of
     // "src" is just a constraint that would reject TypeScript tests under test/
-    "rootDir": "."
+    "rootDir": ".",
+    "types": ["node"]
   }
 }

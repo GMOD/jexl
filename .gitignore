@@ -9,4 +9,5 @@ dist
 esm
 .DS_Store
 .eslintcache
-.claude
+.claude/settings.local.json
+.claude/worktrees/

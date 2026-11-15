@@ -1,7 +1,6 @@
 import eslint from '@eslint/js'
 import { defineConfig } from 'eslint/config'
 import importPlugin from 'eslint-plugin-import-x'
-import eslintPluginUnicorn from 'eslint-plugin-unicorn'
 import tseslint from 'typescript-eslint'
 
 export default defineConfig(
@@ -17,7 +16,9 @@ export default defineConfig(
       // vitest writes JS reporter assets here, so `pnpm coverage && pnpm lint`
       // failed on them. Already ignored by git and prettier.
       'coverage/*',
-      'eslint.config.mjs'
+      'eslint.config.mjs',
+      'vitest.config.ts',
+      '.claude/**'
     ]
   },
   {
@@ -33,7 +34,6 @@ export default defineConfig(
   ...tseslint.configs.stylisticTypeChecked,
   ...tseslint.configs.strictTypeChecked,
   importPlugin.flatConfigs.recommended,
-  eslintPluginUnicorn.configs.recommended,
   {
     rules: {
       'no-empty': 'off',
@@ -62,47 +62,6 @@ export default defineConfig(
         'error',
         { 'ts-expect-error': 'allow-with-description', 'ts-ignore': true }
       ],
-      'unicorn/no-array-sort': 'off',
-      'unicorn/text-encoding-identifier-case': 'off',
-      'unicorn/no-new-array': 'off',
-      'unicorn/no-empty-file': 'off',
-      'unicorn/prefer-type-error': 'off',
-      'unicorn/prefer-modern-math-apis': 'off',
-      'unicorn/prefer-node-protocol': 'off',
-      'unicorn/no-unreadable-array-destructuring': 'off',
-      'unicorn/no-array-callback-reference': 'off',
-      'unicorn/number-literal-case': 'off',
-      'unicorn/prefer-add-event-listener': 'off',
-      'unicorn/prefer-top-level-await': 'off',
-      'unicorn/consistent-function-scoping': 'off',
-      'unicorn/no-await-expression-member': 'off',
-      'unicorn/no-lonely-if': 'off',
-      'unicorn/consistent-destructuring': 'off',
-      'unicorn/prefer-module': 'off',
-      'unicorn/no-useless-undefined': 'off',
-      'unicorn/no-null': 'off',
-      'unicorn/no-nested-ternary': 'off',
-      'unicorn/filename-case': 'off',
-      'unicorn/catch-error-name': 'off',
-      'unicorn/prevent-abbreviations': 'off',
-      'unicorn/prefer-code-point': 'off',
-      'unicorn/numeric-separators-style': 'off',
-      'unicorn/no-array-for-each': 'off',
-      'unicorn/prefer-spread': 'off',
-      'unicorn/explicit-length-check': 'off',
-      'unicorn/prefer-regexp-test': 'off',
-      'unicorn/relative-url-style': 'off',
-      'unicorn/prefer-math-trunc': 'off',
-      'unicorn/prefer-query-selector': 'off',
-      'unicorn/no-negated-condition': 'off',
-      'unicorn/switch-case-braces': 'off',
-      'unicorn/prefer-switch': 'off',
-      'unicorn/better-regex': 'off',
-      'unicorn/no-for-loop': 'off',
-      'unicorn/escape-case': 'off',
-      'unicorn/prefer-number-properties': 'off',
-      'unicorn/no-process-exit': 'off',
-      'unicorn/prefer-at': 'off',
 
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-non-null-assertion': 'off',

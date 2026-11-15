@@ -3,7 +3,7 @@
  * Copyright 2020 Tom Shawver
  */
 
-import { bench, describe } from 'vitest'
+import { bench, describe } from './harness.ts'
 
 import { Jexl } from '../src/index.ts'
 import Parser from '../src/parser/Parser.ts'
@@ -20,9 +20,6 @@ const EXPRESSIONS = [
 ]
 
 const inst = new Jexl()
-const tokenized = EXPRESSIONS.map((expression) =>
-  inst._lexer.tokenize(expression)
-)
 
 describe('parse and compile', () => {
   bench('realistic mix: lex, parse, compile', () => {
@@ -30,11 +27,9 @@ describe('parse and compile', () => {
       inst.createExpression(expression).compile()
     }
   })
-  bench('realistic mix: parse only', () => {
-    for (const tokens of tokenized) {
-      const parser = new Parser(inst._grammar, inst._lexer)
-      parser.addTokens(tokens)
-      parser.complete()
+  bench('realistic mix: lex and parse', () => {
+    for (const expression of EXPRESSIONS) {
+      new Parser(inst._grammar, inst._lexer).parse(expression)
     }
   })
 })

@@ -62,8 +62,7 @@ export interface ObjectLiteral {
 }
 
 export type TemplateLiteralPart =
-  | { type: 'static'; value: string }
-  | { type: 'expression'; value: AstNode }
+  { type: 'static'; value: string } | { type: 'expression'; value: AstNode }
 
 export interface TemplateLiteral {
   type: 'TemplateLiteral'

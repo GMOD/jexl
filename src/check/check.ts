@@ -7,9 +7,9 @@ import { infer } from './infer.ts'
 import { recordOf } from './schema.ts'
 import { UNDEFINED, UNKNOWN } from './types.ts'
 
+import type { AstNode } from '../types.ts'
 import type { Checker } from './context.ts'
 import type { CheckOptions, CheckResult } from './types.ts'
-import type { AstNode } from '../types.ts'
 
 /**
  * Checks an expression against the fields a host's data declares and the

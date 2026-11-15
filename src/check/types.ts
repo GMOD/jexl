@@ -12,12 +12,7 @@ import type { AstNode } from '../types.ts'
  * `G` and `.` do.
  */
 export type Cardinality =
-  | 'one'
-  | 'perAlt'
-  | 'perAllele'
-  | 'perGenotype'
-  | 'many'
-  | number
+  'one' | 'perAlt' | 'perAllele' | 'perGenotype' | 'many' | number
 
 /**
  * One field of a row, as a file header declares it. A `record` field's own
@@ -87,11 +82,7 @@ export interface Signature {
   /** Whether the last param repeats. */
   variadic?: boolean
   returns?:
-    | 'number'
-    | 'string'
-    | 'boolean'
-    | Type
-    | ((args: readonly Type[]) => Type)
+    'number' | 'string' | 'boolean' | Type | ((args: readonly Type[]) => Type)
 }
 
 export type Severity = 'error' | 'warning' | 'info'

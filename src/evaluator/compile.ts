@@ -24,10 +24,10 @@ import {
   unassigned
 } from './scope.ts'
 
-import type { CompiledNode, Context } from './context.ts'
-import type { Scope } from './scope.ts'
 import type { Grammar } from '../grammar.ts'
 import type { AstNode, JexlValue } from '../types.ts'
+import type { CompiledNode, Context } from './context.ts'
+import type { Scope } from './scope.ts'
 
 /**
  * Lowers an expression tree into a tree of closures, resolving each node's type

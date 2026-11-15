@@ -3,7 +3,7 @@
  * Copyright 2020 Tom Shawver
  */
 
-import { bench, describe } from 'vitest'
+import { bench, describe } from './harness.ts'
 
 import { Jexl } from '../src/index.ts'
 import { compileAst } from '../src/evaluator/compile.ts'
