@@ -1,3 +1,25 @@
+## [8.0.1](https://github.com/GMOD/jexl/compare/v8.0.0...v8.0.1) (2026-11-23)
+
+### Bug Fixes
+
+- Min/max on long lists, objects in expr``, inherited function names ([347d241](https://github.com/GMOD/jexl/commit/347d24110bf9e097236ba3769dab540c5af6acad))
+
+### Chores
+
+- Drop persisted checkout credentials and the publish job's cache ([ccba5a6](https://github.com/GMOD/jexl/commit/ccba5a6179720d602884e007625ed65ceda506c6))
+
+### Documentation
+
+- Trusted publishing adds provenance without a --provenance flag ([2febc96](https://github.com/GMOD/jexl/commit/2febc96738398e5c37bf6e30c8a405751642ce3f))
+
+### Features
+
+- Sort by the value a one-parameter lambda gives ([4fc7d58](https://github.com/GMOD/jexl/commit/4fc7d587e5a12acd77bc24310fb77ad23e97dc7b))
+
+### Other Changes
+
+- Move onto the shared GMOD release setup and bump deps ([8f0bc92](https://github.com/GMOD/jexl/commit/8f0bc92921783aa8e2ddb958f5a5033e3977419c))
+
 ## [v8.0.0]
 
 Jexl 8 makes a filter mean what it reads as, and reads as JavaScript does:
