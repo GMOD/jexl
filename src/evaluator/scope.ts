@@ -11,7 +11,11 @@ import type { Grammar } from '../grammar.ts'
 import type { AstNode, JexlValue } from '../types.ts'
 import type { CompiledNode, Context } from './context.ts'
 
-export function lambda(fn: Lambda) {
+// a lambda of one parameter has a length of 1, so `sort` can tell `x => key`
+// from `(a, b) => order`
+export function lambda(arity: number, call: (args: JexlValue[]) => JexlValue) {
+  const fn: Lambda =
+    arity === 1 ? (arg) => call([arg]) : (...args) => call(args)
   fn[LAMBDA] = true
   return fn
 }

@@ -564,6 +564,12 @@ describe('check', () => {
       ).toEqual([])
     })
 
+    it('binds the one param of a sort key to a record', () => {
+      expect(
+        summary('sort(feature.INFO.CSQ, c => c.IMPCT)', WALKS).diagnostics
+      ).toEqual(['unknown-field @ c.IMPCT → c.IMPACT'])
+    })
+
     it('binds the second param of reduce to a record', () => {
       expect(
         summary(

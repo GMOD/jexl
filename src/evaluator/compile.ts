@@ -333,18 +333,19 @@ function compileNode(
         ...scope,
         params: { names: node.params, outer: scope.params }
       })
+      const arity = node.params.length
       if (!scope.params) {
         const frame = scope.locals?.frame
         return (ctx) => {
           const locals = frame?.locals
-          return lambda((...args) =>
+          return lambda(arity, (args) =>
             body(asContext(new LambdaFrame(args, undefined, ctx, locals)))
           )
         }
       }
       return (env) => {
         const outer = asFrame(env)
-        return lambda((...args) =>
+        return lambda(arity, (args) =>
           body(
             asContext(new LambdaFrame(args, outer, outer.context, outer.locals))
           )

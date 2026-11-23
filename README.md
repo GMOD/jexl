@@ -277,6 +277,14 @@ jexl.eval('map(xs, (x, i) => x * i)', { xs: [1, 2, 3] }) // [0, 2, 6]
 jexl.eval('xs.filter(x => x > 1)', { xs: [1, 2, 3] }) // [2, 3]
 ```
 
+`sort` orders ascending, missing values last. A lambda of one parameter gives
+the value to sort by, and one of two compares a pair as `Array.sort` does:
+
+```javascript
+jexl.eval('sort(samples, s => -s.DP)', context) // deepest first
+jexl.eval('sort(xs, (a, b) => b - a)', { xs: [1, 3, 2] }) // [3, 2, 1]
+```
+
 A host function of the same name replaces the built-in one. The built-in ones
 call only a lambda the expression wrote, never a function it reads from the
 context, and `a.constructor` and `a.__proto__` find only an own property, so an

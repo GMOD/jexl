@@ -61,6 +61,28 @@ describe('lambdas', () => {
       ])
       expect(context.xs).toEqual([10, 9, 1])
     })
+    it('sorts by the value a lambda of one parameter gives', () => {
+      const samples = [
+        { id: 'a', DP: 12 },
+        { id: 'b' },
+        { id: 'c', DP: 30 },
+        { id: 'd', DP: 5 }
+      ]
+      expect(
+        inst.eval('map(sort(samples, s => s.DP), s => s.id)', { samples })
+      ).toEqual(['d', 'a', 'c', 'b'])
+      expect(
+        inst.eval('map(sort(samples, s => -s.DP), s => s.id)', { samples })
+      ).toEqual(['c', 'a', 'd', 'b'])
+      expect(inst.eval("sort(['b', 'c', 'a'], s => s)")).toEqual([
+        'a',
+        'b',
+        'c'
+      ])
+    })
+    it('sorts missing values last', () => {
+      expect(inst.eval('sort([3, null, 1, 2])')).toEqual([1, 2, 3, null])
+    })
     it('rejects a callback that is not a lambda', () => {
       expect(() => inst.eval('any(xs, 5)', { xs: [1] })).toThrow(
         /any\(\) expects a lambda/

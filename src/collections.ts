@@ -102,11 +102,24 @@ function sum(values: number[]) {
 }
 
 function ascending(a: JexlValue, b: JexlValue) {
-  return (a as number) < (b as number)
-    ? -1
-    : (a as number) > (b as number)
-      ? 1
-      : 0
+  return a == null
+    ? b == null
+      ? 0
+      : 1
+    : b == null
+      ? -1
+      : (a as number) < (b as number)
+        ? -1
+        : (a as number) > (b as number)
+          ? 1
+          : 0
+}
+
+function sortBy(items: JexlValue[], key: JexlFunction) {
+  return items
+    .map((item) => ({ item, key: key(item) }))
+    .sort((a, b) => ascending(a.key, b.key))
+    .map(({ item }) => item)
 }
 
 /**
@@ -139,8 +152,13 @@ export const collectionFunctions: Record<string, GrammarFn> = {
   filter: (list, fn) => toList(list).filter(callback('filter', fn)),
   find: (list, fn) => toList(list).find(callback('find', fn)),
   sort: (list, fn) => {
-    const compare = fn === undefined ? ascending : callback('sort', fn)
-    return [...toList(list)].sort((a, b) => compare(a, b) as number)
+    const items = [...toList(list)]
+    const by = fn === undefined ? undefined : callback('sort', fn)
+    return by === undefined
+      ? items.sort(ascending)
+      : by.length === 1
+        ? sortBy(items, by)
+        : items.sort((a, b) => by(a, b) as number)
   },
   sum: (list, fn) => sum(numbers('sum', list, fn)),
   mean: (list, fn) => {
