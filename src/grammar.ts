@@ -183,6 +183,11 @@ export const nullish: BinaryOpEvalOnDemand = (left, right) =>
 const equals = (left: JexlValue, right: JexlValue) =>
   isList(left, right) ? anyPair(loose, left, right) : left == right
 
+function withoutPrototype<T>(entries: Record<string, T>) {
+  const table: Record<string, T> = Object.create(null)
+  return Object.assign(table, entries)
+}
+
 export const getGrammar = (): Grammar => ({
   /**
    * A map of all expression elements to their properties. Note that changes
@@ -359,6 +364,6 @@ export const getGrammar = (): Grammar => ({
    * than throw. An error is only appropriate when the function would normally
    * return a value, but cannot due to some other failure.
    */
-  functions: { ...collectionFunctions },
-  signatures: { ...collectionSignatures }
+  functions: withoutPrototype(collectionFunctions),
+  signatures: withoutPrototype(collectionSignatures)
 })

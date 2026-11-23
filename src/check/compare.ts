@@ -179,9 +179,14 @@ export function binary(c: Checker, node: BinaryExpression): Type {
   }
 
   if (ARITHMETIC.has(operator) || ORDER.has(operator)) {
-    for (const [type, typeNode, other] of [
-      [leftItem, node.left, rightItem],
-      [rightItem, rightNode, leftItem]
+    const parsed = (operand: AstNode): AstNode => ({
+      type: 'FunctionCall',
+      name: 'parseFloat',
+      args: [operand]
+    })
+    for (const [type, typeNode, other, fixed] of [
+      [leftItem, node.left, rightItem, { ...node, left: parsed(node.left) }],
+      [rightItem, rightNode, leftItem, { ...node, right: parsed(rightNode) }]
     ] as const) {
       const numericOther = ARITHMETIC.has(operator) || isNumberish(other)
       if (type.kind === 'string' && type.field && numericOther) {
@@ -190,14 +195,7 @@ export function binary(c: Checker, node: BinaryExpression): Type {
           'warning',
           node,
           `${print(typeNode)} is text, so ${operator} converts it to a number, ${ORDER.has(operator) ? 'answering false' : operator === '&' ? 'giving 0' : 'giving NaN'} wherever it is not one`,
-          c.functions?.parseFloat
-            ? [
-                print(node).replace(
-                  print(typeNode),
-                  `parseFloat(${print(typeNode)})`
-                )
-              ]
-            : []
+          c.functions?.parseFloat ? [print(fixed)] : []
         )
       }
     }

@@ -273,6 +273,11 @@ describe('list operands', () => {
       expect(inst.eval('max(3, 9, 2)')).toBe(9)
       expect(inst.eval('max(xs, 7)', context)).toBe(7)
     })
+    it('takes min and max of a list too long to spread into arguments', () => {
+      const xs = Array.from({ length: 300_000 }, (_, i) => i)
+      expect(inst.eval('max(xs)', { xs })).toBe(299_999)
+      expect(inst.eval('min(xs, x => -x)', { xs })).toBe(-299_999)
+    })
     it('reads the values of an object, a Map or a Set', () => {
       const samples = { NA1: { GQ: 99 }, NA2: { GQ: 20 } }
       expect(inst.eval('count(samples, s => s.GQ > 90)', { samples })).toBe(1)

@@ -339,7 +339,7 @@ class Parser {
       case 'literal': {
         return {
           type: 'Literal',
-          value: token.value as string | number | boolean
+          value: token.value as Literal['value']
         }
       }
       case 'identifier': {

@@ -6,6 +6,7 @@
 import Expression from './Expression.ts'
 import Lexer from './Lexer.ts'
 import { getGrammar } from './grammar.ts'
+import { printValue } from './print.ts'
 
 import type { Signature } from './check/types.ts'
 import type {
@@ -256,7 +257,7 @@ class Jexl {
         ) {
           exprStr += String(arg)
         } else if (arg != null) {
-          exprStr += JSON.stringify(arg)
+          exprStr += printValue(arg) ?? ''
         }
       }
     }

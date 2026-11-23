@@ -158,11 +158,15 @@ export const collectionFunctions: Record<string, GrammarFn> = {
   },
   min: (...args) => {
     const values = extremes('min', args)
-    return values.length > 0 ? Math.min(...values) : undefined
+    return values.length > 0
+      ? values.reduce((a, b) => Math.min(a, b))
+      : undefined
   },
   max: (...args) => {
     const values = extremes('max', args)
-    return values.length > 0 ? Math.max(...values) : undefined
+    return values.length > 0
+      ? values.reduce((a, b) => Math.max(a, b))
+      : undefined
   },
   reduce: (list, fn, ...initial) => {
     const items = toList(list)

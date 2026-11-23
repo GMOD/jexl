@@ -85,6 +85,10 @@ describe('Jexl', () => {
       const e = expr`${myVar}5`
       expect(e.eval()).toBe(10)
     })
+    it('writes an object argument as the value it holds', () => {
+      const value = { a: 'x\ny', b: [1, "it's"] }
+      expect(inst.expr`${value}`.eval()).toEqual(value)
+    })
   })
   describe('addFunction', () => {
     it('allows functions to be defined', () => {
@@ -102,6 +106,15 @@ describe('Jexl', () => {
       expect(inst.functionNames()).toContain('ret2')
       expect(inst.functionNames()).toContain('map')
       expect(inst.functionNames()).not.toContain('toString')
+    })
+    it('finds no function an object inherits', () => {
+      expect(inst.getFunction('toString')).toBeUndefined()
+      expect(inst.getFunction('constructor')).toBeUndefined()
+    })
+    it('takes __proto__ as a function name', () => {
+      inst.addFunction('__proto__', () => 1)
+      expect(inst.eval('__proto__()')).toBe(1)
+      expect(inst.getFunction('map')).toBeDefined()
     })
     it('allows functions to be set in batch', () => {
       inst.addFunctions({

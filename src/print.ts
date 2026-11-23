@@ -4,6 +4,7 @@
  */
 
 import { identRegex } from './Lexer.ts'
+import { unknownNode } from './errors.ts'
 import { COMPARISONS, getGrammar } from './grammar.ts'
 
 import type { AstNode, BinaryExpression, Literal } from './types.ts'
@@ -216,7 +217,7 @@ export function print(node: AstNode): string {
       return `${params} => ${within(node.body, ASSIGNMENT)}`
     }
     default: {
-      return '?'
+      return unknownNode(node)
     }
   }
 }

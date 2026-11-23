@@ -640,6 +640,16 @@ describe('check', () => {
         ['string-numeric @ feature.dif > 0.6 → parseFloat(feature.dif) > 0.6']
       ],
       [
+        'the same text attribute on both sides',
+        'feature.dif - feature.dif',
+        gff,
+        'number',
+        [
+          'string-numeric @ feature.dif - feature.dif → parseFloat(feature.dif) - feature.dif',
+          'string-numeric @ feature.dif - feature.dif → feature.dif - parseFloat(feature.dif)'
+        ]
+      ],
+      [
         'DTU tutorial spelling',
         'parseFloat(feature.dif) > 0.6',
         gff,
